@@ -5,8 +5,8 @@ The hero mascot is drawn by mascot-three.tsx, whose shaders write the sRGB
 artwork's *linearised* values straight to the screen. That gives the fur a
 deeper, richer brown than the source PNGs, and it's the look we ship. This
 script bakes the identical transform into the flat images used everywhere
-else (the celebrate pose, the wave still shown before WebGL is ready and under
-reduced motion) so every antelope on the page is the same brown.
+else (the wave still shown before WebGL is ready and under reduced motion, the
+logo mark, the app icons) so every antelope on the page is the same brown.
 
     python3 scripts/mascot-deepen.py
 """
@@ -22,7 +22,6 @@ PUBLIC = ROOT / "public"
 
 SOURCES = [
     "brand-mascot-wave-cartoon.png",
-    "brand-mascot-celebrate-cartoon.png",
 ]
 
 

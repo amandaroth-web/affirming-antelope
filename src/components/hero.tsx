@@ -53,7 +53,6 @@ export function Hero() {
             </motion.p>
             <div className="pt-12">
               <Mascot
-                pose="wave"
                 alt="Affirming Antelope waving hello"
                 width={674}
                 height={978}
