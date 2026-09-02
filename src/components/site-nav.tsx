@@ -11,7 +11,7 @@ export function SiteNav() {
           className="flex min-w-0 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <Image
-            src="/brand-lockup-horizontal.svg?v=2"
+            src="/brand-lockup-horizontal-deep.svg"
             alt="Affirming Antelope"
             width={700}
             height={180}

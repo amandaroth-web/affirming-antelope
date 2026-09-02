@@ -10,11 +10,15 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
+    "@react-three/fiber": "^9.7.0",
+    "@rive-app/react-canvas": "^4.33.0",
+    "@types/three": "^0.185.4",
     "lottie-react": "^3.1.1",
     "motion": "^13.1.1",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
