@@ -22,7 +22,7 @@ export type Effort = "low" | "medium" | "high";
 const DEFAULT_EFFORT: Record<ModelRole, Effort> = {
   rolePlayer: "low",
   observer: "low",
-  coach: "medium",
+  coach: "low", // measured: ~12s -> ~8s on a 6-turn debrief, same copy quality
   drillCoach: "low",
 };
 

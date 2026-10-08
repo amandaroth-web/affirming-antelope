@@ -10,7 +10,7 @@ export * from "./drillCoach";
 /** Intended model per AI role. The API layer may adjust. */
 export const MODEL_ROLES = {
   rolePlayer: "claude-sonnet-5-5",
-  observer: "claude-opus-5-5",
+  observer: "claude-sonnet-5-5",
   coach: "claude-opus-5-5",
   drillCoach: "claude-sonnet-5-5",
 } as const;
