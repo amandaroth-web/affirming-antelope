@@ -1,0 +1,97 @@
+import type { ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { XIcon, color, layout, space } from '@/design';
+import { usePressScale } from '@/motion';
+import Animated from 'react-native-reanimated';
+
+/**
+ * Shared chrome for the practice-loop screens (lesson, drill, role-play):
+ * a close X at top left, an optional centre and trailing slot, and a docked
+ * bottom bar for the one primary action.
+ */
+export function SessionHeader({
+  onClose,
+  closeLabel = 'Close',
+  center,
+  trailing,
+  style,
+}: {
+  onClose: () => void;
+  closeLabel?: string;
+  center?: ReactNode;
+  trailing?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.header, { paddingTop: insets.top + space[2] }, style]}>
+      <View style={styles.headerRow}>
+        <CloseButton onPress={onClose} label={closeLabel} />
+        <View style={styles.center}>{center}</View>
+        <View style={styles.trailing}>{trailing}</View>
+      </View>
+    </View>
+  );
+}
+
+export function CloseButton({ onPress, label = 'Close' }: { onPress: () => void; label?: string }) {
+  const press = usePressScale(0.88);
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
+      style={styles.close}
+    >
+      <Animated.View style={press.style}>
+        <XIcon size={26} weight="bold" color={color.muted} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+/** Bottom bar for the screen's primary action. Sits above the home indicator. */
+export function Dock({ children, style, rule = true }: { children: ReactNode; style?: StyleProp<ViewStyle>; rule?: boolean }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.dock, rule && styles.dockRule, { paddingBottom: Math.max(insets.bottom, space[3]) + space[2] }, style]}>
+      <View style={styles.column}>{children}</View>
+    </View>
+  );
+}
+
+/**
+ * Keyboard handling that works in Expo Go and on web: the screen's column
+ * (scroll + dock) lifts with the keyboard on iOS and Android (edge-to-edge),
+ * and is a plain flex column on web where the browser handles it.
+ */
+export function KeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  if (Platform.OS === 'web') return <View style={[styles.fill, style]}>{children}</View>;
+  return (
+    <KeyboardAvoidingView behavior="padding" style={[styles.fill, style]}>
+      {children}
+    </KeyboardAvoidingView>
+  );
+}
+
+export const sessionStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.white },
+  column: { width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
+  scroll: { paddingHorizontal: layout.gutter },
+});
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  header: { paddingHorizontal: layout.gutter - 10, paddingBottom: space[2], backgroundColor: color.white, zIndex: 3 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: space[2], width: '100%', maxWidth: layout.maxWidth + 20, alignSelf: 'center' },
+  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  trailing: { minWidth: 44, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 10 },
+  dock: { backgroundColor: color.white, paddingHorizontal: layout.gutter, paddingTop: space[3] },
+  dockRule: { borderTopWidth: 2, borderTopColor: color.line },
+  column: { width: '100%', maxWidth: layout.maxWidth, alignSelf: 'center' },
+});

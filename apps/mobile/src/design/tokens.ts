@@ -1,0 +1,133 @@
+import type { TextStyle } from 'react-native';
+
+/**
+ * Design tokens. Mirrors BRAND.md and apps/web/src/app/globals.css.
+ * Never hard-code a colour or radius in a screen; extend these instead.
+ */
+
+export const color = {
+  primary: '#4F6BED', // cobalt: primary actions, active learning states
+  primaryShadow: '#374FBF', // deep cobalt: pressed, bottom shadow of cobalt surfaces
+  primaryTint: '#C9D2FA', // cobalt at ~30% on white: future trail, idle rings
+  navy: '#0A284E',
+  gold: '#E8A638', // ochre: achievement and emphasis only, never a CTA
+  goldShadow: '#B97914',
+  goldTint: '#FBEBCB',
+  soft: '#EEF1FF', // pale periwinkle learning surfaces
+  softDeep: '#E2E7FC', // second periwinkle band (landscape, pressed soft surfaces)
+  line: '#DFE3F2',
+  shadow: '#CBD1E5', // bottom shadow of white surfaces
+  ink: '#3C3C3C',
+  muted: '#687568',
+  faint: '#A3AAC2', // locked glyphs, placeholder text (decorative only, not body copy)
+  white: '#FFFFFF',
+  scrim: 'rgba(10, 40, 78, 0.42)', // navy backdrop for sheets
+} as const;
+
+export type ColorToken = keyof typeof color;
+
+/**
+ * Learner-move families (drill feedback, debrief chart markers, tallies). One
+ * colour + one shape per family so the chart, legend and counters read as one system.
+ * Not red for MI-inconsistent: it's information, not an error.
+ */
+export const moveColor = {
+  question: color.primary,
+  reflection: '#2E8C7E', // teal
+  support: color.navy,
+  inconsistent: '#C46A3F', // warm terracotta
+  neutral: color.faint,
+} as const;
+
+/** Debrief replay chart bands (employee stance). */
+export const zone = {
+  change: color.soft,
+  mixed: color.white,
+  hold: '#F5F1E8', // warm sand
+  holdInk: '#8A7B5C',
+} as const;
+
+/** 4pt grid. Use these, not raw numbers. */
+export const space = {
+  0: 0,
+  1: 4,
+  2: 8,
+  3: 12,
+  4: 16,
+  5: 20,
+  6: 24,
+  7: 32,
+  8: 40,
+  9: 48,
+  10: 64,
+} as const;
+
+export const radius = {
+  sm: 12,
+  md: 16,
+  surface: 20, // standard surface
+  lg: 24,
+  illustration: 32,
+  pill: 999,
+} as const;
+
+export const border = 2;
+
+/** Bottom-shadow depth for raised surfaces. Pressed controls drop to 0. */
+export const depth = {
+  sm: 3,
+  md: 4,
+  lg: 5,
+  xl: 6,
+} as const;
+
+/** Surface tones: face colour, border, and the darker related bottom shadow. */
+export const tone = {
+  primary: { face: color.primary, border: color.primaryShadow, shadow: color.primaryShadow, ink: color.white },
+  surface: { face: color.white, border: color.line, shadow: color.shadow, ink: color.ink },
+  soft: { face: color.soft, border: color.line, shadow: color.shadow, ink: color.ink },
+  gold: { face: color.gold, border: color.goldShadow, shadow: color.goldShadow, ink: color.white },
+  navy: { face: color.navy, border: '#061B36', shadow: '#061B36', ink: color.white },
+  /** White control on a cobalt surface. */
+  onPrimary: { face: color.white, border: color.white, shadow: color.primaryShadow, ink: color.primary },
+  locked: { face: color.soft, border: color.line, shadow: color.line, ink: color.faint },
+} as const;
+
+export type Tone = keyof typeof tone;
+
+export const font = {
+  display: 'Fredoka_700Bold',
+  displaySemi: 'Fredoka_600SemiBold',
+  body: 'Nunito_600SemiBold',
+  bodyBold: 'Nunito_700Bold',
+  bodyHeavy: 'Nunito_800ExtraBold',
+  bodyBlack: 'Nunito_900Black',
+} as const;
+
+/**
+ * Type scale. Fredoka carries display and headings; Nunito carries everything
+ * you read or tap. Sizes are in pt and scale with Dynamic Type (capped in Text).
+ */
+export const type = {
+  hero: { fontFamily: font.display, fontSize: 34, lineHeight: 38, letterSpacing: -0.4 },
+  title: { fontFamily: font.display, fontSize: 28, lineHeight: 32, letterSpacing: -0.3 },
+  heading: { fontFamily: font.display, fontSize: 22, lineHeight: 26, letterSpacing: -0.2 },
+  subheading: { fontFamily: font.displaySemi, fontSize: 18, lineHeight: 22, letterSpacing: -0.1 },
+  body: { fontFamily: font.body, fontSize: 16, lineHeight: 22 },
+  bodyStrong: { fontFamily: font.bodyHeavy, fontSize: 16, lineHeight: 22 },
+  label: { fontFamily: font.bodyHeavy, fontSize: 14, lineHeight: 18 },
+  caption: { fontFamily: font.bodyBold, fontSize: 13, lineHeight: 17 },
+  overline: { fontFamily: font.bodyHeavy, fontSize: 13, lineHeight: 16, letterSpacing: 0.2 },
+  button: { fontFamily: font.bodyBlack, fontSize: 16, lineHeight: 20, letterSpacing: 0.9 },
+  number: { fontFamily: font.display, fontSize: 28, lineHeight: 32, fontVariant: ['tabular-nums'] },
+} satisfies Record<string, TextStyle>;
+
+export type TypeVariant = keyof typeof type;
+
+/** Content insets. Screens use gutter on both sides. */
+export const layout = {
+  gutter: 20,
+  maxWidth: 520,
+  tabBarHeight: 64, // excluding the bottom safe area
+  minHit: 44,
+} as const;
