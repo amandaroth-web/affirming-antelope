@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { Card, Hoofprint, ProgressRing, Text, color, haptic, space } from '@/design';
+import { Card, Hoofprint, ProgressRing, Text, color, haptic, radius, space } from '@/design';
 import { Expand, FADE_MS, RollingNumber, spring, useReduceMotion } from '@/motion';
 import { weekdayIndex } from '@/state/store';
 import { TickSwap, useOnChange } from './motion';
@@ -146,11 +146,11 @@ function DayDot({ label, index, done, isToday, quiet }: { label: string; index: 
         </View>
         <Animated.View style={[styles.track, styles.trackDone, styles.overlay, face]}>
           <Animated.View style={print}>
-            <Hoofprint size={16} tint={color.white} rotate={tilt} />
+            <Hoofprint size={16} tint={color.navy} rotate={tilt} />
           </Animated.View>
         </Animated.View>
       </View>
-      <Text variant="caption" color={isToday ? color.primary : color.muted} style={styles.dayLabel}>
+      <Text variant="captionStrong" color={isToday ? color.primary : color.muted}>
         {label}
       </Text>
     </View>
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   track: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: radius.badge,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: color.white,
@@ -181,5 +181,4 @@ const styles = StyleSheet.create({
   overlay: { position: 'absolute', left: 0, top: 0 },
   trackDone: { backgroundColor: color.gold, borderColor: color.goldShadow, borderBottomWidth: 4 },
   trackToday: { borderColor: color.primary, borderStyle: 'dashed' },
-  dayLabel: { fontFamily: 'Nunito_800ExtraBold' },
 });

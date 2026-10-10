@@ -258,7 +258,7 @@ export function PracticeTicks({
         <View style={[styles.shrink, !compact && styles.centered]}>
           {justHit && phase >= 2 ? (
             <PopIn delay={reduce ? 0 : 60}>
-              <Chip label={compact ? 'Goal hit' : 'Weekly goal hit'} tone="gold" icon={<SealCheckIcon size={14} weight="fill" color="#8A5A0B" />} style={compact ? undefined : styles.chipCentered} />
+              <Chip label={compact ? 'Goal hit' : 'Weekly goal hit'} tone="gold" icon={<SealCheckIcon size={14} weight="fill" color={color.goldInk} />} style={compact ? undefined : styles.chipCentered} />
             </PopIn>
           ) : (
             <Text variant="label">Weekly goal</Text>

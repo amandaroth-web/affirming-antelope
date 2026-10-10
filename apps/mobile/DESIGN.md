@@ -16,17 +16,22 @@ Read this before you build a screen. It covers the system the drill, role-play, 
 | Token | Use |
 |---|---|
 | `color.primary` #4F6BED / `primaryShadow` #374FBF | actions, active states / pressed + bottom shadow of cobalt |
-| `color.gold` #E8A638 / `goldShadow` #B97914 / `goldTint` | achievement only |
+| `color.onPrimaryMuted` #DCE2FF / `onPrimaryBody` #F0F3FF / `onPrimaryChip` #6A82F0 | overlines, body copy and chip faces on a cobalt surface (never `rgba(255,255,255,…)`) |
+| `color.gold` #E8A638 / `goldShadow` #B97914 / `goldTint` | achievement only. Glyphs on ochre are **navy** (`tone.gold.ink`): white on ochre is 2.1:1 |
+| `color.goldInk` #8A5A0B | text and glyphs on `goldTint` or white (a gold chip's label, "Done", the seal check). Never hard-code the hex |
 | `color.soft` #EEF1FF, `softDeep` | learning surfaces, selected states, tracks |
 | `color.line` #DFE3F2 / `shadow` #CBD1E5 | 2pt borders / bottom shadow of white surfaces |
-| `color.ink` / `muted` / `faint` | body text / secondary text / locked glyphs only (not text you need to read) |
+| `color.rule` (= `soft`) | dividers *inside* a card (list rows, the explain rule, the feedback actions). Chrome rules (dock, tab bar, compact bar) keep `line` |
+| `color.ink` / `muted` / `faint` | body text / secondary text (also placeholders: `faint` is 2.2:1) / locked glyphs only (not text you need to read) |
 | `color.navy` | illustration contours, rare dark surfaces (Challenge me card, tooltips) |
 | `space[1..10]` | 4pt grid. Screen gutter is `layout.gutter` (20) |
-| `radius.surface` 20, `radius.illustration` 32, `radius.md` 16 (buttons) | |
+| `radius.surface` 20, `radius.illustration` 32, `radius.md` 16 (buttons), `radius.lg` 24 | |
+| `radius.badge` 12 | step badges, chips, the tab pill, small icon boxes. No other off-scale radii |
+| `depth.sm/md/lg/xl` 3/4/5/6 | bottom shadow: learner bubble, choice tiles, bubbles + standard surfaces + large buttons, hero cards |
 | `moveColor.*` | learner-move families: `question` cobalt, `reflection` teal, `support` navy, `inconsistent` terracotta, `neutral` faint. Always paired with a shape (`MoveMarker`) |
 | `zone.*` | replay-chart bands: `change` (soft), `mixed` (white), `hold` (warm sand) + `holdInk` |
 | `tone.*` | `{face, border, shadow, ink}` sets: primary, surface, soft, gold, navy, onPrimary, locked |
-| `type.*` | hero/title/heading/subheading/number = Fredoka. body/bodyStrong/label/caption/overline/button = Nunito |
+| `type.*` | hero/title/heading/subheading/number = Fredoka. body/bodyStrong/bodySmall/bodySmallStrong/label/caption/captionStrong/overline/tabLabel/button/buttonSentence = Nunito. Never override `fontFamily` or size on a `Text`: add a variant |
 
 ## Components: `src/design` (import from `@/design`)
 
@@ -34,9 +39,17 @@ Read this before you build a screen. It covers the system the drill, role-play, 
 - `PressableSurface`: the 3D press primitive. `tone`, `depth`, `radius`, `haptic` ('press' | 'tick' | false), `pressScale`, `contentStyle` (the face). `Raised` is the static version.
 - `Button`: `variant` primary | secondary | onPrimary (white on a cobalt card), `size` lg/md/sm, optional `icon`. Hit targets are at least 44pt.
 - `Card`: a raised surface. Pass `onPress` to make it pressable. **Never nest a Button inside a pressable Card** (on web that renders a button inside a button).
-- `Chip`: non-interactive label (soft, primary, gold, neutral, locked, onPrimary).
+- `Chip`: non-interactive label (soft, primary, gold, neutral, locked, onPrimary). `icon` leads the label (the drill's level chip carries `LevelPips`).
+- `StepBadge`: the 32pt step marker. `shape` `square` | `pill`; `state` `level` (numeral, Home) | `done` / `target` (navy check on ochre) | `locked` | `letter` (choice) | `selected`. The root is an `Animated.View`: pass an animated `style` for pops; `glyph` replaces the state's glyph; `size` is 32 except dense rows (the assignment check is 24).
+- `Bubble`: the one speech-bubble surface. `side` `learner` (depth.sm, tail bottom right) | `other` (depth.lg, tail bottom left) | `coach` (like other, fills the row); `compact`; `tail={false}` for a card-sized line (the drill's speech card). It's an `Animated.View` that forwards its ref and every animation prop (`layout`, `entering`, `exiting`, animated `style`).
+- `Callout`: soft inset inside a card or sheet (no edge, no depth): optional `glyph` (leading column), `overline` (+ `overlineIcon`), `dense`, `overlay` (decoration pinned to its box, e.g. the "Try next" cue edge). Trainer note, task, possible response and "Try next" are all Callouts.
+- `ListRow`: a pressable row of at least 56pt, ruled with `color.rule`, with the press squeeze built in. `contentStyle` takes an animated style for the row's own give.
+- `TextLink`: quiet cobalt action, 44pt tall (`caret` when it navigates, `entering` to tick its label over). `SectionHeader` actions and the drill's "I'm done" are TextLinks. `SectionHeader` with `action` but no `onAction` shows a muted note instead.
+- `IconButton`: flat icon control with a 44pt hit target and a press squeeze (the close X).
+- `ProgressBar`: segmented track (`fills` 0..1 per segment). It shares `Pip` with `LevelPips`: same track, settle spring and 45ms stagger. It starts settled, so only a change animates; reduced motion cross-fades the changing segment.
+- `Pip`: one track + fill; the shared element of `LevelPips` and `ProgressBar`.
 - `ProgressRing`: SVG ring that springs to `value` (0..1). `onFilled` fires once on landing (pair it with `haptic.success`).
-- `LevelPips`: six-step skill level (`level`, `percent`, `state` progress/complete/locked). The pips fill on a 45ms stagger.
+- `LevelPips`: six-step skill level (`level`, `percent`, `state` progress/complete/locked). The pips fill on a 45ms stagger. Skills are shown as levels, never as percentages (Home's progress rows say "Next: Respond").
 - `BottomSheet`: gesture-driven modal. Drag down or flick to dismiss, drag up to rubber-band, and the backdrop dims with position. `open` / `onClose`. Keep content short (the sheet doesn't scroll).
 - `SegmentedControl`: raised white thumb that slides on a periwinkle track. Segments take a `hint` second line.
 - `Switch`, `Avatar` (deterministic from `persona.avatarSeed`, flat with the navy contour, same seed gives the same person), `Hoofprint` (the streak and track motif; antelopes leave tracks, not flames), `Screen` (safe area plus tab-bar padding).
@@ -183,7 +196,7 @@ Seeded from `DEMO_LEARNER` in `@antelope/core`. Actions for the practice loop:
 ## Practice loop: `src/components/practice-loop` (shared)
 
 - `SessionHeader` (close X + centre + trailing slot, safe top), `Dock` (bottom bar above the home indicator), `KeyboardColumn` (KeyboardAvoidingView `padding` on iOS/Android, plain column on web; Expo Go safe, no keyboard-controller), `sessionStyles`.
-- `Speech`: `LearnerBubble` (cobalt, raised on deep cobalt, tail bottom right), `EmployeeBubble` (white raised, persona `Avatar`, tail bottom left; children replace text, e.g. `TypingDots`), `useBubbleEntrance(side, delay, skip)` (rise + scale from the speaker's side), `SpeechCard` (drill line: avatar pops on `bouncy`, bubble rises after it), `InstructionChip` (the task, target glyph), `CoachSays` (mascot + bubble = coach voice), `PossibleResponse` ("One possible MI-consistent response", never "correct").
+- `Speech` (all built on `Bubble` / `Callout`; animations stay on the callers' wrappers): `LearnerBubble` (cobalt, tail bottom right), `EmployeeBubble` (white raised, persona `Avatar`, tail bottom left; children replace text, e.g. `TypingDots`), `LiveEmployeeBubble` (one element from typing dots to finished line; its `layout` springs the frame), `useBubbleEntrance(side, delay, skip)` (rise + scale from the speaker's side), `SpeechCard` (drill line: avatar pops on `bouncy`, bubble rises after it; a `Bubble` with `tail={false}`, depth 5), `InstructionChip` (the task, target glyph, a `Callout`), `CoachSays` (mascot + `Bubble side="coach"`), `PossibleResponse` ("One possible MI-consistent response", never "correct").
 - `Composer`: multiline, grows to 132pt then scrolls, focus ring cross-fades to cobalt, the send button wakes with a spring pop when there's text. Web: Enter sends, Shift+Enter adds a line.
 - `Thinking`: `Shimmer` (a band sweeping a soft track: working, no fake percent), `RotatingLine` (cross-faded coach lines), `CoachThinking` (listening antelope + both).
 - `Completion`: `usePracticeSnapshot()` captures streak/goal on mount; `PracticeTicks` rolls the streak (`RollingNumber` from → to) and advances the weekly ring (ochre + success haptic when the goal lands); `CompletionMoment` = celebrating antelope (cheers ~3s, then idles) + ticks + actions.
@@ -197,8 +210,8 @@ Physical card stack. The top card follows the finger (rotation from distance + a
 
 ## Drill: `app/drill/[id].tsx`, `components/drill/*`
 
-Header: "Day N" (streak including today) + "N minutes of MI practice today", and a rep counter (hoofprint + rolling count that pops). Setup: skill/level chips, `SpeechCard`, `InstructionChip`.
-- **Choices (level 1):** `ChoiceTiles`. Tap selects (tick haptic, soft face, cobalt edge, letter badge pops); multi-target drills toggle ("Pick all that apply"). CHECK reveals: targets turn ochre with a check that pops, picks resolve first, every tile opens its explanation on a stagger, others dim slightly. Nothing is marked wrong. The coach reacts (hop + success haptic on a hit).
+Header: "Day N" (streak including today) + "N minutes of MI practice today", and a rep counter (hoofprint + rolling count that pops; invisible until the first rep lands, then it fades in as the count rolls to 1). Setup: skill chip, level chip (the six `LevelPips` inside the chip, so "level" reads the same as on Home), `SpeechCard`, `InstructionChip`.
+- **Choices (level 1):** `ChoiceTiles`. Tap selects (tick haptic, soft face, cobalt edge, `StepBadge` letter pops); multi-target drills toggle ("Pick all that apply"). CHECK reveals: targets turn ochre with a check that pops, picks resolve first, every tile opens its explanation on a stagger, others dim slightly. Nothing is marked wrong. The coach reacts (hop + success haptic on a hit).
 - **Free text:** docked `Composer`. Send → your words appear as a cobalt bubble, the antelope listens beside a shimmer (≥1.1s so the moment lands). `FeedbackPanel` rises on `gentle` over a light scrim: chip ("Did what the drill asked" ochre / "Worth another pass" soft), "That's a complex reflection." / "That landed as a closed question.", observation, what worked, possible responses, try next. Errors keep the text: TRY AGAIN or edit.
 - "One more" chains the course activity's drills, then `DAILY_DRILL_ORDER`. The session is recorded once, on the first finished rep (closing early never loses it). "I'm done" → `CompletionMoment`.
 
@@ -213,9 +226,13 @@ Header: "Day N" (streak including today) + "N minutes of MI practice today", and
   - `MovesPanel`: rolling counters per move (dashed when zero) and a reflections-vs-questions balance beam that tips on a soft spring. A balance, not a grade.
   - Strengths, `KeyMoments` (snapping horizontal cards, next one peeks, ochre dot tracks scroll on the UI thread), Try next, What next (try again / practice this skill / harder / easier / new; coach's pick highlighted and docked as the primary), `ReviewSheet` (exactly what's shared and what isn't, optional note, `submitForReview` incl. the debrief, "Sent to Dr. Rosa Lin" with a check pop).
 
+## Home
+
+Today's practice card (chips: skill, then "Drill · ~5 min"), This week, From your trainer (`AssignmentCard`: a `Callout` note, a gold `ProgressBar`, `ListRow`s with a 24pt `StepBadge` check), Your progress (`ProgressList`: a level `StepBadge`, caption "Level 2 · Respond", `LevelPips` and "Next: Elicit"; no percentages), More practice (the focus skill sits in the header's action slot: "Focus this week: Sustain talk").
+
 ## Rules for the practice loop
 
 - AI is never the authority: "One possible MI-consistent response", "That landed as…", no numeric scores, no grades, no red or X marks. `hitTarget` means "did what the drill asked".
 - Self-reflection before AI feedback. The antelope is the coach; the employee is a person with an `Avatar` (the mascot never plays them).
 - Every ending offers a way on (try again / practice this skill / harder / new). Trainer review is opt-in per session and says what's shared.
-- **Don't:** use emoji, purple gradients, blurred shadows, centred-everything layouts, walls of identical cards, scores or percentages for skills (use levels), or leaderboards.
+- **Don't:** hard-code a hex, radius, rgba or `fontFamily` in a screen (add a token or variant), put white glyphs on ochre, use `faint` for text you need to read, use emoji, purple gradients, blurred shadows, centred-everything layouts, walls of identical cards, scores or percentages for skills (use levels), or leaderboards.

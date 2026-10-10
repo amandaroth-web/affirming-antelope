@@ -61,9 +61,9 @@ export function Button({
     >
       <View style={[styles.row, iconPosition === 'leading' && styles.reverse]}>
         <Text
-          variant={caps ? 'button' : 'bodyStrong'}
+          variant={caps ? 'button' : 'buttonSentence'}
           color={ink}
-          style={[caps ? null : styles.sentence, size === 'sm' && styles.small]}
+          style={size === 'sm' ? styles.small : undefined}
           numberOfLines={1}
         >
           {caps ? label.toUpperCase() : label}
@@ -81,6 +81,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reverse: { flexDirection: 'row-reverse' },
   icon: { marginTop: -1 },
-  sentence: { fontFamily: 'Nunito_900Black' },
   small: { fontSize: 14 },
 });

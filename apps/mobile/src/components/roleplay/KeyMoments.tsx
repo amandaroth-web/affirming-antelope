@@ -39,7 +39,7 @@ export function KeyMoments({ moments, turns }: { moments: KeyMoment[]; turns: Tu
           const exchange = turns.filter((t) => t.speaker === 'learner').findIndex((t) => t.id === m.turnId) + 1;
           return (
             <View key={m.turnId + i} style={[styles.card, { width: cardW }]}>
-              <Text variant="overline" color="#8A5A0B">
+              <Text variant="overline" color={color.goldInk}>
                 {exchange > 0 ? `Exchange ${exchange}` : 'Key moment'} · {i + 1} of {moments.length}
               </Text>
               {said ? (

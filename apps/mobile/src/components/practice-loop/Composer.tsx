@@ -124,7 +124,7 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={color.faint}
+          placeholderTextColor={color.muted}
           multiline
           autoFocus={autoFocus}
           onFocus={() => setFocused(true)}
@@ -141,7 +141,7 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
         <PressableSurface
           tone={ready ? 'primary' : 'locked'}
           depth={4}
-          radius={24}
+          radius={radius.lg}
           onPress={send}
           haptic={ready ? 'press' : false}
           accessibilityLabel="Send"

@@ -1,5 +1,5 @@
 import type { DemoAssignmentItem, DemoTrainerAssignment } from '@antelope/core';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -9,8 +9,8 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Avatar, CaretRightIcon, CheckIcon, Chip, Raised, Text, color, radius, space } from '@/design';
-import { FADE_MS, STAGGER, spring, usePressScale, useReduceMotion } from '@/motion';
+import { Avatar, CaretRightIcon, Callout, CheckIcon, Chip, ListRow, ProgressBar, Raised, StepBadge, Text, color, space } from '@/design';
+import { FADE_MS, STAGGER, spring, useReduceMotion } from '@/motion';
 import { useOnChange } from './motion';
 
 const KIND: Record<DemoAssignmentItem['kind'], string> = { drill: 'Short practice', roleplay: 'AI role-play', learn: 'Lesson' };
@@ -53,18 +53,20 @@ export function AssignmentCard({
       </Text>
 
       {assignment.note ? (
-        <View style={styles.note}>
-          <Text variant="body" color={color.ink} style={styles.noteText}>
+        <Callout dense style={styles.note}>
+          <Text variant="bodySmall" color={color.ink}>
             “{assignment.note}”
           </Text>
-        </View>
+        </Callout>
       ) : null}
 
-      <View style={styles.bar} accessible accessibilityLabel={`${done} of ${total} done`}>
-        {assignment.items.map((it, i) => (
-          <Segment key={i} done={it.done} />
-        ))}
-      </View>
+      <ProgressBar
+        fills={assignment.items.map((it) => (it.done ? 1 : 0))}
+        tint={color.gold}
+        delay={SEG_AFTER_CHECK}
+        style={styles.bar}
+        accessibilityLabel={`${done} of ${total} done`}
+      />
 
       <View style={styles.items}>
         {assignment.items.map((it, i) => (
@@ -75,28 +77,8 @@ export function AssignmentCard({
   );
 }
 
-function Segment({ done }: { done: boolean }) {
-  const reduce = useReduceMotion();
-  const p = useSharedValue(done ? 1 : 0);
-  useOnChange(done, (_, next) => {
-    const to = next ? 1 : 0;
-    p.value = reduce ? withTiming(to, { duration: FADE_MS }) : withDelay(next ? SEG_AFTER_CHECK : 0, withSpring(to, spring.settle));
-  });
-  // reduced motion: the fill cross-fades in at full width instead of growing
-  const fill = useAnimatedStyle(() => ({
-    width: `${(reduce ? 1 : Math.max(0, Math.min(1, p.value))) * 100}%` as `${number}%`,
-    opacity: reduce ? p.value : 1,
-  }));
-  return (
-    <View style={styles.seg}>
-      <Animated.View style={[styles.segFill, fill]} />
-    </View>
-  );
-}
-
 function ItemRow({ item, onPress, last }: { item: DemoAssignmentItem; onPress: () => void; last: boolean }) {
   const reduce = useReduceMotion();
-  const press = usePressScale(0.98);
   const c = useSharedValue(item.done ? 1 : 0);
   const settle = useSharedValue(0);
 
@@ -118,77 +100,47 @@ function ItemRow({ item, onPress, last }: { item: DemoAssignmentItem; onPress: (
   const rowStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 - 0.015 * settle.value }] }));
 
   return (
-    <Pressable
+    <ListRow
       onPress={onPress}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
-      accessibilityRole="button"
+      last={last}
       accessibilityLabel={`${item.title}, ${KIND[item.kind]}${item.done ? ', done' : ''}`}
-      style={[!last && styles.itemRule]}
+      contentStyle={rowStyle}
     >
-      <Animated.View style={press.style}>
-        <Animated.View style={[styles.item, rowStyle]}>
-          <View style={styles.check}>
-            <Animated.View style={[styles.checkFill, ring]} />
-            <Animated.View style={tick}>
-              <CheckIcon size={14} weight="bold" color={color.white} />
-            </Animated.View>
-          </View>
-          <View style={styles.itemCopy}>
-            <Text variant="bodyStrong" numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text variant="caption" color={color.muted}>
-              {KIND[item.kind]}
-            </Text>
-          </View>
-          <CaretRightIcon size={18} weight="bold" color={color.faint} />
+      <View style={styles.check}>
+        <StepBadge shape="pill" state="letter" size={CHECK} style={styles.idle} />
+        <Animated.View style={[StyleSheet.absoluteFill, ring]}>
+          <StepBadge shape="pill" state="done" size={CHECK} glyph={null} />
         </Animated.View>
-      </Animated.View>
-    </Pressable>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.tick, tick]}>
+          <CheckIcon size={14} weight="bold" color={color.navy} />
+        </Animated.View>
+      </View>
+      <View style={styles.itemCopy}>
+        <Text variant="bodyStrong" numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text variant="caption" color={color.muted}>
+          {KIND[item.kind]}
+        </Text>
+      </View>
+      <CaretRightIcon size={18} weight="bold" color={color.faint} />
+    </ListRow>
   );
 }
+
+/** The row's check is the dense 24pt StepBadge. */
+const CHECK = 24;
 
 const styles = StyleSheet.create({
   face: { padding: space[5] },
   head: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   from: { flex: 1 },
   title: { marginTop: space[4], marginBottom: 2 },
-  note: {
-    marginTop: space[4],
-    backgroundColor: color.soft,
-    borderRadius: radius.md,
-    borderTopLeftRadius: 4,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
-  noteText: { fontSize: 15, lineHeight: 21 },
-  bar: { flexDirection: 'row', gap: 6, marginTop: space[4] },
-  seg: { flex: 1, height: 8, borderRadius: 4, backgroundColor: color.line, overflow: 'hidden' },
-  segFill: { height: '100%', borderRadius: 4, backgroundColor: color.gold },
+  note: { marginTop: space[4], borderTopLeftRadius: 4 },
+  bar: { marginTop: space[4] },
   items: { marginTop: space[2] },
-  item: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 56, paddingVertical: space[2] },
-  itemRule: { borderBottomWidth: 2, borderBottomColor: color.soft },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: color.shadow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // covers the idle ring exactly (sits over the 2pt border)
-  checkFill: {
-    position: 'absolute',
-    left: -2,
-    top: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    backgroundColor: color.gold,
-    borderColor: color.goldShadow,
-  },
+  check: { width: CHECK, height: CHECK },
+  idle: { borderColor: color.shadow },
+  tick: { alignItems: 'center', justifyContent: 'center' },
   itemCopy: { flex: 1 },
 });

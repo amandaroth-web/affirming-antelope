@@ -18,12 +18,11 @@ export interface ProgressRow {
   label: string;
   skill: SkillId;
   status: 'complete' | 'in-progress' | 'locked';
-  percent: number;
 }
 
 /**
  * Home's "Your progress": the course's core processes. A process is done when
- * its unit is complete; otherwise it shows the skill's progress in its level.
+ * its unit is complete; otherwise it shows the skill's level (no percentages).
  */
 export function useProgressRows(): ProgressRow[] {
   const skills = useLearner((s) => s.skills);
@@ -38,6 +37,6 @@ export function useProgressRows(): ProgressRow[] {
   return rows.map((r) => {
     const p = skills[r.skill];
     const status = r.unitWeek < week ? 'complete' : p.status === 'locked' ? 'locked' : 'in-progress';
-    return { key: r.key, label: r.label, skill: r.skill, status, percent: status === 'complete' ? 100 : p.percent };
+    return { key: r.key, label: r.label, skill: r.skill, status };
   });
 }

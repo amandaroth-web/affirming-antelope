@@ -296,7 +296,7 @@ export function Debrief({
               </View>
               {reviewSent ? (
                 <View style={styles.sentTick}>
-                  <CheckIcon size={14} weight="bold" color={color.white} />
+                  <CheckIcon size={14} weight="bold" color={color.navy} />
                 </View>
               ) : (
                 <CaretRightIcon size={18} weight="bold" color={color.faint} />

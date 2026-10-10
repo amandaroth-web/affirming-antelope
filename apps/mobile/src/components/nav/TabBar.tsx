@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic } from '@/design/haptics';
 import { HouseIcon, PathIcon, TargetIcon, UserIcon } from '@/design/icons';
 import { Text } from '@/design/Text';
-import { border, color, layout } from '@/design/tokens';
+import { border, color, layout, radius } from '@/design/tokens';
 import { FADE_MS } from '@/motion/constants';
 import { spring } from '@/motion/springs';
 import { useReduceMotion } from '@/motion/useMotionPrefs';
@@ -249,12 +249,12 @@ function Tab({
       </View>
       <View>
         <Animated.View style={idleStyle}>
-          <Text variant="caption" color={color.muted} style={styles.label} maxScale={1.15}>
+          <Text variant="tabLabel" color={color.muted} style={styles.label} maxScale={1.15}>
             {label}
           </Text>
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, activeStyle]}>
-          <Text variant="caption" color={color.primary} style={styles.label} maxScale={1.15}>
+          <Text variant="tabLabel" color={color.primary} style={styles.label} maxScale={1.15}>
             {label}
           </Text>
         </Animated.View>
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: PILL_W,
     height: PILL_H,
-    borderRadius: 14,
+    borderRadius: radius.badge,
     backgroundColor: color.soft,
   },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 11, minHeight: layout.minHit },
@@ -296,5 +296,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: color.primary,
   },
-  label: { marginTop: 5, fontFamily: 'Nunito_800ExtraBold', fontSize: 12, lineHeight: 14, textAlign: 'center' },
+  label: { marginTop: 5, textAlign: 'center' },
 });

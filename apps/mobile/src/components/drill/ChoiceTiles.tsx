@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { CheckIcon, PressableSurface, Text, color, haptic, radius, space } from '@/design';
+import { PressableSurface, StepBadge, Text, border, color, haptic, radius, space } from '@/design';
 import { Burst, Enter, Expand, FADE_MS, spring, useReduceMotion, type BurstHandle } from '@/motion';
 
 type Choice = NonNullable<Drill['choices']>[number];
@@ -144,8 +144,6 @@ function Tile({
   const face = target ? color.goldTint : selected ? color.soft : color.white;
   const edge = target ? color.gold : selected ? color.primary : color.line;
   const shadow = target ? color.goldShadow : selected ? color.primary : color.shadow;
-  const badgeBg = target ? color.gold : selected ? color.primary : color.white;
-  const badgeInk = target || selected ? color.white : color.muted;
 
   return (
     <Animated.View style={fade}>
@@ -165,15 +163,7 @@ function Tile({
       >
         <View style={styles.row}>
           <View style={styles.badgeBox}>
-            <Animated.View style={[styles.badge, { backgroundColor: badgeBg, borderColor: target ? color.goldShadow : selected ? color.primaryShadow : color.line }, badge]}>
-              {target ? (
-                <CheckIcon size={16} weight="bold" color={color.white} />
-              ) : (
-                <Text variant="label" color={badgeInk}>
-                  {LETTERS[i]}
-                </Text>
-              )}
-            </Animated.View>
+            <StepBadge shape="pill" state={target ? 'target' : selected ? 'selected' : 'letter'} label={LETTERS[i]} style={badge} />
             {choice.isTarget ? <Burst ref={burst} count={12} power={0.6} scale={0.85} duration={600} spread={80} /> : null}
           </View>
           <Text variant="bodyStrong" style={styles.text}>
@@ -184,7 +174,7 @@ function Tile({
           <Expand delay={120 + order * 110}>
             <View style={styles.explain}>
               {target ? (
-                <Text variant="overline" color="#8A5A0B" style={styles.tag}>
+                <Text variant="overline" color={color.goldInk} style={styles.tag}>
                   {selected ? 'Your pick · what the drill asked for' : 'What the drill asked for'}
                 </Text>
               ) : selected ? (
@@ -192,7 +182,7 @@ function Tile({
                   Your pick
                 </Text>
               ) : null}
-              <Text variant="body" color={color.ink} style={styles.explainText}>
+              <Text variant="bodySmall" color={color.ink}>
                 {choice.explanation}
               </Text>
             </View>
@@ -209,16 +199,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   raise: { zIndex: 2 },
   badgeBox: { width: 32, height: 32 },
-  badge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   text: { flex: 1 },
-  explain: { marginTop: space[3], paddingTop: space[3], borderTopWidth: 2, borderTopColor: 'rgba(10,40,78,0.06)' },
+  explain: { marginTop: space[3], paddingTop: space[3], borderTopWidth: border, borderTopColor: color.rule },
   tag: { marginBottom: 4 },
-  explainText: { fontSize: 15, lineHeight: 21 },
 });

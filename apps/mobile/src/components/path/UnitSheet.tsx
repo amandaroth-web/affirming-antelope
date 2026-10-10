@@ -56,7 +56,7 @@ export function UnitSheet({
     >
       {unit ? (
         <View>
-          <Text variant="overline" color={status === 'complete' ? '#8A5A0B' : color.primaryShadow}>
+          <Text variant="overline" color={status === 'complete' ? color.goldInk : color.primaryShadow}>
             Week {unit.week} · {status === 'complete' ? 'Complete' : 'In progress'} · {total} min
           </Text>
           <Text variant="title" style={styles.title}>
@@ -85,7 +85,7 @@ export function UnitSheet({
                 >
                   <View style={[styles.kind, done && styles.kindDone, isNext && styles.kindNext]}>
                     {done ? (
-                      <CheckIcon size={18} weight="bold" color={color.white} />
+                      <CheckIcon size={18} weight="bold" color={color.navy} />
                     ) : (
                       <Icon size={20} weight="fill" color={isNext ? color.white : color.primary} />
                     )}

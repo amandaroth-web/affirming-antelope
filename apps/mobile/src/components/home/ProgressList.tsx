@@ -1,17 +1,17 @@
-import { getSkillLevel, type DemoSkillProgress, type SkillId } from '@antelope/core';
-import { useState } from 'react';
+import { getSkillLevel, type DemoSkillProgress, type SkillId, type SkillLevelNumber } from '@antelope/core';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
-import { CheckIcon, LevelPips, LockSimpleIcon, Raised, Text, color, space } from '@/design';
-import { FADE_MS, RollingNumber, spring, useReduceMotion } from '@/motion';
+import { Easing, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { LevelPips, Raised, StepBadge, Text, border, color, space } from '@/design';
+import { FADE_MS, spring, useReduceMotion } from '@/motion';
 import type { ProgressRow } from '@/state/selectors';
 import { useLearner } from '@/state/store';
 import { TickSwap, useOnChange } from './motion';
 
 /**
  * The course's core processes with their level state. One card, ruled rows.
- * On change: pips spring to the new fill, the percent rolls, a new level or a
- * completed process pops its badge and ticks its caption over. Rows never change height.
+ * On change: pips spring to the new fill, a new level or a completed process
+ * pops its badge and ticks its caption over. Rows never change height. No
+ * percentages: skills are shown as levels.
  */
 export function ProgressList({ rows, skills: skillsProp }: { rows: ProgressRow[]; skills?: Record<SkillId, DemoSkillProgress> }) {
   const live = useLearner((s) => s.skills);
@@ -30,7 +30,6 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
   const level = getSkillLevel(p.level);
   const locked = r.status === 'locked';
   const complete = r.status === 'complete';
-  const [percentAtMount] = useState(r.percent);
 
   // badge content changed (new level, unlocked, completed): it pops like a stamp
   const pop = useSharedValue(1);
@@ -42,6 +41,8 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
   const badgeStyle = useAnimatedStyle(() => (reduce ? { opacity: pop.value } : { transform: [{ scale: pop.value }] }));
 
   const caption = locked ? 'Opens in week 7' : `Level ${p.level} · ${level.name}`;
+  // what the pips are heading for; the last level has no next
+  const next = !locked && !complete && p.level < 6 ? `Next: ${getSkillLevel((p.level + 1) as SkillLevelNumber).name}` : null;
 
   return (
     <View
@@ -52,20 +53,10 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
           ? `${r.label}, locked`
           : complete
             ? `${r.label}, complete, level ${p.level} ${level.name}`
-            : `${r.label}, ${r.percent}% through level ${p.level} ${level.name}`
+            : `${r.label}, level ${p.level} ${level.name}${next ? `, ${next.toLowerCase()}` : ''}`
       }
     >
-      <Animated.View style={[styles.badge, complete && styles.badgeDone, locked && styles.badgeLocked, badgeStyle]}>
-        {complete ? (
-          <CheckIcon size={16} weight="bold" color={color.white} />
-        ) : locked ? (
-          <LockSimpleIcon size={15} weight="bold" color={color.faint} />
-        ) : (
-          <Text variant="caption" color={color.primary} style={styles.badgeNum} maxScale={1}>
-            {p.level}
-          </Text>
-        )}
-      </Animated.View>
+      <StepBadge shape="square" state={complete ? 'done' : locked ? 'locked' : 'level'} label={p.level} style={badgeStyle} />
       <View style={styles.copy}>
         <Text variant="bodyStrong" color={locked ? color.muted : color.ink}>
           {r.label}
@@ -79,7 +70,7 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
       <View style={styles.right}>
         <LevelPips
           level={p.level}
-          percent={complete ? 100 : r.percent}
+          percent={complete ? 100 : p.percent}
           state={locked ? 'locked' : complete ? 'complete' : 'progress'}
           pipWidth={10}
           height={7}
@@ -87,24 +78,16 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
           delay={300 + i * 60}
         />
         {complete || locked ? (
-          <Text variant="caption" color={complete ? '#8A5A0B' : color.faint} style={styles.status}>
+          <Text variant="captionStrong" color={complete ? color.goldInk : color.faint}>
             {complete ? 'Done' : 'Locked'}
           </Text>
-        ) : (
-          <View style={styles.percent}>
-            <RollingNumber
-              value={r.percent}
-              from={percentAtMount}
-              variant="caption"
-              color={color.primaryShadow}
-              delay={300 + i * 60}
-              style={styles.status}
-            />
-            <Text variant="caption" color={color.primaryShadow} style={styles.status}>
-              %
+        ) : next ? (
+          <TickSwap value={next}>
+            <Text variant="captionStrong" color={color.primaryShadow}>
+              {next}
             </Text>
-          </View>
-        )}
+          </TickSwap>
+        ) : null}
       </View>
     </View>
   );
@@ -113,22 +96,7 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
 const styles = StyleSheet.create({
   face: { paddingHorizontal: space[4], paddingVertical: space[1] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: space[3] + 2 },
-  rule: { borderBottomWidth: 2, borderBottomColor: color.soft },
-  badge: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.soft,
-    borderWidth: 2,
-    borderColor: color.primaryTint,
-  },
-  badgeDone: { backgroundColor: color.gold, borderColor: color.goldShadow },
-  badgeLocked: { backgroundColor: color.white, borderColor: color.line },
-  badgeNum: { fontFamily: 'Fredoka_700Bold', fontSize: 15 },
+  rule: { borderBottomWidth: border, borderBottomColor: color.rule },
   copy: { flex: 1 },
   right: { alignItems: 'flex-end', gap: 6 },
-  percent: { flexDirection: 'row' },
-  status: { fontFamily: 'Nunito_800ExtraBold' },
 });

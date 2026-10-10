@@ -1,10 +1,7 @@
-import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import { getSkillLevel, type SkillLevelNumber } from '@antelope/core';
 import { STAGGER } from '@/motion/constants';
-import { spring } from '@/motion/springs';
-import { useReduceMotion } from '@/motion/useMotionPrefs';
+import { Pip } from './Pip';
 import { color } from './tokens';
 
 export interface LevelPipsProps {
@@ -40,42 +37,19 @@ export function LevelPips({
       style={[styles.row, { gap }]}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={state === 'locked' ? 'Locked' : `Level ${level} of 6, ${name}, ${percent}% through`}
+      accessibilityLabel={state === 'locked' ? 'Locked' : `Level ${level} of 6, ${name}`}
     >
       {Array.from({ length: 6 }, (_, i) => {
         const n = i + 1;
         const fill = state === 'locked' ? 0 : n < level ? 1 : n === level ? percent / 100 : 0;
         return (
-          <Pip
-            key={i}
-            fill={fill}
-            tint={tint}
-            width={pipWidth}
-            height={height}
-            delay={delay + i * STAGGER}
-          />
+          <Pip key={i} fill={fill} tint={tint} width={pipWidth} height={height} delay={delay + i * STAGGER} />
         );
       })}
     </View>
   );
 }
 
-function Pip({ fill, tint, width, height, delay }: { fill: number; tint: string; width: number; height: number; delay: number }) {
-  const reduce = useReduceMotion();
-  const v = useSharedValue(0);
-  useEffect(() => {
-    v.value = reduce ? withTiming(fill, { duration: 0 }) : withDelay(delay, withSpring(fill, spring.settle));
-  }, [fill, reduce, delay, v]);
-  const style = useAnimatedStyle(() => ({ width: Math.max(0, v.value) * width }));
-  return (
-    <View style={[styles.pip, { width, height, borderRadius: height / 2 }]}>
-      <Animated.View style={[styles.fill, { backgroundColor: tint, borderRadius: height / 2 }, style]} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
-  pip: { backgroundColor: color.line, overflow: 'hidden' },
-  fill: { height: '100%' },
 });

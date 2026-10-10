@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { CaretRightIcon, Text, color, space } from '@/design';
+import { StyleSheet, View } from 'react-native';
+import { Text, TextLink, color, space } from '@/design';
 import { useTickSwap } from '@/motion';
 
 /**
- * Section title with an optional quiet link on the right. When the link text
- * changes ("Week 3 of 12" → "Week 4 of 12") it ticks over; never on mount.
+ * Section title with an optional action slot on the right. With `onAction` the
+ * slot is a quiet link; without it, a muted note ("Focus this week: Sustain
+ * talk"). When the text changes ("Week 3 of 12" → "Week 4 of 12") it ticks
+ * over; never on mount.
  */
 export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   const tick = useTickSwap();
@@ -20,14 +21,11 @@ export function SectionHeader({ title, action, onAction }: { title: string; acti
         {title}
       </Text>
       {action && onAction ? (
-        <Pressable onPress={onAction} hitSlop={10} accessibilityRole="link" accessibilityLabel={action} style={styles.link}>
-          <Animated.View key={action} entering={mounted.current ? tick.entering : undefined}>
-            <Text variant="label" color={color.primary}>
-              {action}
-            </Text>
-          </Animated.View>
-          <CaretRightIcon size={14} weight="bold" color={color.primary} />
-        </Pressable>
+        <TextLink label={action} onPress={onAction} caret hitSlop={10} role="link" entering={mounted.current ? tick.entering : undefined} />
+      ) : action ? (
+        <Text variant="caption" color={color.muted} align="right" style={styles.note}>
+          {action}
+        </Text>
       ) : null}
     </View>
   );
@@ -41,5 +39,5 @@ const styles = StyleSheet.create({
     marginTop: space[8],
     marginBottom: space[3],
   },
-  link: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 },
+  note: { flexShrink: 1, marginLeft: space[3] },
 });

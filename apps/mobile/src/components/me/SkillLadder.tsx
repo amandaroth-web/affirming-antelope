@@ -60,7 +60,7 @@ export function SkillLadder({ skill, progress, last }: { skill: Skill; progress:
                 <View style={styles.rail}>
                   <View style={[styles.dot, done && styles.dotDone, now && styles.dotNow]}>
                     {done ? (
-                      <CheckIcon size={12} weight="bold" color={color.white} />
+                      <CheckIcon size={12} weight="bold" color={color.navy} />
                     ) : (
                       <Text variant="caption" color={now ? color.white : color.muted} style={styles.dotNum} maxScale={1}>
                         {l.level}
@@ -72,7 +72,7 @@ export function SkillLadder({ skill, progress, last }: { skill: Skill; progress:
                 <View style={styles.rungCopy}>
                   <Text variant="label" color={now ? color.primaryShadow : done ? color.ink : color.muted}>
                     {l.name}
-                    {now ? `  ·  ${progress.percent}%` : ''}
+                    {now ? "  ·  You're here" : ''}
                   </Text>
                   <Text variant="caption" color={now ? color.ink : color.muted}>
                     {skillLevelQuestion(skill.id, l.level)}

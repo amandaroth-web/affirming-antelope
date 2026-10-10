@@ -3,8 +3,8 @@
 :root {
   color-scheme: light;
   --background: #ffffff;
-  --foreground: #3c3c3c;
-  --muted: #687568;
+  --foreground: #2e3448;
+  --muted: #68708c;
   --primary: #4f6bed;
   --primary-shadow: #374fbf;
   --primary-ink: #ffffff;
@@ -15,7 +15,46 @@
   --soft: #eef1ff;
   --line: #dfe3f2;
   --shadow: #cbd1e5;
-  --ink: #3c3c3c;
+  --ink: #2e3448;
+
+  /* Mobile parity: apps/mobile/src/design/tokens.ts is the source of truth. */
+  --primary-tint: #c9d2fa;
+  --gold-tint: #fbebcb;
+  --gold-ink: #8a5a0b;
+  --soft-deep: #e2e7fc;
+  --rule: #eef1ff; /* in-card dividers; chrome rules stay var(--line) */
+  --faint: #a3aac2;
+  --scrim: rgba(10, 40, 78, 0.42);
+  --on-primary-muted: #dce2ff;
+  --on-primary-body: #f0f3ff;
+  --on-primary-chip: #6a82f0;
+
+  /* Learner-move families (drill feedback, debrief chart) */
+  --move-question: #4f6bed;
+  --move-reflection: #2e8c7e;
+  --move-support: #0a284e;
+  --move-inconsistent: #c46a3f;
+  --move-neutral: #a3aac2;
+
+  /* Debrief replay chart bands */
+  --zone-change: #eef1ff;
+  --zone-mixed: #ffffff;
+  --zone-hold: #f5f1e8;
+  --zone-hold-ink: #8a7b5c;
+
+  /* Shape and depth. Not in @theme, so Tailwind's rounded-* utilities are untouched. */
+  --radius-sm: 12px;
+  --radius-badge: 12px;
+  --radius-md: 16px;
+  --radius-surface: 20px;
+  --radius-lg: 24px;
+  --radius-illustration: 32px;
+  --radius-pill: 999px;
+  --border: 2px;
+  --depth-sm: 3px;
+  --depth-md: 4px;
+  --depth-lg: 5px;
+  --depth-xl: 6px;
 }
 
 @theme inline {
@@ -33,6 +72,11 @@
   --color-line: var(--line);
   --color-shadow: var(--shadow);
   --color-ink: var(--ink);
+  --color-primary-tint: var(--primary-tint);
+  --color-gold-tint: var(--gold-tint);
+  --color-gold-ink: var(--gold-ink);
+  --color-soft-deep: var(--soft-deep);
+  --color-faint: var(--faint);
   --font-sans: var(--font-nunito);
   --font-display: var(--font-fredoka);
 }

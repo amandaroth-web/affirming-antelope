@@ -557,7 +557,7 @@ export default function PathScreen() {
                 >
                   <Text
                     variant="overline"
-                    color={status === 'complete' ? '#8A5A0B' : status === 'current' ? color.primaryShadow : color.muted}
+                    color={status === 'complete' ? color.goldInk : status === 'current' ? color.primaryShadow : color.muted}
                   >
                     Week {u.week}
                   </Text>

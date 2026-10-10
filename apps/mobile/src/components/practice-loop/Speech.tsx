@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Mascot, type MascotHandle, type MascotMood, type MascotPose } from '@/components/mascot';
-import { Avatar, QuotesIcon, TargetIcon, Text, border, color, radius, space } from '@/design';
+import { Avatar, Bubble, Callout, QuotesIcon, TargetIcon, Text, border, color, space } from '@/design';
 import { FADE_MS, spring, useFades, useListLayout, useReduceMotion } from '@/motion';
 import { takeLaunchPad } from './Composer';
 import { HeroTarget, useSession } from './SessionSurface';
@@ -97,11 +97,11 @@ export function useComposerLaunch(skip = false) {
 export function LearnerBubble({ text, compact, style }: { text: string; compact?: boolean; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[styles.learnerWrap, style]}>
-      <View style={[styles.learner, compact && styles.compact]}>
+      <Bubble side="learner" compact={compact}>
         <Text variant="body" color={color.white} style={compact ? styles.compactText : undefined} selectable>
           {text}
         </Text>
-      </View>
+      </Bubble>
     </View>
   );
 }
@@ -127,13 +127,13 @@ export function EmployeeBubble({
   return (
     <View style={[styles.employeeRow, style]}>
       {showAvatar ? <Avatar seed={seed} size={compact ? 26 : 34} accessibilityLabel={name} /> : null}
-      <View style={[styles.employee, compact && styles.compact]}>
+      <Bubble side="other" compact={compact}>
         {children ?? (
           <Text variant="body" style={compact ? styles.compactText : undefined} selectable>
             {text}
           </Text>
         )}
-      </View>
+      </Bubble>
     </View>
   );
 }
@@ -150,7 +150,7 @@ export function LiveEmployeeBubble({ text, typing, seed, name }: { text: string;
   return (
     <View style={styles.employeeRow}>
       <Avatar seed={seed} size={34} accessibilityLabel={name} />
-      <Animated.View layout={layout} style={[styles.employee, styles.live]}>
+      <Bubble side="other" layout={layout} style={styles.live}>
         {typing ? (
           <Animated.View key="dots" exiting={fades.exiting}>
             <TypingDots />
@@ -162,7 +162,7 @@ export function LiveEmployeeBubble({ text, typing, seed, name }: { text: string;
             </Text>
           </Animated.View>
         )}
-      </Animated.View>
+      </Bubble>
     </View>
   );
 }
@@ -240,11 +240,11 @@ export function SpeechCard({ speaker, seed, line, context }: { speaker: string; 
       <Animated.View style={[{ transformOrigin: '12% 0%' }, bubbleStyle]}>
         <HeroTarget name="cta" insetTop={8} style={styles.speechWrap}>
           <View style={styles.speechTail} />
-          <View style={styles.speech}>
+          <Bubble side="other" tail={false} style={styles.speech}>
             <Text variant="subheading" style={[styles.speechText, line.length > 120 && styles.speechLong]} maxScale={1.5}>
               “{line}”
             </Text>
-          </View>
+          </Bubble>
         </HeroTarget>
       </Animated.View>
     </View>
@@ -254,14 +254,22 @@ export function SpeechCard({ speaker, seed, line, context }: { speaker: string; 
 /** What to try. Long instructions wrap; the target glyph anchors it as "the task". */
 export function InstructionChip({ text, style }: { text: string; style?: StyleProp<ViewStyle> }) {
   return (
-    <View style={[styles.instruction, style]} accessibilityRole="text" accessibilityLabel={`Task: ${text}`}>
-      <View style={styles.instructionIcon}>
-        <TargetIcon size={16} weight="bold" color={color.white} />
-      </View>
-      <Text variant="label" color={color.primaryShadow} style={styles.instructionText}>
+    <Callout
+      dense
+      align="center"
+      glyph={
+        <View style={styles.instructionIcon}>
+          <TargetIcon size={16} weight="bold" color={color.white} />
+        </View>
+      }
+      style={style}
+      accessibilityRole="text"
+      accessibilityLabel={`Task: ${text}`}
+    >
+      <Text variant="bodySmallStrong" color={color.primaryShadow}>
         {text}
       </Text>
-    </View>
+    </Callout>
   );
 }
 
@@ -283,10 +291,9 @@ export const CoachSays = forwardRef<
   return (
     <View style={[styles.coach, style]}>
       <Mascot ref={ref} pose={pose} mood={mood} size={size} paused={paused} accessibilityLabel="The antelope coach" />
-      <View style={styles.coachBubble}>
-        <View style={styles.coachTail} />
+      <Bubble side="coach" style={styles.coachBubble}>
         {typeof children === 'string' ? <Text variant="body">{children}</Text> : children}
-      </View>
+      </Bubble>
     </View>
   );
 });
@@ -297,48 +304,22 @@ export const CoachSays = forwardRef<
 
 export function PossibleResponse({ text, index, style }: { text: string; index?: number; style?: StyleProp<ViewStyle> }) {
   return (
-    <View style={[styles.possible, style]}>
-      <View style={styles.possibleHead}>
-        <QuotesIcon size={16} weight="fill" color={color.primary} />
-        <Text variant="overline" color={color.primaryShadow}>
-          {index !== undefined && index > 0 ? 'Another MI-consistent option' : 'One possible MI-consistent response'}
-        </Text>
-      </View>
+    <Callout
+      overline={index !== undefined && index > 0 ? 'Another MI-consistent option' : 'One possible MI-consistent response'}
+      overlineIcon={<QuotesIcon size={16} weight="fill" color={color.primary} />}
+      style={style}
+    >
       <Text variant="body" selectable>
         {text}
       </Text>
-    </View>
+    </Callout>
   );
 }
 
 const styles = StyleSheet.create({
   learnerWrap: { alignItems: 'flex-end' },
-  learner: {
-    maxWidth: '86%',
-    backgroundColor: color.primary,
-    borderRadius: radius.surface,
-    borderBottomRightRadius: 6,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    borderBottomWidth: 3,
-    borderBottomColor: color.primaryShadow,
-  },
   employeeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
-  employee: {
-    maxWidth: '82%',
-    flexShrink: 1,
-    backgroundColor: color.white,
-    borderRadius: radius.surface,
-    borderBottomLeftRadius: 6,
-    borderWidth: border,
-    borderColor: color.line,
-    borderBottomWidth: 5,
-    borderBottomColor: color.shadow,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
   live: { overflow: 'hidden' },
-  compact: { paddingHorizontal: space[3], paddingVertical: space[2], borderRadius: radius.md },
   compactText: { fontSize: 14, lineHeight: 19 },
   dots: { flexDirection: 'row', gap: 6, paddingVertical: 7, paddingHorizontal: 2 },
   dot: { width: 8, height: 8, borderRadius: 4 },
@@ -359,44 +340,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 4,
     zIndex: 2,
   },
-  speech: {
-    backgroundColor: color.white,
-    borderRadius: radius.surface,
-    borderWidth: border,
-    borderColor: color.line,
-    borderBottomWidth: 6,
-    borderBottomColor: color.shadow,
-    padding: space[5],
-  },
+  // a card-sized bubble: full width, roomier padding, no corner tail
+  speech: { maxWidth: '100%', flexShrink: 0, paddingHorizontal: space[5], paddingVertical: space[5] },
   speechText: { fontSize: 20, lineHeight: 27 },
   speechLong: { fontSize: 17, lineHeight: 24 },
-  instruction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    backgroundColor: color.soft,
-    borderRadius: radius.md,
-    paddingVertical: space[3],
-    paddingLeft: space[3],
-    paddingRight: space[4],
-  },
   instructionIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: color.primary, alignItems: 'center', justifyContent: 'center' },
-  instructionText: { flex: 1, fontSize: 15, lineHeight: 20 },
   coach: { flexDirection: 'row', alignItems: 'flex-end', gap: space[3] },
-  coachBubble: {
-    flex: 1,
-    backgroundColor: color.white,
-    borderRadius: radius.surface,
-    borderBottomLeftRadius: 6,
-    borderWidth: border,
-    borderColor: color.line,
-    borderBottomWidth: 5,
-    borderBottomColor: color.shadow,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    marginBottom: 6,
-  },
-  coachTail: {},
-  possible: { backgroundColor: color.soft, borderRadius: radius.md, padding: space[4], gap: space[2] },
-  possibleHead: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  coachBubble: { marginBottom: 6 },
 });

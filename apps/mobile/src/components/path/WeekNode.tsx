@@ -193,7 +193,7 @@ export const WeekNode = forwardRef<
         {status !== 'locked' && (
           <Animated.View style={glyphStyle}>
             {status === 'complete' ? (
-              <CheckIcon size={32} weight="bold" color={color.white} />
+              <CheckIcon size={32} weight="bold" color={color.navy} />
             ) : (
               <Text variant="title" color={color.white} maxScale={1} style={styles.num}>
                 {week}

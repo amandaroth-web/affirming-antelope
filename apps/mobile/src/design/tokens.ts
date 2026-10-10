@@ -5,6 +5,8 @@ import type { TextStyle } from 'react-native';
  * Never hard-code a colour or radius in a screen; extend these instead.
  */
 
+const SOFT = '#EEF1FF';
+
 export const color = {
   primary: '#4F6BED', // cobalt: primary actions, active learning states
   primaryShadow: '#374FBF', // deep cobalt: pressed, bottom shadow of cobalt surfaces
@@ -13,15 +15,21 @@ export const color = {
   gold: '#E8A638', // ochre: achievement and emphasis only, never a CTA
   goldShadow: '#B97914',
   goldTint: '#FBEBCB',
-  soft: '#EEF1FF', // pale periwinkle learning surfaces
+  goldInk: '#8A5A0B', // text and glyphs on goldTint / white (5.7:1); never on ochre
+  soft: SOFT, // pale periwinkle learning surfaces
+  rule: SOFT, // in-card dividers (chrome rules, e.g. dock and tab bar, stay `line`)
   softDeep: '#E2E7FC', // second periwinkle band (landscape, pressed soft surfaces)
   line: '#DFE3F2',
   shadow: '#CBD1E5', // bottom shadow of white surfaces
-  ink: '#3C3C3C',
-  muted: '#687568',
+  ink: '#2E3448',
+  muted: '#68708C',
   faint: '#A3AAC2', // locked glyphs, placeholder text (decorative only, not body copy)
   white: '#FFFFFF',
   scrim: 'rgba(10, 40, 78, 0.42)', // navy backdrop for sheets
+  // text and chip faces on a cobalt surface (these were white at 82% / 90% / 16%)
+  onPrimaryMuted: '#DCE2FF', // overlines on cobalt
+  onPrimaryBody: '#F0F3FF', // body copy on cobalt
+  onPrimaryChip: '#6A82F0', // chip face on cobalt
 } as const;
 
 export type ColorToken = keyof typeof color;
@@ -64,6 +72,7 @@ export const space = {
 
 export const radius = {
   sm: 12,
+  badge: 12, // step badges, small icon boxes, chips, tab pill
   md: 16,
   surface: 20, // standard surface
   lg: 24,
@@ -86,7 +95,7 @@ export const tone = {
   primary: { face: color.primary, border: color.primaryShadow, shadow: color.primaryShadow, ink: color.white },
   surface: { face: color.white, border: color.line, shadow: color.shadow, ink: color.ink },
   soft: { face: color.soft, border: color.line, shadow: color.shadow, ink: color.ink },
-  gold: { face: color.gold, border: color.goldShadow, shadow: color.goldShadow, ink: color.white },
+  gold: { face: color.gold, border: color.goldShadow, shadow: color.goldShadow, ink: color.navy }, // navy: white on ochre is 2.1:1
   navy: { face: color.navy, border: '#061B36', shadow: '#061B36', ink: color.white },
   /** White control on a cobalt surface. */
   onPrimary: { face: color.white, border: color.white, shadow: color.primaryShadow, ink: color.primary },
@@ -116,9 +125,14 @@ export const type = {
   body: { fontFamily: font.body, fontSize: 16, lineHeight: 22 },
   bodyStrong: { fontFamily: font.bodyHeavy, fontSize: 16, lineHeight: 22 },
   label: { fontFamily: font.bodyHeavy, fontSize: 14, lineHeight: 18 },
+  bodySmall: { fontFamily: font.body, fontSize: 15, lineHeight: 21 },
+  bodySmallStrong: { fontFamily: font.bodyHeavy, fontSize: 15, lineHeight: 21 },
   caption: { fontFamily: font.bodyBold, fontSize: 13, lineHeight: 17 },
+  captionStrong: { fontFamily: font.bodyHeavy, fontSize: 13, lineHeight: 17 },
+  tabLabel: { fontFamily: font.bodyHeavy, fontSize: 12, lineHeight: 14 },
   overline: { fontFamily: font.bodyHeavy, fontSize: 13, lineHeight: 16, letterSpacing: 0.2 },
   button: { fontFamily: font.bodyBlack, fontSize: 16, lineHeight: 20, letterSpacing: 0.9 },
+  buttonSentence: { fontFamily: font.bodyBlack, fontSize: 16, lineHeight: 22 }, // secondary buttons, sentence case
   number: { fontFamily: font.display, fontSize: 28, lineHeight: 32, fontVariant: ['tabular-nums'] },
 } satisfies Record<string, TextStyle>;
 

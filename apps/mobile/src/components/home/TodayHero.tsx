@@ -31,7 +31,7 @@ export function TodayHero({ practice, onStart }: { practice: DemoTodaysPractice;
   return (
     <View ref={card} collapsable={false}>
       <Raised tone="primary" depth={DEPTH} radius={radius.lg} contentStyle={styles.face}>
-        <Text variant="overline" color="rgba(255,255,255,0.82)">
+        <Text variant="overline" color={color.onPrimaryMuted}>
           Today’s practice
         </Text>
         <View ref={title} collapsable={false} style={styles.title}>
@@ -41,10 +41,9 @@ export function TodayHero({ practice, onStart }: { practice: DemoTodaysPractice;
         </View>
         <View style={styles.chips}>
           <Chip tone="onPrimary" label={getSkill(practice.skill).name} />
-          <Chip tone="onPrimary" label={KIND[practice.kind]} />
-          <Chip tone="onPrimary" label={`~${practice.minutes} min`} />
+          <Chip tone="onPrimary" label={`${KIND[practice.kind]} · ~${practice.minutes} min`} />
         </View>
-        <Text variant="body" color="rgba(255,255,255,0.9)" style={styles.why}>
+        <Text variant="body" color={color.onPrimaryBody} style={styles.why}>
           {practice.why}
         </Text>
         <View ref={cta} collapsable={false}>

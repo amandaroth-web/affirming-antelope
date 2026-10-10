@@ -1,6 +1,6 @@
 import type { DrillFeedback } from '@antelope/core';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -8,7 +8,7 @@ import { PopIn } from '@/components/celebrate/PopIn';
 import { Mascot, type MascotHandle } from '@/components/mascot';
 import { movePhrase } from '@/components/practice-loop/moves';
 import { PossibleResponse } from '@/components/practice-loop/Speech';
-import { Chip, LightbulbIcon, SealCheckIcon, Text, border, color, haptic, layout, radius, space } from '@/design';
+import { Callout, Chip, LightbulbIcon, SealCheckIcon, Text, border, color, haptic, layout, radius, space } from '@/design';
 import { Burst, Enter, FADE_MS, spring, useReduceMotion, type BurstHandle } from '@/motion';
 
 /*
@@ -190,7 +190,7 @@ function SealIn({ delay }: { delay: number }) {
   }));
   return (
     <Animated.View style={a}>
-      <SealCheckIcon size={14} weight="fill" color="#8A5A0B" />
+      <SealCheckIcon size={14} weight="fill" color={color.goldInk} />
     </Animated.View>
   );
 }
@@ -222,37 +222,25 @@ function TryNext({ text, cue }: { text: string; cue?: SharedValue<number> }) {
     return { opacity: reduce ? 0 : Math.sin(Math.min(1, v) * Math.PI) * 0.9 };
   });
   return (
-    <View style={styles.tryNext}>
-      {cue ? <Animated.View pointerEvents="none" style={[styles.tryEdge, edge]} /> : null}
-      <View style={styles.tryIconBox}>
-        {cue ? <Animated.View pointerEvents="none" style={[styles.tryHalo, halo]} /> : null}
-        <Animated.View style={[styles.tryIcon, bulb]}>
-          <LightbulbIcon size={18} weight="fill" color={color.primary} />
-          {cue ? (
-            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tryIconLit, lit]}>
-              <LightbulbIcon size={18} weight="fill" color={color.white} />
-            </Animated.View>
-          ) : null}
-        </Animated.View>
-      </View>
-      <View style={styles.flex}>
-        <Text variant="label" color={color.primaryShadow}>
-          Try next
-        </Text>
-        <Text variant="body">{text}</Text>
-      </View>
-    </View>
-  );
-}
-
-/** Quiet text action (secondary to the docked primary). */
-export function QuietLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={styles.link}>
-      <Text variant="label" color={color.primary}>
-        {label}
-      </Text>
-    </Pressable>
+    <Callout
+      glyph={
+        <View style={styles.tryIconBox}>
+          {cue ? <Animated.View pointerEvents="none" style={[styles.tryHalo, halo]} /> : null}
+          <Animated.View style={[styles.tryIcon, bulb]}>
+            <LightbulbIcon size={18} weight="fill" color={color.primary} />
+            {cue ? (
+              <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.tryIconLit, lit]}>
+                <LightbulbIcon size={18} weight="fill" color={color.white} />
+              </Animated.View>
+            ) : null}
+          </Animated.View>
+        </View>
+      }
+      overline="Try next"
+      overlay={cue ? <Animated.View pointerEvents="none" style={[styles.tryEdge, edge]} /> : null}
+    >
+      <Text variant="body">{text}</Text>
+    </Callout>
   );
 }
 
@@ -298,21 +286,13 @@ const styles = StyleSheet.create({
   headline: {},
   strength: { flexDirection: 'row', gap: space[3], alignItems: 'flex-start' },
   flex: { flex: 1 },
-  tryNext: {
-    flexDirection: 'row',
-    gap: space[3],
-    alignItems: 'flex-start',
-    borderWidth: border,
-    borderColor: color.primaryTint,
-    borderRadius: radius.md,
-    padding: space[4],
-  },
+  // the cue's edge traces the callout's own box
   tryEdge: {
     position: 'absolute',
-    left: -border,
-    right: -border,
-    top: -border,
-    bottom: -border,
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     borderRadius: radius.md,
     borderWidth: border,
     borderColor: color.primary,
@@ -322,7 +302,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: color.soft,
+    backgroundColor: color.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -346,11 +326,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.gutter,
     paddingTop: space[3],
     gap: space[2],
-    borderTopWidth: 2,
-    borderTopColor: color.soft,
+    borderTopWidth: border,
+    borderTopColor: color.rule,
     width: '100%',
     maxWidth: layout.maxWidth + 40,
     alignSelf: 'center',
   },
-  link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

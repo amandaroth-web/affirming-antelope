@@ -167,7 +167,7 @@ export default function Home() {
 
       <Animated.View layout={listLayout}>
         <Enter index={5}>
-          <SectionHeader title="More practice" />
+          <SectionHeader title="More practice" action={`Focus this week: ${getSkill(focusSkill).name}`} />
           <PracticeTiles
             tiles={[
               {
@@ -200,9 +200,6 @@ export default function Home() {
               },
             ]}
           />
-          <Text variant="caption" color={color.muted} align="center" style={styles.footnote}>
-            Focus this week: {getSkill(focusSkill).name}
-          </Text>
         </Enter>
       </Animated.View>
     </Screen>
@@ -305,5 +302,4 @@ const styles = StyleSheet.create({
   mascot: { marginRight: space[2] },
   heroWrap: { zIndex: 1 },
   block: { marginTop: space[5] },
-  footnote: { marginTop: space[5] },
 });

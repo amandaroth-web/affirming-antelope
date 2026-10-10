@@ -2,9 +2,9 @@ import { getDrill, getSkill, getSkillLevel, type Drill, type DrillFeedback } fro
 import { useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeOutDown, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import Animated, { FadeOutDown, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { ChoiceTiles } from '@/components/drill/ChoiceTiles';
-import { FeedbackPanel, QuietLink } from '@/components/drill/FeedbackPanel';
+import { FeedbackPanel } from '@/components/drill/FeedbackPanel';
 import { Mascot, type MascotHandle } from '@/components/mascot';
 import { CompletionMoment, usePracticeSnapshot } from '@/components/practice-loop/Completion';
 import { Composer } from '@/components/practice-loop/Composer';
@@ -13,10 +13,10 @@ import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components
 import { HeroTarget, SessionSurface, useSession, useSessionClose } from '@/components/practice-loop/SessionSurface';
 import { CoachSays, InstructionChip, LearnerBubble, SpeechCard, useComposerLaunch } from '@/components/practice-loop/Speech';
 import { Shimmer } from '@/components/practice-loop/Thinking';
-import { ArrowRightIcon, Button, Chip, Hoofprint, Raised, Text, WifiSlashIcon, color, haptic, layout, radius, space } from '@/design';
+import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, WifiSlashIcon, color, haptic, layout, radius, space } from '@/design';
 import { nextDrillId } from '@/data/routes';
 import { postJson } from '@/lib/api';
-import { Enter, Expand, RollingNumber, spring, useFades, useForwardSwap, useReduceMotion } from '@/motion';
+import { Enter, Expand, FADE_MS, RollingNumber, spring, useFades, useForwardSwap, useReduceMotion } from '@/motion';
 import { today, useLearner } from '@/state/store';
 
 /**
@@ -244,7 +244,11 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
         <View style={sessionStyles.column}>
           <Enter style={styles.chips}>
             <Chip label={getSkill(drill.skill).name} tone="soft" />
-            <Chip label={`Level ${drill.level} · ${level.name}`} tone="neutral" />
+            <Chip
+              label={`Level ${drill.level} · ${level.name}`}
+              tone="neutral"
+              icon={<LevelPips level={drill.level} percent={100} pipWidth={8} height={5} gap={2} delay={300} />}
+            />
           </Enter>
 
           <View style={styles.block}>
@@ -333,7 +337,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
           {revealed ? (
             <>
               <Button label="One more" fullWidth onPress={onOneMore} icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />} />
-              <QuietLink label="I’m done" onPress={onDone} />
+              <TextLink label="I’m done" onPress={onDone} />
             </>
           ) : (
             <Button label="Check" fullWidth disabled={!selected.length} onPress={check} />
@@ -354,7 +358,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
       ) : phase === 'error' ? (
         <Dock>
           <Button label="Try again" fullWidth onPress={submit} />
-          <QuietLink label="Edit my response" onPress={editAgain} />
+          <TextLink label="Edit my response" onPress={editAgain} />
         </Dock>
       ) : null}
 
@@ -368,9 +372,9 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
             <>
               <Button label="One more" fullWidth onPress={onOneMore} icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />} />
               <View style={styles.linkRow}>
-                <QuietLink label="Try this one again" onPress={tryAgain} />
+                <TextLink label="Try this one again" onPress={tryAgain} />
                 <View style={styles.linkDot} />
-                <QuietLink label="I’m done" onPress={onDone} />
+                <TextLink label="I’m done" onPress={onDone} />
               </View>
             </>
           }
@@ -398,18 +402,31 @@ function Submitted({ text }: { text: string }) {
   );
 }
 
-/** Reps this session: a hoofprint and a rolling count that pops when it ticks. */
+/**
+ * Reps this session: a hoofprint and a rolling count that pops when it ticks.
+ * It stays invisible (and keeps its slot, so the title doesn't shift) until the
+ * first rep lands, then fades in as the count rolls to 1.
+ */
 function RepCounter({ count }: { count: number }) {
   const reduce = useReduceMotion();
   const pop = useSharedValue(1);
+  const shown = useSharedValue(count > 0 ? 1 : 0);
   useEffect(() => {
+    shown.value = withTiming(count > 0 ? 1 : 0, { duration: FADE_MS });
     if (count > 0 && !reduce) pop.value = withSequence(withSpring(1.18, spring.snappy), withSpring(1, spring.bouncy));
-  }, [count, reduce, pop]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  }, [count, reduce, pop, shown]);
+  const style = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ scale: pop.value }] }));
   return (
-    <Animated.View style={[styles.reps, count > 0 && styles.repsOn, style]} accessible accessibilityLabel={`${count} ${count === 1 ? 'rep' : 'reps'} this session`}>
-      <Hoofprint size={16} tint={count > 0 ? color.gold : color.faint} rotate={-12} />
-      <RollingNumber value={count} variant="label" color={count > 0 ? '#8A5A0B' : color.muted} />
+    <Animated.View
+      style={[styles.reps, styles.repsOn, style]}
+      accessible={count > 0}
+      accessibilityElementsHidden={count === 0}
+      importantForAccessibility={count > 0 ? 'auto' : 'no-hide-descendants'}
+      pointerEvents="none"
+      accessibilityLabel={`${count} ${count === 1 ? 'rep' : 'reps'} this session`}
+    >
+      <Hoofprint size={16} tint={color.gold} rotate={-12} />
+      <RollingNumber value={count} variant="label" color={color.goldInk} />
     </Animated.View>
   );
 }

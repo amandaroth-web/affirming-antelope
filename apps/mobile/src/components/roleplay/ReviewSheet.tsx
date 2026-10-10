@@ -119,7 +119,7 @@ function Sent({ trainer, onDone }: { trainer: { name: string }; onDone: () => vo
   return (
     <View style={styles.sent} accessibilityLiveRegion="polite">
       <Animated.View style={[styles.sentBadge, pop]}>
-        <CheckIcon size={34} weight="bold" color={color.white} />
+        <CheckIcon size={34} weight="bold" color={color.navy} />
       </Animated.View>
       <Text variant="title" align="center">
         Sent to {trainer.name}

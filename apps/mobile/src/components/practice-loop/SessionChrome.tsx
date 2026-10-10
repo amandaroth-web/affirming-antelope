@@ -1,9 +1,7 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { XIcon, color, layout, space } from '@/design';
-import { usePressScale } from '@/motion';
-import Animated from 'react-native-reanimated';
+import { IconButton, XIcon, color, layout, space } from '@/design';
 import { DismissZone } from './SessionSurface';
 
 /**
@@ -30,31 +28,12 @@ export function SessionHeader({
     <DismissZone>
       <View style={[styles.header, { paddingTop: insets.top + space[2] }, style]}>
         <View style={styles.headerRow}>
-          <CloseButton onPress={onClose} label={closeLabel} />
+          <IconButton onPress={onClose} label={closeLabel} icon={<XIcon size={26} weight="bold" color={color.muted} />} />
           <View style={styles.center}>{center}</View>
           <View style={styles.trailing}>{trailing}</View>
         </View>
       </View>
     </DismissZone>
-  );
-}
-
-export function CloseButton({ onPress, label = 'Close' }: { onPress: () => void; label?: string }) {
-  const press = usePressScale(0.88);
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={6}
-      style={styles.close}
-    >
-      <Animated.View style={press.style}>
-        <XIcon size={26} weight="bold" color={color.muted} />
-      </Animated.View>
-    </Pressable>
   );
 }
 
@@ -92,7 +71,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   header: { paddingHorizontal: layout.gutter - 10, paddingBottom: space[2], backgroundColor: color.white, zIndex: 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', minHeight: 48, gap: space[2], width: '100%', maxWidth: layout.maxWidth + 20, alignSelf: 'center' },
-  close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   trailing: { minWidth: 44, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 10 },
   dock: { backgroundColor: color.white, paddingHorizontal: layout.gutter, paddingTop: space[3] },
