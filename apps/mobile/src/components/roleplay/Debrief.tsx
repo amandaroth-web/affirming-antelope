@@ -1,7 +1,7 @@
 import { getScenario, getSkill, type Debrief as DebriefData, type NextStep, type ScenarioSpec, type SelfReflection, type Turn } from '@antelope/core';
 import { useIsFocused } from 'expo-router';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { Mascot } from '@/components/mascot';
 import { PracticeTicks, type PracticeSnapshot } from '@/components/practice-loop/Completion';
@@ -26,7 +26,9 @@ import {
   radius,
   space,
 } from '@/design';
-import { Enter } from '@/motion';
+import { Enter, useReduceMotion } from '@/motion';
+import { Cascade } from './Cascade';
+import { TypeIn } from './TypeIn';
 import { KeyMoments } from './KeyMoments';
 import { MovesPanel } from './MovesPanel';
 import { ReplayChart, type Exchange } from './ReplayChart';
@@ -35,6 +37,24 @@ import { ReviewSheet } from './ReviewSheet';
 export type NextChoice = NextStep | 'easier';
 
 const FEELING: Record<SelfReflection['feeling'], string> = { rough: 'Rough', mixed: 'Mixed', solid: 'Solid' };
+
+/** Debriefs that have already played their reveal: any later visit shows them settled. */
+const played = new WeakSet<DebriefData>();
+
+/*
+ * The debrief reveal (first visit only; later visits are settled).
+ *
+ *   0ms      coach pops in (scale) beside an empty bubble
+ *   60       the coach's answer to your read types in, line by line, caret riding the edge (≤1.4s)
+ *   typed    the compact ticks land: hoofprint stamp + burst, streak rolls, ring advances (PracticeTicks)
+ *   +700     each section below plays when it's on screen (≥ 80pt into the viewport), never before the coach
+ *            has finished, so nothing competes with the words:
+ *     chart     the line traces left to right; markers pop as it reaches them; key moments (ochre rings)
+ *               land with a light haptic; it settles on the first key moment
+ *     moves     tallies roll up on a 70ms stagger, then the balance beam tips (haptic tick at its first peak)
+ *     strengths cascade in on an 80ms stagger, each seal popping as its line arrives
+ * Reduced motion: everything is present at once (fades only), no haptic beats except the ticks' own.
+ */
 
 /**
  * The payoff. Coach responds to your own read first, then the replay chart,
@@ -75,6 +95,45 @@ export function Debrief({
     return () => clearTimeout(t);
   }, []);
   const scroll = useRef<ScrollView>(null);
+  const reduce = useReduceMotion();
+  const [settled] = useState(() => played.has(debrief));
+  useEffect(() => {
+    played.add(debrief);
+  }, [debrief]);
+  const [typed, setTyped] = useState(settled);
+  const onTyped = useCallback(() => setTyped(true), []);
+  // the compact ticks get their moment (stamp, roll, ring) before the chart starts drawing beside them
+  const [ticked, setTicked] = useState(settled);
+  useEffect(() => {
+    if (!typed || ticked) return;
+    const id = setTimeout(() => setTicked(true), reduce ? 0 : 700);
+    return () => clearTimeout(id);
+  }, [typed, ticked, reduce]);
+
+  // sections play when they scroll into view (after the coach has finished speaking)
+  const view = useRef({ y: 0, h: 0 });
+  const tops = useRef<Record<string, number>>({});
+  const [seen, setSeen] = useState<Record<string, boolean>>({});
+  const check = useCallback(() => {
+    const { y, h } = view.current;
+    if (!h) return;
+    setSeen((prev) => {
+      let next = prev;
+      for (const [k, top] of Object.entries(tops.current)) {
+        if (!prev[k] && top < y + h - 80) next = next === prev ? { ...prev, [k]: true } : { ...next, [k]: true };
+      }
+      return next;
+    });
+  }, []);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    view.current.y = e.nativeEvent.contentOffset.y;
+    check();
+  };
+  const track = (key: string) => (e: LayoutChangeEvent) => {
+    tops.current[key] = e.nativeEvent.layout.y;
+    check();
+  };
+  const plays = (key: string) => settled || reduce || (ticked && !!seen[key]);
 
   const exchanges = useMemo(() => buildExchanges(turns, debrief), [turns, debrief]);
   const traj = exchanges.map((e) => e.value);
@@ -112,7 +171,17 @@ export function Debrief({
           </View>
         }
       />
-      <ScrollView ref={scroll} contentContainerStyle={[sessionStyles.scroll, styles.content]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scroll}
+        contentContainerStyle={[sessionStyles.scroll, styles.content]}
+        showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        onLayout={(e) => {
+          view.current.h = e.nativeEvent.layout.height;
+          check();
+        }}
+      >
         <View style={sessionStyles.column}>
           {/* coach answers your own read first */}
           <Enter from="scale" style={styles.coach}>
@@ -127,34 +196,31 @@ export function Debrief({
               <Text variant="overline" color={color.primaryShadow}>
                 You called it {FEELING[reflection.feeling].toLowerCase()}
               </Text>
-              <Text variant="body" style={styles.coachText}>
-                {debrief.reflectionResponse}
-              </Text>
+              <TypeIn text={debrief.reflectionResponse} settled={settled} onDone={onTyped} style={styles.coachText} />
             </View>
           </Enter>
 
           <Enter index={1} style={styles.ticks}>
-            <PracticeTicks before={before} compact delay={900} />
+            <PracticeTicks before={before} compact delay={settled ? 0 : 150} start={typed} />
           </Enter>
 
-          <Section index={2} title="How the conversation moved">
-            <ReplayChart exchanges={exchanges} name={p.name} seed={p.avatarSeed} />
+          <Section index={2} title="How the conversation moved" onLayout={track('chart')}>
+            <ReplayChart exchanges={exchanges} name={p.name} seed={p.avatarSeed} play={plays('chart')} settled={settled} />
           </Section>
 
-          <Section index={3} title="Your moves">
-            <MovesPanel tallies={debrief.tallies} name={p.name} />
+          <Section index={3} title="Your moves" onLayout={track('moves')}>
+            <MovesPanel tallies={debrief.tallies} name={p.name} play={plays('moves')} settled={settled} />
           </Section>
 
           {debrief.strengths.length ? (
-            <Section index={4} title="What went well">
+            <Section index={4} title="What went well" onLayout={track('strengths')}>
               <View style={styles.strengths}>
                 {debrief.strengths.map((s, i) => (
-                  <View key={i} style={styles.strength}>
-                    <SealCheckIcon size={22} weight="fill" color={color.gold} />
+                  <Cascade key={i} index={i} play={plays('strengths')} settled={settled} style={styles.strength} icon={<SealCheckIcon size={22} weight="fill" color={color.gold} />}>
                     <Text variant="body" style={styles.flex}>
                       {s}
                     </Text>
-                  </View>
+                  </Cascade>
                 ))}
               </View>
             </Section>
@@ -260,9 +326,21 @@ export function Debrief({
   );
 }
 
-function Section({ index, title, caption, children }: { index: number; title: string; caption?: string; children: ReactNode }) {
+function Section({
+  index,
+  title,
+  caption,
+  children,
+  onLayout,
+}: {
+  index: number;
+  title: string;
+  caption?: string;
+  children: ReactNode;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   return (
-    <Enter index={index} style={styles.section}>
+    <Enter index={index} style={styles.section} onLayout={onLayout}>
       <View style={styles.sectionHead}>
         <Text variant="heading" accessibilityRole="header">
           {title}

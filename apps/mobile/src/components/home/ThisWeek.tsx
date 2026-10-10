@@ -1,12 +1,29 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Card, Hoofprint, ProgressRing, Text, color, haptic, space } from '@/design';
-import { RollingNumber } from '@/motion';
+import { Expand, FADE_MS, RollingNumber, spring, useReduceMotion } from '@/motion';
 import { weekdayIndex } from '@/state/store';
+import { TickSwap, useOnChange } from './motion';
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-/** Weekly goal ring + the streak as a trail of hoofprints. No leaderboards, no flames. */
+/**
+ * Weekly goal ring + the streak as a trail of hoofprints. No leaderboards, no flames.
+ *
+ * When a practice lands (Home passes values only once it's back in view):
+ * today's hoofprint stamps into its dot first, the streak rolls and its print
+ * thumps, then the ring springs to the new count (ochre + success when the goal is met).
+ */
 export function ThisWeek({
   streak,
   goal,
@@ -16,9 +33,23 @@ export function ThisWeek({
   goal: { target: number; done: number };
   weekDays: boolean[];
 }) {
+  const reduce = useReduceMotion();
   const todayIdx = weekdayIndex();
   const hit = goal.done >= goal.target;
   const onFilled = useCallback(() => haptic.success(), []);
+  // the ring's count starts where it is (no roll on mount); it rolls on change
+  const [doneAtMount] = useState(goal.done);
+
+  // the streak print thumps as the new number lands
+  const thump = useSharedValue(1);
+  useOnChange(streak, (prev, next) => {
+    if (reduce || next <= prev) return;
+    thump.value = withDelay(140, withSequence(withTiming(1.28, { duration: 120, easing: Easing.out(Easing.cubic) }), withSpring(1, spring.bouncy)));
+  });
+  const thumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: thump.value }] }));
+
+  const caption = hit ? 'Weekly goal met. Nice steady work.' : `${goal.target - goal.done} more to hit your weekly goal`;
+
   return (
     <Card padding={space[5]}>
       <View style={styles.row}>
@@ -32,11 +63,9 @@ export function ThisWeek({
           accessibilityLabel={`Weekly goal: ${goal.done} of ${goal.target} practices`}
         >
           <View style={styles.ringCenter}>
-            <Text variant="heading" style={styles.ringNum} maxScale={1}>
-              {goal.done}
-              <Text variant="subheading" color={color.muted} maxScale={1}>
-                /{goal.target}
-              </Text>
+            <RollingNumber value={goal.done} from={doneAtMount} variant="heading" lineHeight={28} delay={250} style={styles.ringNum} />
+            <Text variant="subheading" color={color.muted} maxScale={1} style={styles.ringOf}>
+              /{goal.target}
             </Text>
           </View>
         </ProgressRing>
@@ -45,56 +74,100 @@ export function ThisWeek({
             This week
           </Text>
           <View style={styles.streakRow} accessible accessibilityLabel={`${streak}-day streak`}>
-            <Hoofprint size={26} tint={color.gold} rotate={-12} />
+            <Animated.View style={thumpStyle}>
+              <Hoofprint size={26} tint={color.gold} rotate={-12} />
+            </Animated.View>
             <RollingNumber value={streak} variant="title" delay={200} />
             <Text variant="subheading" color={color.ink} style={styles.days}>
               day streak
             </Text>
           </View>
-          <Text variant="caption" color={color.muted}>
-            {hit ? 'Weekly goal met. Nice steady work.' : `${goal.target - goal.done} more to hit your weekly goal`}
-          </Text>
+          {/* the goal line can wrap differently once it changes; let the column grow, not jump */}
+          <Expand appear={false}>
+            <TickSwap value={caption}>
+              <Text variant="caption" color={color.muted}>
+                {caption}
+              </Text>
+            </TickSwap>
+          </Expand>
         </View>
       </View>
       <View style={styles.week} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {DAYS.map((d, i) => {
-          const done = weekDays[i];
-          const isToday = i === todayIdx;
-          return (
-            <View key={i} style={styles.day}>
-              <View
-                style={[
-                  styles.track,
-                  done && styles.trackDone,
-                  isToday && !done && styles.trackToday,
-                ]}
-              >
-                {done ? (
-                  <Hoofprint size={16} tint={color.white} rotate={i % 2 ? 10 : -10} />
-                ) : (
-                  <Hoofprint size={14} tint={isToday ? color.primaryTint : color.line} rotate={i % 2 ? 10 : -10} />
-                )}
-              </View>
-              <Text variant="caption" color={isToday ? color.primary : color.muted} style={styles.dayLabel}>
-                {d}
-              </Text>
-            </View>
-          );
-        })}
+        {DAYS.map((d, i) => (
+          <DayDot key={i} label={d} index={i} done={weekDays[i]} isToday={i === todayIdx} quiet={goal.done === goal.target} />
+        ))}
       </View>
     </Card>
   );
 }
 
+/**
+ * One day of the week. A day that becomes done stamps in: the ochre face pops
+ * over the empty track and its hoofprint lands with a little twist. Light
+ * impact at the stamp unless the ring's success is about to play (`quiet`).
+ */
+function DayDot({ label, index, done, isToday, quiet }: { label: string; index: number; done: boolean; isToday: boolean; quiet: boolean }) {
+  const reduce = useReduceMotion();
+  const p = useSharedValue(done ? 1 : 0);
+  const tilt = index % 2 ? 10 : -10;
+
+  useOnChange(done, (_, next) => {
+    if (!next) {
+      p.value = withTiming(0, { duration: reduce ? FADE_MS : 160 });
+      return;
+    }
+    if (reduce) {
+      p.value = withTiming(1, { duration: FADE_MS });
+      return;
+    }
+    const land = (finished?: boolean) => {
+      'worklet';
+      if (finished && !quiet) scheduleOnRN(haptic.press);
+    };
+    p.value = withSequence(
+      withTiming(1.16, { duration: 170, easing: Easing.out(Easing.cubic) }, land),
+      withSpring(1, spring.release),
+    );
+  });
+
+  const face = useAnimatedStyle(() => ({
+    opacity: Math.min(1, p.value * 2.2),
+    transform: [{ scale: reduce ? 1 : 0.5 + 0.5 * p.value }],
+  }));
+  const print = useAnimatedStyle(() => ({
+    transform: [{ scale: reduce ? 1 : Math.max(0, p.value * 1.6 - 0.6) }, { rotate: `${reduce ? 0 : (1 - Math.min(1, p.value)) * -40}deg` }],
+  }));
+
+  return (
+    <View style={styles.day}>
+      <View style={styles.dot}>
+        <View style={[styles.track, isToday && styles.trackToday]}>
+          <Hoofprint size={14} tint={isToday ? color.primaryTint : color.line} rotate={tilt} />
+        </View>
+        <Animated.View style={[styles.track, styles.trackDone, styles.overlay, face]}>
+          <Animated.View style={print}>
+            <Hoofprint size={16} tint={color.white} rotate={tilt} />
+          </Animated.View>
+        </Animated.View>
+      </View>
+      <Text variant="caption" color={isToday ? color.primary : color.muted} style={styles.dayLabel}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
-  ringCenter: { alignItems: 'center' },
+  ringCenter: { flexDirection: 'row', alignItems: 'flex-end' },
   ringNum: { fontSize: 24 },
+  ringOf: { marginBottom: 2 },
   copy: { flex: 1, gap: 2 },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 2 },
   days: { marginLeft: 2, marginTop: 4 },
   week: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space[5] },
   day: { alignItems: 'center', gap: 6 },
+  dot: { width: 36, height: 36 },
   track: {
     width: 36,
     height: 36,
@@ -105,6 +178,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: color.line,
   },
+  overlay: { position: 'absolute', left: 0, top: 0 },
   trackDone: { backgroundColor: color.gold, borderColor: color.goldShadow, borderBottomWidth: 4 },
   trackToday: { borderColor: color.primary, borderStyle: 'dashed' },
   dayLabel: { fontFamily: 'Nunito_800ExtraBold' },

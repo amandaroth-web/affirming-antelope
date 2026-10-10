@@ -5,3 +5,6 @@ export * from './springs';
 export * from './useEntrance';
 export * from './useMotionPrefs';
 export * from './usePress';
+export * from './Burst';
+export * from './Expand';
+export * from './layout';

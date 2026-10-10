@@ -1,8 +1,8 @@
 import { getDrill, getSkill, getSkillLevel, type Drill, type DrillFeedback } from '@antelope/core';
-import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import Animated, { FadeOutDown, ReduceMotion, useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { ChoiceTiles } from '@/components/drill/ChoiceTiles';
 import { FeedbackPanel, QuietLink } from '@/components/drill/FeedbackPanel';
 import { Mascot, type MascotHandle } from '@/components/mascot';
@@ -10,12 +10,13 @@ import { CompletionMoment, usePracticeSnapshot } from '@/components/practice-loo
 import { Composer } from '@/components/practice-loop/Composer';
 import { friendlyError, withTimeout, type FriendlyError } from '@/components/practice-loop/errors';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
-import { CoachSays, InstructionChip, LearnerBubble, SpeechCard, useBubbleEntrance } from '@/components/practice-loop/Speech';
+import { HeroTarget, SessionSurface, useSession, useSessionClose } from '@/components/practice-loop/SessionSurface';
+import { CoachSays, InstructionChip, LearnerBubble, SpeechCard, useComposerLaunch } from '@/components/practice-loop/Speech';
 import { Shimmer } from '@/components/practice-loop/Thinking';
 import { ArrowRightIcon, Button, Chip, Hoofprint, Raised, Text, WifiSlashIcon, color, haptic, layout, radius, space } from '@/design';
 import { nextDrillId } from '@/data/routes';
 import { postJson } from '@/lib/api';
-import { Enter, RollingNumber, spring, useReduceMotion } from '@/motion';
+import { Enter, Expand, RollingNumber, spring, useFades, useForwardSwap, useReduceMotion } from '@/motion';
 import { today, useLearner } from '@/state/store';
 
 /**
@@ -25,6 +26,19 @@ import { today, useLearner } from '@/state/store';
  * loses it); "I'm done" shows the streak and weekly ring tick.
  */
 export default function DrillScreen() {
+  return (
+    <SessionSurface>
+      <DrillSession />
+    </SessionSurface>
+  );
+}
+
+function DrillSession() {
+  const close = useSessionClose();
+  // arriving from a hero source (Home's card, a Practice tile): its title lands in the header
+  const heroTitle = useSession()?.title;
+  const swap = useForwardSwap();
+  const [reps, setReps] = useState(0);
   const { id, activityId, minutes } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string; source?: string }>();
   const [drillId, setDrillId] = useState(id);
   const [done, setDone] = useState<string[]>([]);
@@ -47,20 +61,39 @@ export default function DrillScreen() {
   };
 
   const oneMore = () => {
+    setReps((n) => n + 1);
     setComplete(false);
     setDrillId(nextDrillId(drillId, done, activityId));
   };
 
+  const finish = () => {
+    setReps((n) => n + 1);
+    setComplete(true);
+  };
+
   const header = (
     <SessionHeader
-      onClose={() => router.back()}
+      onClose={close}
       center={
-        <View style={styles.headCenter}>
-          <Text variant="subheading">Day {day}</Text>
-          <Text variant="caption" color={color.muted}>
-            {mins} minutes of MI practice today
-          </Text>
-        </View>
+        heroTitle ? (
+          <View style={styles.headCenter}>
+            <HeroTarget name="title" fontSize={18}>
+              <Text variant="subheading" numberOfLines={1}>
+                {heroTitle}
+              </Text>
+            </HeroTarget>
+            <Text variant="caption" color={color.muted}>
+              Day {day} · {mins} minutes today
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.headCenter}>
+            <Text variant="subheading">Day {day}</Text>
+            <Text variant="caption" color={color.muted}>
+              {mins} minutes of MI practice today
+            </Text>
+          </View>
+        )
       }
       trailing={<RepCounter count={done.length} />}
     />
@@ -71,18 +104,18 @@ export default function DrillScreen() {
     return (
       <View style={sessionStyles.root}>
         {header}
-        <View style={styles.completeBody}>
+        <Animated.View key="complete" entering={swap.entering} exiting={swap.exiting} style={styles.completeBody}>
           <CompletionMoment
             title={n > 1 ? `${n} reps. That’s practice.` : 'One rep, done.'}
             subtitle="Small reps, most days. That’s how this becomes the way you talk."
             before={before}
           >
             <Dock rule={false} style={styles.flush}>
-              <Button label="Done" fullWidth onPress={() => router.back()} />
+              <Button label="Done" fullWidth onPress={close} />
               <Button variant="secondary" label="One more" fullWidth onPress={oneMore} style={styles.second} />
             </Dock>
           </CompletionMoment>
-        </View>
+        </Animated.View>
       </View>
     );
   }
@@ -100,10 +133,13 @@ export default function DrillScreen() {
     );
   }
 
+  // "One more": the finished rep leaves to the left as the next one arrives from the right
   return (
     <View style={sessionStyles.root}>
       {header}
-      <DrillRep key={drill.id} drill={drill} onRepDone={() => repDone(drill)} onOneMore={oneMore} onDone={() => setComplete(true)} />
+      <Animated.View key={`${drill.id}-${reps}`} entering={reps ? swap.entering : undefined} exiting={swap.exiting} style={styles.flex}>
+        <DrillRep drill={drill} onRepDone={() => repDone(drill)} onOneMore={oneMore} onDone={finish} />
+      </Animated.View>
     </View>
   );
 }
@@ -126,6 +162,10 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
   const [feedback, setFeedback] = useState<DrillFeedback | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
   const inflight = useRef<ReturnType<typeof withTimeout> | null>(null);
+  const reduce = useReduceMotion();
+  const fades = useFades(200, 140);
+  // the composer drops away as your words lift out of it
+  const composerOut = reduce ? fades.exiting : FadeOutDown.duration(200).reduceMotion(ReduceMotion.Never);
 
   useEffect(() => () => inflight.current?.abort(), []);
 
@@ -134,12 +174,8 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
   // ---- choices: local evaluation
   const check = () => {
     if (!selected.length || !drill.choices) return;
+    // haptics + bursts are ChoiceTiles' (on the check frame); the coach hops from onResolved
     setRevealed(true);
-    const hit = selected.length === targets.length && selected.every((i) => targets.includes(i));
-    if (hit) {
-      haptic.success();
-      setTimeout(() => coach.current?.hop(), 380);
-    } else haptic.tick();
     onRepDone();
     toEnd();
   };
@@ -164,8 +200,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
       setFeedback({ ...fb, possibleResponses: fb.possibleResponses ?? [] });
       setPhase('feedback');
       onRepDone();
-      if (fb.hitTarget) haptic.success();
-      else haptic.thud();
+      // FeedbackPanel owns the hit/miss haptics, on its chip pop
     } catch (e) {
       if (inflight.current !== req) return;
       setError(friendlyError(e));
@@ -182,7 +217,11 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
     setFeedback(null);
   };
 
-  const tryAgain = () => {
+  // the panel drops away first (FeedbackPanel open=false → onExited), then the rep resets
+  const [leavingPanel, setLeavingPanel] = useState<null | 'retry'>(null);
+  const tryAgain = () => setLeavingPanel('retry');
+  const panelExited = () => {
+    setLeavingPanel(null);
     setDraft('');
     editAgain();
   };
@@ -228,6 +267,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
                 selected={selected}
                 revealed={revealed}
                 multi={multi}
+                onResolved={(hit) => hit && coach.current?.hop()}
                 onSelect={(i) => {
                   if (revealed) return;
                   setSelected((xs) => (multi ? (xs.includes(i) ? xs.filter((x) => x !== i) : [...xs, i]) : [i]));
@@ -237,7 +277,8 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
           ) : null}
 
           {revealed ? (
-            <Enter delay={420} style={styles.block}>
+            <Expand delay={420}>
+              <View style={styles.block}>
               <CoachSays ref={coach} pose="head" size={60} paused={!focused}>
                 <Text variant="body">
                   {hit
@@ -247,12 +288,14 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
                       : 'Not the one the drill was after, and that’s useful to notice. Read why each one lands the way it does.'}
                 </Text>
               </CoachSays>
-            </Enter>
+              </View>
+            </Expand>
           ) : null}
 
           {submitted ? <Submitted text={submitted} /> : null}
 
           {phase === 'waiting' ? (
+            <Animated.View exiting={fades.exiting}>
             <Enter delay={250} style={[styles.block, styles.listening]}>
               <Mascot pose="head" mood="listening" size={58} paused={!focused} accessibilityLabel="The antelope coach, listening" />
               <View style={styles.listeningCopy}>
@@ -262,10 +305,12 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
                 <Shimmer width={150} />
               </View>
             </Enter>
+            </Animated.View>
           ) : null}
 
           {phase === 'error' && error ? (
-            <Enter style={styles.block}>
+            <Expand>
+              <View style={styles.block}>
               <Raised tone="surface" depth={4} contentStyle={styles.errorFace}>
                 <View style={styles.errorIcon}>
                   <WifiSlashIcon size={22} weight="bold" color={color.primary} />
@@ -277,7 +322,8 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
                   </Text>
                 </View>
               </Raised>
-            </Enter>
+              </View>
+            </Expand>
           ) : null}
         </View>
       </ScrollView>
@@ -294,6 +340,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
           )}
         </Dock>
       ) : phase === 'answer' ? (
+        <Animated.View exiting={composerOut}>
         <Dock>
           <Composer
             value={draft}
@@ -303,6 +350,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
             accessibilityLabel={`Your response to: ${drill.prompt}`}
           />
         </Dock>
+        </Animated.View>
       ) : phase === 'error' ? (
         <Dock>
           <Button label="Try again" fullWidth onPress={submit} />
@@ -313,6 +361,8 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
       {phase === 'feedback' && feedback ? (
         <FeedbackPanel
           feedback={feedback}
+          open={!leavingPanel}
+          onExited={panelExited}
           paused={!focused}
           actions={
             <>
@@ -330,15 +380,21 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
   );
 }
 
+/** Your words, launched out of the composer as it drops away. */
 function Submitted({ text }: { text: string }) {
-  const enter = useBubbleEntrance('right');
+  const launch = useComposerLaunch();
+  const fades = useFades(220);
   return (
-    <Animated.View style={[styles.block, enter]}>
-      <Text variant="caption" color={color.muted} align="right" style={styles.you}>
-        You
-      </Text>
-      <LearnerBubble text={text} />
-    </Animated.View>
+    <View style={styles.block}>
+      <Animated.View entering={fades.entering}>
+        <Text variant="caption" color={color.muted} align="right" style={styles.you}>
+          You
+        </Text>
+      </Animated.View>
+      <Animated.View ref={launch.ref} onLayout={launch.onLayout} collapsable={false} style={launch.style}>
+        <LearnerBubble text={text} />
+      </Animated.View>
+    </View>
   );
 }
 

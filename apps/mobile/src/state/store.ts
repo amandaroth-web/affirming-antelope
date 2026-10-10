@@ -75,6 +75,11 @@ export interface LearnerState {
   settings: Settings;
   /** Day the mascot last waved on Home; it greets once per day. */
   lastGreetedDay: string | null;
+  /**
+   * The week the Path screen last showed as current. When `currentWeek` moves
+   * past it, Path plays the unlock choreography once and then marks it seen.
+   */
+  pathSeenWeek: number;
 }
 
 export interface LearnerActions {
@@ -86,6 +91,10 @@ export interface LearnerActions {
   submitForReview: (s: Omit<ReviewSubmission, 'id' | 'submittedAt' | 'status'>) => ReviewSubmission;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   markGreeted: () => void;
+  /** Path played the unlock for the current week. */
+  markPathSeen: () => void;
+  /** Dev: rewind `pathSeenWeek` one week so Path replays the latest unlock. */
+  replayPathUnlock: () => void;
   /** Demo helpers (Me > Settings). */
   resetDemo: () => void;
   previewPathwayComplete: () => void;
@@ -118,6 +127,7 @@ function seed(): LearnerState {
     reviews: [],
     settings: { motion: 'system', haptics: true },
     lastGreetedDay: null,
+    pathSeenWeek: d.currentWeek,
   };
 }
 
@@ -184,6 +194,8 @@ export const useLearner = create<LearnerState & LearnerActions>()(
 
       setSetting: (key, value) => set((s) => ({ settings: { ...s.settings, [key]: value } })),
       markGreeted: () => set({ lastGreetedDay: today() }),
+      markPathSeen: () => set((s) => (s.pathSeenWeek === s.currentWeek ? s : { pathSeenWeek: s.currentWeek })),
+      replayPathUnlock: () => set((s) => (s.currentWeek > 1 ? { pathSeenWeek: s.currentWeek - 1 } : s)),
       resetDemo: () => set(seed()),
       previewPathwayComplete: () =>
         set({

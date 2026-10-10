@@ -3,4 +3,9 @@
 // packages/core) resolves and is transpiled with no manual overrides.
 const { getDefaultConfig } = require('expo/metro-config');
 
-module.exports = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname);
+
+// Rive animation files are bundled as assets: require('./x.riv').
+config.resolver.assetExts.push('riv');
+
+module.exports = config;

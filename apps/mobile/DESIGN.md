@@ -53,19 +53,120 @@ Read this before you build a screen. It covers the system the drill, role-play, 
 - Run everything on the UI thread (shared values, `useAnimatedStyle` / `useAnimatedProps`). JS-thread animation loops aren't allowed. Read shared values directly inside each worklet, or through `useDerivedValue`. Reanimated web doesn't pick up shared values that are read through a nested worklet helper (see `components/path/Trail.tsx`).
 - Use `scheduleOnRN` from `react-native-worklets` (not `runOnJS`) to call back into React.
 
+## Motion system (transitions, choreography, rules)
+
+Reference captures: `docs/motion/*.gif`.
+
+### Primitives (`src/motion`)
+
+- `layout.ts`: `useListLayout()` (LinearTransition spring for siblings making room), `useFades()`, `useTickSwap()` (a value ticks over: new content rises in, old lifts away), `useForwardSwap()` (next in a sequence: out left, in from the right). Always use these hooks instead of raw Reanimated builders: they respect Me > Reduce motion (raw builders only follow the OS setting) and stick to predefined builders, so they also run on web.
+- `Expand`: animated auto-height. Content is measured off-flow and the container springs its real layout height, so everything below moves on the same frame. Use it for anything that opens in place (MC explanations, the coach's reaction, error cards).
+- `Burst`: UI-thread particles. One shared clock, closed-form motion under gravity and drag, no per-frame JS. Fire it on the visual peak, on the same frame as the haptic. Renders nothing under reduced motion.
+- `launch.ts` + `components/practice-loop/SessionSurface.tsx`: continuity transitions (below).
+- `components/roleplay/TypeIn.tsx`: the coach's words type in line by line behind a curtain in the bubble colour, with a cobalt caret. The paragraph is laid out once at final size, so nothing grows or jumps. Web and reduced motion get a fade.
+
+### Continuity transitions
+
+Shared element transitions in Reanimated 4.5 sit behind the `ENABLE_SHARED_ELEMENT_TRANSITIONS` static flag, which needs a package.json flag plus a native rebuild and is still experimental with the native stack. We use a hero overlay instead, and it runs everywhere, Expo Go and web included:
+
+1. A source calls `launchFrom({ container, title?, cta?, face, radius, depth })`. It measures the card, its title and its button, registers a `Launch`, then navigates.
+2. The practice screen is a `transparentModal` with `animation: 'none'`, so the source stays mounted and visible underneath.
+3. `SessionSurface` takes the launch once. It grows a window from the source rect to full screen and keeps the content fixed in screen space, so the window reveals it. The source's face colour fades out, the title flies to `<HeroTarget name="title">`, and the CTA surface morphs into `<HeroTarget name="cta">`. On close it re-measures the source and collapses back into it.
+
+| Source → destination | Title lands in | CTA becomes |
+|---|---|---|
+| Home "Today's practice" card → drill | drill header | the speech card (white button → white card) |
+| Practice skill tile → drill / role-play brief | header | role-play: the brief's START CONVERSATION |
+| Path node → unit sheet | (BottomSheet `origin`) | sheet grows out of the node; node scales 1.08 and glows. On close it heads back and is transparent before it nears the labels; a thin ring ripples out of the node as it lands |
+| Brief portrait → conversation header | (AvatarFlight, inside the role-play) | |
+
+Timelines, measured on the simulator:
+
+```
+Hero open (OPEN spring d18 k80, ζ=1: ≈75% at 300ms, ≈91% at 450ms)
+  0ms      the window IS the card (rect, radius, face colour), opaque from frame one; proxies sit exactly
+           on the source's title and START, so nothing doubles or pops
+  0-450    window grows from the card's rect on all sides; radius → 0; Home dims (navy backdrop to 34%)
+  30-320   face colour → white; flying title white → ink
+  140-370  destination content fades in (its own staggered entrances already running)
+  190-330  title hands off to the header mid-flight (large-title style, no overlap)
+  230-420  the CTA's target fills in under the arriving surface (no empty skeleton)
+Hero close (CLOSE spring d32 k340): the window shrinks onto the re-measured source; content stays
+  visible until ~45% so you watch it close; the face fades back in; the last 10% fades out over the real card.
+No source: rises from the bottom (sheet semantics). Replace (practice → practice): forward swap.
+Swipe down on the header: follows the finger 1:1, scale ≥ 0.9, radius → 32, backdrop lightens;
+  tick at 120pt (point of no return); release past it or flick (> 900pt/s) → exit carries the velocity.
+Brief → conversation ("walking into the meeting")
+  0-240    brief scales up 6%, drifts up, fades (ease-in: you step through it)
+  60-420   conversation comes into focus from 96%
+  0-460    portrait flies to its header seat (y spring stiffer than x, so it arcs)
+  ~400     the opening line rises in once you've sat down
+```
+
+### Content changes
+
+- Chat: your bubble launches out of the composer. It starts on the field (left and bottom edges aligned), and the field's text hides that frame. The thread is one keyed list, so the employee's typing dots and their finished reply are the same element. Its frame springs as words stream in, and the text is clipped to the growing frame, so it grows and never jumps. The header status ticks over.
+- Drill: "One more" uses the forward swap (old rep out left, new rep in from the right). The composer drops away as the words lift out. MC explanations and the coach's reaction open with `Expand`. The feedback panel animates out (`open={false}` → `onExited`) before the rep resets.
+- Role-play phases stack absolutely, so an exiting phase never holds layout space.
+
+### Choreographed payoffs (storyboards live in the code comments)
+
+- **Debrief reveal** (`Debrief.tsx`), first visit only (`played` WeakSet); later visits are settled. The coach types in → the compact ticks land → +700ms, each section plays as it scrolls ≥ 80pt into view. The chart traces and markers pop as the line reaches them, with a light haptic on key moments. Tallies roll on a 70ms stagger, then the beam tips (one tick at its first peak). Strengths cascade 80ms apart.
+- **Completion** (`Completion.tsx`): the hoofprint stamp drops, squashes on contact (thud + small burst), the streak rolls and the ring advances with a glow. When the weekly goal completes: an ochre ring with a check, a big burst, a second glow, the "Weekly goal hit" chip and a mascot hop. That's the only success haptic in the sequence. Buttons are usable within about 600ms.
+- **Drill tones** (`FeedbackPanel`, `ChoiceTiles`): a target hit is warm (livelier rise, chip pops with the seal rotating in, burst, hop, success haptic). "Worth another pass" is gentle (soft rise, the coach leans in to listen, a tick at most, the "Try next" bulb lights once). Never shakes, red or X marks on a learner's attempt.
+- **Path unlock** (`path.tsx`): triggered when `currentWeek > pathSeenWeek`. The trail draws, the previous node checks, the lock breaks (small burst), the new node pops (success), and the mascot hops out at the old week and drops in beside the new one (it never crosses a label). Dev replay: Me › Demo › Replay path unlock.
+
+### Scroll and tabs
+
+- Home: the big greeting fades, scales and drifts with parallax as the compact sticky title rises in (a clear handoff; at no point are both fully visible, or neither).
+- Path: depth-based parallax (lag capped so no gaps open). The "Week N" pill appears only when the current node is off screen and smooth-scrolls it back to centre.
+- Tab icons each have their own gesture: Home squashes onto its base, Path takes two steps along its curve, Practice punches in with one ring ripple, Me nods. Bold → fill cross-fades in 160ms.
+
+### Do
+
+- Use springs for anything interruptible. A new target retargets from the current value, so rapid taps never queue.
+- Run every animation on the UI thread. Never capture objects that hold native refs in a worklet (copy primitives out first; `launch` is the cautionary tale), and schedule plain JS functions with `scheduleOnRN` (not `Keyboard.dismiss` directly).
+- Give every new animation a reduced path: same end state, cross-fade at most.
+- Fire a haptic on its visual peak (use a reaction or a spring callback), one per beat. Ochre and bursts are for achievement only.
+- Keep durations tight. Motion should explain where something came from or went; nothing should make the learner wait.
+
+### Don't
+
+- Don't call `router.back()` from a practice screen (use `useSessionClose()`).
+- Don't animate the same thing twice. A heroed target skips its own entrance (`useSession()?.hasPiece('cta')`).
+- Don't let an exiting element hold layout space. Stack exiting and entering content absolutely.
+- Don't let raised faces (`flexGrow: 1`) sit in a header's trailing slot without `flexGrow: 0` on the content style; they stretch to the full screen height.
+- Don't trust `TextInput` `onContentSizeChange` for auto-grow on this RN version (it reports the frame and feeds back on itself). Composer measures a hidden text mirror instead.
+
 ## Mascot: `src/components/mascot`
 
 ```tsx
-<Mascot pose="wave" | "celebrate" | "head" mood="idle" | "listening" | "cheer" size={120}
+<Mascot pose="wave" | "celebrate" | "head" mood="idle" | "listening" | "thinking" | "cheer" size={120}
         greet paused={!isFocused} flip ref={handle} />
-handle.current?.wave() | hop() | turn()
+handle.current?.wave() | hop() | turn() | nod() | cheer()
 ```
 
-- `size` is height in pt. Breathing is anchored at the feet. Blinks are randomized (sometimes double) using three hand-drawn lid frames. `greet` waves once after mount. Changing `pose` squashes, swaps at the bottom of the squash, then stretches and settles. `cheer` hops every 2.4s. `listening` leans in and blinks less.
-- Pass `paused={!useIsFocused()}` from screens. The mascot also pauses when the app is backgrounded.
-- Artwork lives in `assets/mascot/rig/` and is generated by `python3 scripts/build-mascot-rig.py`. The script deepens colours to match the landing page and writes `rig.generated.ts`. Don't edit that output by hand.
-- Rive later: implement `MascotProps` / `MascotHandle` (`types.ts`) and swap the export in `index.ts`.
-- Suggested moods: drill feedback uses `head`/`listening`, a correct answer triggers `hop()`, and debrief completion uses `celebrate`/`cheer`.
+- `size` is the height in pt of the pose's drawing. `greet` waves once after mount. Changing `pose` squashes, swaps at the bottom of the squash, then stretches and settles. Pass `paused={!useIsFocused()}` from screens; the mascot also pauses when the app is backgrounded. Reduced motion keeps blinks, breathing and moods but skips wave/hop/cheer and the cheer mood's hops.
+- Suggested use: drill feedback `head`/`listening`, a correct answer `hop()`, an approving beat `nod()`, the coach working something out `thinking`, debrief completion `celebrate`/`cheer`.
+- **Two implementations behind one API** (`index.ts`). `RiveMascot` (Rive file `assets/rive/mascot-coach.riv`) on native builds that link the Rive runtime; `MascotSprite` (layered PNGs, `assets/mascot/rig/`, from `scripts/build-mascot-rig.py`) on Expo Go, Expo web, and whenever the Rive file fails to load. The choice is a capability check (`riveAvailable.ts`: platform, Expo Go, Nitro hybrid objects), never a try-and-see; `RiveMascot` is `require`d only when it passes. The sprite also covers the first frames while the Rive file loads.
+- **Rive layout.** One artboard, `Coach` (820x1140), holds both drawings. `coach.generated.ts` gives each pose's drawing rect on it; `RiveMascot` sizes the canvas so that rect is the layout box and lets the canvas overhang it (hops and ears never clip). The head pose shows the wave drawing cropped below the face, open above for hops.
+- **Source of truth.** Art: `apps/web/scripts/mascot-coach-layers.py` cuts the approved stills (`apps/web/public/brand-mascot-{wave,celebrate}-cartoon.png`) into layers with hidden fills, joint caps and an eye rig (`apps/web/public/mascot-layers/coach/`). Animation and state machine: `apps/web/scripts/mascot-coach-build.mjs` writes the `.riv`, `coach.generated.ts` and `mascot-coach.scene.json`. Test headlessly with `node scripts/rive-harness.mjs <riv> <script.json> [framesDir]` (all from `apps/web`). Don't hand-edit the outputs.
+
+### State machine contract (`Coach` state machine, view model `Coach`)
+
+The app drives it through data binding: `RiveView dataBind={instance}` with the file's default view-model instance. (SMI inputs throw on the default iOS runtime, so there are none.)
+
+| View-model property | Type | Meaning |
+| --- | --- | --- |
+| `pose` | number | `0` wave drawing, `1` celebrate drawing, `2` head (wave drawing, raised arm hidden; the app crops). Instant swap; the app squashes around it. |
+| `mood` | number | `0` idle, `1` listening (head tilts toward the text, ears perk with overshoot, eyes up-right, slight lean in, "mm-hm" bob), `2` thinking (tilts the other way, eyes up-left drifting, one ear back), `3` cheer (a happy hop with squint every 2.4 s). Moods ease in with an anticipation one-shot and mix out over 420 ms. |
+| `wave` | trigger | Anticipation toward the face, then 2.5 outward swings; elbow and hoof lag the shoulder; head leans in, ears flick, a small "hi!" bounce. Celebrate pose: the raised arm waves. Head pose: head and ears only. |
+| `hop` | trigger | Anticipation squash, launch stretch, apex, landing squash, rebound, settle (1.33 s). Volume-preserving squash; the head keeps most of its shape; ears, tail and scarf follow through. |
+| `cheer` | trigger | A bigger hop with arms up and a happy squint. From the wave pose the drawing swaps to the celebrate drawing at the bottom of the squash and back at landing; head and celebrate poses hop in place. |
+| `nod` | trigger | Head dips twice (foreshortened), ears lag, a contented half-squint. |
+| `blink` | trigger | Blink now. Blinks also run by themselves on an irregular 2.9 / 4.3 / 1.7 / 5.4 s chain with one double blink. |
+
+Layers, back to front: **Pose** (drawing visibility), **Idle** (6.4 s loop: breath at the feet, head/ears/scarf/tail/arm drift with lag, an ear flick and a tail swish off the beat), **Mood**, **Blink**, **Action** (one-shots return to rest on their own). Each layer keys its own node in a nested chain (`wHead > wHeadMood > wHeadAct > wHeadIdle`, same for ears, tail, scarf, arms, and `wHop > wHopSquash > wHopBreath > wHopLean` at the feet; `c*` for the celebrate drawing), so motion from different layers adds up instead of fighting. Authored at 60 fps.
 
 ## State: `src/state/store.ts` (zustand, persisted to AsyncStorage)
 
@@ -77,7 +178,7 @@ Seeded from `DEMO_LEARNER` in `@antelope/core`. Actions for the practice loop:
 
 ## Practice-loop routes: `src/data/routes.ts`
 
-`openDrill(id, {activityId?, minutes?, source, replace?})`, `openRoleplay(scenarioId, …)`, `openLesson(id, {activityId?, minutes?, replace?})`, `openActivity(pathActivity, source, {replace?})`, `pickDrill(skill, level)`, `pickScenario(skill)`, `findActivity(activityId)`, `nextDrillId(current, done, activityId?)`. Use `replace: true` when one practice screen leads to another (debrief "Try a harder scenario", lesson "Start next") so Close still returns to where the learner started. The three practice screens are stack screens over the tabs (`slide_from_bottom`), close X top left, one primary action docked at the bottom.
+`openDrill(id, {activityId?, minutes?, source, replace?})`, `openRoleplay(scenarioId, …)`, `openLesson(id, {activityId?, minutes?, replace?})`, `openActivity(pathActivity, source, {replace?})`, `pickDrill(skill, level)`, `pickScenario(skill)`, `findActivity(activityId)`, `nextDrillId(current, done, activityId?)`. Use `replace: true` when one practice screen leads to another (debrief "Try a harder scenario", lesson "Start next") so Close still returns to where the learner started. The three practice screens are transparent modals over the tabs with no native animation; `SessionSurface` owns their transitions (see Motion system). Close X top left, one primary action docked at the bottom. Leave with `useSessionClose()`, never `router.back()`, so the exit animates. `go()` ignores a second launch within 650ms, so double taps never stack screens.
 
 ## Practice loop: `src/components/practice-loop` (shared)
 

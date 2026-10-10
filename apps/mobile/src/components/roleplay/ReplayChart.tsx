@@ -1,5 +1,5 @@
 import type { LearnerMove, Stance, Turn } from '@antelope/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -115,7 +115,21 @@ function segLen(seg: [Pt, Pt, Pt, Pt], to = 1) {
  * exchange: a guide and callout follow your finger on springs, with a soft
  * haptic per point. A list view carries the same content for screen readers.
  */
-export function ReplayChart({ exchanges, name, seed }: { exchanges: Exchange[]; name: string; seed: string }) {
+export function ReplayChart({
+  exchanges,
+  name,
+  seed,
+  play = true,
+  settled,
+}: {
+  exchanges: Exchange[];
+  name: string;
+  seed: string;
+  /** Hold the trace until the chart is on screen and it's its turn. */
+  play?: boolean;
+  /** Already seen: draw it finished. */
+  settled?: boolean;
+}) {
   const reduce = useReduceMotion();
   const [w, setW] = useState(0);
   const [asList, setAsList] = useState(false);
@@ -144,17 +158,23 @@ export function ReplayChart({ exchanges, name, seed }: { exchanges: Exchange[]; 
   const selY = useSharedValue(0);
   const selOn = useSharedValue(0);
   const cur = useSharedValue(-1);
+  // haptics only for a trace the learner is watching, never for an instant redraw
+  const quiet = useSharedValue(1);
+  const traced = useRef(!!settled);
 
   useEffect(() => {
-    if (!geo) return;
+    if (!geo || !play) return;
+    const instant = reduce || traced.current;
+    traced.current = true;
+    quiet.value = instant ? 1 : 0;
     drawn.value = 0;
-    drawn.value = reduce ? geo.total : withDelay(350, withTiming(geo.total, { duration: 1500 + n * 90, easing: Easing.inOut(Easing.cubic) }));
+    drawn.value = instant ? geo.total : withDelay(150, withTiming(geo.total, { duration: 1300 + n * 90, easing: Easing.inOut(Easing.cubic) }));
     // after the trace lands, settle on the first key moment so the replay invites a touch
     const first = exchanges.findIndex((e) => e.keyMoment);
-    const t = setTimeout(() => select(first > 0 ? first : n - 1, false), reduce ? 300 : 2100 + n * 90);
+    const t = setTimeout(() => select(first > 0 ? first : n - 1, false), instant ? 0 : 1650 + n * 90);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geo, reduce]);
+  }, [geo, reduce, play]);
 
   const select = (i: number, feel = true) => {
     if (!geo || i < 0 || i >= n) return;
@@ -289,12 +309,12 @@ export function ReplayChart({ exchanges, name, seed }: { exchanges: Exchange[]; 
                   ))}
                   <Animated.View style={[styles.guide, { top: TOP, height: PLOT_H }, guide]} pointerEvents="none" />
                   {geo.pts.map((p, i) => (
-                    <PopIn key={`p${i}`} x={p.x} y={p.y} at={geo.cum[i] ?? geo.total} drawn={drawn} size={12}>
+                    <PopIn key={`p${i}`} x={p.x} y={p.y} at={Math.max(1, geo.cum[i] ?? geo.total)} drawn={drawn} size={12}>
                       <View style={[styles.point, { borderColor: exchanges[i].value >= 0.67 ? color.primaryShadow : exchanges[i].value <= -0.67 ? zoneTint.holdInk : color.muted }]} />
                     </PopIn>
                   ))}
                   {geo.marks.map((m, k) => (
-                    <PopIn key={`m${k}`} x={m.x} y={m.y} at={m.at} drawn={drawn} size={16}>
+                    <PopIn key={`m${k}`} x={m.x} y={m.y} at={m.at} drawn={drawn} size={16} feel={m.e.keyMoment} quiet={quiet}>
                       <MoveMarker family={m.e.move ? MOVE[m.e.move].family : 'neutral'} size={16} ring={m.e.keyMoment ? color.gold : undefined} />
                     </PopIn>
                   ))}
@@ -352,13 +372,33 @@ export function ReplayChart({ exchanges, name, seed }: { exchanges: Exchange[]; 
   );
 }
 
-function PopIn({ x, y, at, drawn, size, children }: { x: number; y: number; at: number; drawn: SharedValue<number>; size: number; children: React.ReactNode }) {
+function PopIn({
+  x,
+  y,
+  at,
+  drawn,
+  size,
+  feel,
+  quiet,
+  children,
+}: {
+  x: number;
+  y: number;
+  at: number;
+  drawn: SharedValue<number>;
+  size: number;
+  /** A key moment: a light haptic as the line reaches it. */
+  feel?: boolean;
+  quiet?: SharedValue<number>;
+  children: React.ReactNode;
+}) {
   const reduce = useReduceMotion();
   const s = useSharedValue(0);
   useAnimatedReaction(
     () => drawn.value >= at - 0.5,
     (on, prev) => {
-      if (on && !prev) s.value = reduce ? withTiming(1, { duration: FADE_MS }) : withSpring(1, spring.bouncy);
+      if (on && !prev && feel && quiet && !quiet.value) scheduleOnRN(haptic.press);
+      if (on && !prev) s.value = reduce || (quiet && quiet.value) ? withTiming(1, { duration: reduce ? FADE_MS : 0 }) : withSpring(1, spring.bouncy);
       if (!on && prev) s.value = 0;
     },
   );

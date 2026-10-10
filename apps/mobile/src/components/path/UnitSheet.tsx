@@ -22,14 +22,23 @@ const KIND: Record<ActivityKind, { label: string; Icon: typeof LightningIcon }> 
   roleplay: { label: 'Role-play', Icon: ChatsCircleIcon },
 };
 
+/**
+ * The week's sheet. Keep passing the last `unit` while `open` goes false so the
+ * content stays put as the sheet shrinks back into its node (`origin`).
+ */
 export function UnitSheet({
   unit,
+  open = !!unit,
+  origin,
   status,
   completed,
   onClose,
   onStart,
 }: {
   unit: PathUnit | null;
+  open?: boolean;
+  /** Window centre of the tapped node; the sheet grows out of it. */
+  origin?: { x: number; y: number };
   status: WeekStatus;
   completed: string[];
   onClose: () => void;
@@ -38,7 +47,13 @@ export function UnitSheet({
   const next = unit?.activities.find((a) => !completed.includes(a.id));
   const total = unit?.activities.reduce((n, a) => n + a.minutes, 0) ?? 0;
   return (
-    <BottomSheet open={!!unit} onClose={onClose} accessibilityLabel={unit ? `Week ${unit.week}, ${unit.title}` : undefined}>
+    <BottomSheet
+      open={open && !!unit}
+      onClose={onClose}
+      origin={origin}
+      originColor={status === 'complete' ? color.gold : color.primary}
+      accessibilityLabel={unit ? `Week ${unit.week}, ${unit.title}` : undefined}
+    >
       {unit ? (
         <View>
           <Text variant="overline" color={status === 'complete' ? '#8A5A0B' : color.primaryShadow}>

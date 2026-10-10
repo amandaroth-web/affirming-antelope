@@ -4,11 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { XIcon, color, layout, space } from '@/design';
 import { usePressScale } from '@/motion';
 import Animated from 'react-native-reanimated';
+import { DismissZone } from './SessionSurface';
 
 /**
  * Shared chrome for the practice-loop screens (lesson, drill, role-play):
  * a close X at top left, an optional centre and trailing slot, and a docked
- * bottom bar for the one primary action.
+ * bottom bar for the one primary action. Inside a SessionSurface the header
+ * is also the drag handle: pull it down to dismiss.
  */
 export function SessionHeader({
   onClose,
@@ -25,13 +27,15 @@ export function SessionHeader({
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.header, { paddingTop: insets.top + space[2] }, style]}>
-      <View style={styles.headerRow}>
-        <CloseButton onPress={onClose} label={closeLabel} />
-        <View style={styles.center}>{center}</View>
-        <View style={styles.trailing}>{trailing}</View>
+    <DismissZone>
+      <View style={[styles.header, { paddingTop: insets.top + space[2] }, style]}>
+        <View style={styles.headerRow}>
+          <CloseButton onPress={onClose} label={closeLabel} />
+          <View style={styles.center}>{center}</View>
+          <View style={styles.trailing}>{trailing}</View>
+        </View>
       </View>
-    </View>
+    </DismissZone>
   );
 }
 

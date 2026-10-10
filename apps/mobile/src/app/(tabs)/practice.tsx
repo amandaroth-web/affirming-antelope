@@ -1,6 +1,6 @@
 import { SKILLS, getSkill, type SkillId } from '@antelope/core';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { createRef, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/common/SectionHeader';
@@ -20,9 +20,11 @@ import {
   layout,
   radius,
   space,
+  type as typeScale,
 } from '@/design';
 import { openDrill, openRoleplay, pickDrill, pickScenario } from '@/data/routes';
 import { Enter } from '@/motion';
+import { launchFrom } from '@/motion/launch';
 import { useCurrentUnit } from '@/state/selectors';
 import { useLearner } from '@/state/store';
 import { SCENARIOS } from '@antelope/core';
@@ -44,9 +46,25 @@ export default function Practice() {
   }, [challengeParam]);
 
   const isDrill = minutes === 5;
+  const tiles = useMemo(() => Object.fromEntries(SKILLS.map((s) => [s.id, { card: createRef<View>(), title: createRef<View>() }])), []);
+  const startRef = useRef<View>(null);
+  // the session opens out of the selected skill tile; for a role-play, START also becomes the brief's START
   const start = () => {
-    if (isDrill) openDrill(pickDrill(skill, skills[skill].level), { minutes, source: 'practice' });
-    else openRoleplay(pickScenario(skill).id, { minutes, source: 'practice' });
+    const name = getSkill(skill).name;
+    launchFrom(
+      {
+        container: tiles[skill].card,
+        depth: 4,
+        face: color.soft,
+        radius: radius.surface,
+        title: { ref: tiles[skill].title, text: name, style: { ...typeScale.subheading, color: color.primaryShadow } },
+        cta: isDrill ? undefined : { ref: startRef, face: color.primary, radius: radius.md, label: 'START', labelStyle: { ...typeScale.button, color: color.white } },
+      },
+      () => {
+        if (isDrill) openDrill(pickDrill(skill, skills[skill].level), { minutes, source: 'practice' });
+        else openRoleplay(pickScenario(skill).id, { minutes, source: 'practice' });
+      },
+    );
   };
 
   return (
@@ -113,7 +131,7 @@ export default function Practice() {
           <SectionHeader title="What do you want to practice?" />
           <View style={styles.grid} accessibilityRole="radiogroup">
             {SKILLS.map((s) => (
-              <SkillTile key={s.id} skill={s} progress={skills[s.id]} selected={s.id === skill} onPress={() => setSkill(s.id)} />
+              <SkillTile key={s.id} skill={s} progress={skills[s.id]} selected={s.id === skill} onPress={() => setSkill(s.id)} heroRefs={tiles[s.id]} />
             ))}
           </View>
         </Enter>
@@ -129,12 +147,14 @@ export default function Practice() {
               {getSkill(skill).name}
             </Text>
           </View>
+          <View ref={startRef} collapsable={false}>
           <Button
             label="Start"
             onPress={start}
             icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />}
             accessibilityLabel={`Start a ${minutes}-minute ${isDrill ? 'drill' : 'role-play'} on ${getSkill(skill).name}`}
           />
+          </View>
         </View>
       </View>
 

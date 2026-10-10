@@ -3,30 +3,37 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import { color } from '@/design';
-import type { Band } from './geometry';
+import { BAND_GAP, ridgeLag, SKY_LAG, type Band } from './geometry';
 
 const LIFT = 60; // room above each ridge for the hill crests
 
 /**
- * Flat, banded savanna in brand tints. Each band drifts at its own rate as you
- * scroll (parallax). Navy appears only as tiny accents: a few birds, a few acacias.
+ * Flat, banded savanna in brand tints. Ridges lag behind the trail more the
+ * higher they sit on screen (the horizon is up), and the sun lags most, so it
+ * sinks behind the first ridge as you set off (see `ridgeLag`). Navy appears
+ * only as tiny accents: a few birds, a few acacias.
  */
 export const Landscape = memo(function Landscape({
   bands,
   width,
   height,
   scrollY,
+  viewportH,
 }: {
   bands: Band[];
   width: number;
   height: number;
   scrollY: SharedValue<number>;
+  viewportH: number;
 }) {
+  const sky = useAnimatedStyle(() => ({ transform: [{ translateY: Math.min(Math.max(scrollY.value, 0), 600) * SKY_LAG }] }));
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { height }]}>
-      <Sky width={width} />
+      <Animated.View style={[StyleSheet.absoluteFill, sky]}>
+        <Sky width={width} />
+      </Animated.View>
       {bands.map((b, i) => (
-        <BandLayer key={i} band={b} width={width} index={i} scrollY={scrollY} />
+        <BandLayer key={i} band={b} width={width} index={i} scrollY={scrollY} viewportH={viewportH} />
       ))}
     </View>
   );
@@ -60,9 +67,22 @@ function Acacia({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
   );
 }
 
-function BandLayer({ band, width, index, scrollY }: { band: Band; width: number; index: number; scrollY: SharedValue<number> }) {
-  const style = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value * band.speed }] }));
-  const h = 300 * 2.4 + LIFT;
+function BandLayer({
+  band,
+  width,
+  index,
+  scrollY,
+  viewportH,
+}: {
+  band: Band;
+  width: number;
+  index: number;
+  scrollY: SharedValue<number>;
+  viewportH: number;
+}) {
+  const bandY = band.y;
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: ridgeLag(bandY, scrollY.value, viewportH) }] }));
+  const h = BAND_GAP * 2.4 + LIFT;
   return (
     <Animated.View style={[styles.band, { top: band.y - LIFT, width, height: h }, style]}>
       <Svg width={width} height={h}>

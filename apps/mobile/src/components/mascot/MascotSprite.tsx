@@ -86,7 +86,7 @@ export const MascotSprite = forwardRef<MascotHandle, MascotProps>(function Masco
 
   // ---- mood posture
   useEffect(() => {
-    lean.value = reduce ? 0 : withSpring(mood === 'listening' ? 2.5 : 0, spring.gentle);
+    lean.value = reduce ? 0 : withSpring(mood === 'listening' ? 2.5 : mood === 'thinking' ? -2 : 0, spring.gentle);
   }, [mood, reduce, lean]);
 
   // ---- blinks: randomised, occasional double. A scheduler, not a frame loop.
@@ -151,7 +151,12 @@ export const MascotSprite = forwardRef<MascotHandle, MascotProps>(function Masco
     setTimeout(doWave, 180);
   }, [reduce, turnX, doWave]);
 
-  useImperativeHandle(ref, () => ({ wave: doWave, hop: doHop, turn: doTurn }), [doWave, doHop, doTurn]);
+  const doNod = useCallback(() => {
+    if (reduce) return;
+    squash.value = withSequence(withTiming(0.96, { duration: 140, easing: Easing.inOut(Easing.quad) }), withSpring(1, spring.bouncy));
+  }, [reduce, squash]);
+
+  useImperativeHandle(ref, () => ({ wave: doWave, hop: doHop, turn: doTurn, nod: doNod, cheer: doHop }), [doWave, doHop, doTurn, doNod]);
 
   // ---- greet once on mount
   const greeted = useRef(false);

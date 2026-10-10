@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, w
 import { Composer } from '@/components/practice-loop/Composer';
 import { ConfirmSheet } from '@/components/practice-loop/ConfirmSheet';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
-import { EmployeeBubble, LearnerBubble, TypingDots, useBubbleEntrance } from '@/components/practice-loop/Speech';
+import { EmployeeBubble, LearnerBubble, LiveEmployeeBubble, useBubbleEntrance, useComposerLaunch } from '@/components/practice-loop/Speech';
 import {
   ArrowCounterClockwiseIcon,
   Avatar,
@@ -20,7 +20,7 @@ import {
   radius,
   space,
 } from '@/design';
-import { FADE_MS, spring, useReduceMotion } from '@/motion';
+import { FADE_MS, spring, useFades, useListLayout, useReduceMotion, useTickSwap } from '@/motion';
 import { useEmployeeReply } from './useEmployeeReply';
 
 const MIN_TURNS = 3;
@@ -37,13 +37,26 @@ export function Conversation({
   onTurns,
   onEnd,
   onLeave,
+  arriving,
+  seatHidden,
+  onSeat,
 }: {
   scenario: ScenarioSpec;
   turns: Turn[];
   onTurns: (t: Turn[]) => void;
   onEnd: (t: Turn[]) => void;
   onLeave: () => void;
+  /** Walking in from the brief: the opening line waits until you've sat down. */
+  arriving?: boolean;
+  /** The header portrait is still in flight from the brief. */
+  seatHidden?: boolean;
+  /** Where the flying portrait should land. */
+  onSeat?: (node: View | null) => void;
 }) {
+  const seat = useRef<View>(null);
+  const tick = useTickSwap();
+  const layout = useListLayout();
+  const fades = useFades();
   const p = scenario.persona;
   const first = p.name.split(' ')[0];
   const { pending, error, request, cut, clearError } = useEmployeeReply(scenario.id);
@@ -60,6 +73,10 @@ export function Conversation({
 
   const learnerCount = turns.filter((t) => t.speaker === 'learner').length;
   const ready = learnerCount >= MIN_TURNS;
+  const status = pending?.typing ? 'typing…' : learnerCount ? `${learnerCount} ${learnerCount === 1 ? 'reply' : 'replies'} from you` : p.role;
+  // one list, so the pending reply and the turn it settles into are the same element (dots morph into words)
+  const rows: Row[] = turns.map((t) => ({ id: t.id, speaker: t.speaker, text: t.text, live: false, typing: false }));
+  if (pending) rows.push({ id: pending.id, speaker: 'employee', text: pending.text, live: true, typing: pending.typing || !pending.text });
 
   const send = () => {
     const text = draft.trim();
@@ -109,14 +126,19 @@ export function Conversation({
         closeLabel="Leave conversation"
         center={
           <View style={styles.who}>
-            <Avatar seed={p.avatarSeed} size={36} />
+            <View ref={seat} collapsable={false} onLayout={() => onSeat?.(seat.current)} style={seatHidden ? styles.hidden : undefined}>
+              <Avatar seed={p.avatarSeed} size={36} />
+            </View>
             <View style={styles.whoCopy}>
               <Text variant="label" numberOfLines={1}>
                 {p.name}
               </Text>
-              <Text variant="caption" color={color.muted} numberOfLines={1}>
-                {pending?.typing ? 'typing…' : learnerCount ? `${learnerCount} ${learnerCount === 1 ? 'reply' : 'replies'} from you` : p.role}
-              </Text>
+              {/* status ticks over (role → typing… → replies from you) instead of swapping in place */}
+              <Animated.View key={status}>
+                <Text variant="caption" color={color.muted} numberOfLines={1}>
+                  {status}
+                </Text>
+              </Animated.View>
             </View>
           </View>
         }
@@ -141,14 +163,18 @@ export function Conversation({
               <Text variant="caption" color={color.muted} align="center" style={styles.stamp}>
                 One-on-one with {first}
               </Text>
-              {turns.map((t, i) => (
-                <Message key={t.id} turn={t} seed={p.avatarSeed} name={p.name} delay={i === 0 ? 250 : 0} settled={streamed.current.has(t.id)} />
+              {rows.map((r, i) => (
+                <Message
+                  key={r.id}
+                  row={r}
+                  seed={p.avatarSeed}
+                  name={p.name}
+                  delay={i === 0 ? (arriving ? 400 : 250) : r.live ? 120 : 0}
+                  settled={!r.live && streamed.current.has(r.id)}
+                />
               ))}
-              {pending ? (
-                <PendingBubble seed={p.avatarSeed} name={p.name} text={pending.text} typing={pending.typing} />
-              ) : null}
               {error ? (
-                <View style={styles.retry}>
+                <Animated.View entering={fades.entering} exiting={fades.exiting} layout={layout} style={styles.retry}>
                   <Text variant="caption" color={color.muted} align="center">
                     {error.title}. {first} didn’t get that.
                   </Text>
@@ -164,12 +190,14 @@ export function Conversation({
                     }}
                     style={styles.center}
                   />
-                </View>
+                </Animated.View>
               ) : null}
               {ready && !pending ? (
-                <Text variant="caption" color={color.muted} align="center" style={styles.readyHint}>
-                  End whenever you’re ready.
-                </Text>
+                <Animated.View entering={fades.entering} exiting={fades.exiting} layout={layout}>
+                  <Text variant="caption" color={color.muted} align="center" style={styles.readyHint}>
+                    End whenever you’re ready.
+                  </Text>
+                </Animated.View>
               ) : null}
             </View>
           </ScrollView>
@@ -224,22 +252,49 @@ export function Conversation({
   );
 }
 
-function Message({ turn, seed, name, delay, settled }: { turn: Turn; seed: string; name: string; delay: number; settled: boolean }) {
-  const enter = useBubbleEntrance(turn.speaker === 'learner' ? 'right' : 'left', delay, settled);
+type Row = { id: string; speaker: Turn['speaker']; text: string; live: boolean; typing: boolean };
+
+/**
+ * One line of the thread. Yours launches out of the composer; theirs rises from
+ * their side as typing dots and stays the same element while the words arrive.
+ * Rows carry a layout spring so anything that changes size above them moves them, not snaps them.
+ */
+function Message({ row, seed, name, delay, settled }: { row: Row; seed: string; name: string; delay: number; settled: boolean }) {
+  const layout = useListLayout();
+  if (row.speaker === 'learner') return <LearnerMessage text={row.text} layout={layout} />;
+  return <EmployeeMessage row={row} seed={seed} name={name} delay={delay} settled={settled} layout={layout} />;
+}
+
+function LearnerMessage({ text, layout }: { text: string; layout: ReturnType<typeof useListLayout> }) {
+  const launch = useComposerLaunch();
   return (
-    <Animated.View style={[styles.msg, enter]}>
-      {turn.speaker === 'learner' ? <LearnerBubble text={turn.text} /> : <EmployeeBubble text={turn.text} seed={seed} name={name} />}
+    <Animated.View ref={launch.ref} onLayout={launch.onLayout} collapsable={false} layout={layout} style={[styles.msg, launch.style]}>
+      <LearnerBubble text={text} />
     </Animated.View>
   );
 }
 
-function PendingBubble({ seed, name, text, typing }: { seed: string; name: string; text: string; typing: boolean }) {
-  const enter = useBubbleEntrance('left', 120);
+function EmployeeMessage({
+  row,
+  seed,
+  name,
+  delay,
+  settled,
+  layout,
+}: {
+  row: Row;
+  seed: string;
+  name: string;
+  delay: number;
+  settled: boolean;
+  layout: ReturnType<typeof useListLayout>;
+}) {
+  const enter = useBubbleEntrance('left', delay, settled);
+  // replies that streamed in keep their live bubble; history and the opening line render statically
+  const [wasLive] = useState(row.live);
   return (
-    <Animated.View style={[styles.msg, enter]} accessibilityLiveRegion="polite">
-      <EmployeeBubble seed={seed} name={name}>
-        {typing || !text ? <TypingDots /> : <Text variant="body">{text}</Text>}
-      </EmployeeBubble>
+    <Animated.View layout={layout} style={[styles.msg, enter]} accessibilityLiveRegion={row.live ? 'polite' : undefined}>
+      {wasLive ? <LiveEmployeeBubble seed={seed} name={name} text={row.text} typing={row.typing} /> : <EmployeeBubble text={row.text} seed={seed} name={name} />}
     </Animated.View>
   );
 }
@@ -333,6 +388,7 @@ function NewReplyPill({ onPress }: { onPress: () => void }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  hidden: { opacity: 0 },
   center: { alignSelf: 'center' },
   who: { flexDirection: 'row', alignItems: 'center', gap: space[2], maxWidth: 230 },
   whoCopy: { flexShrink: 1 },
@@ -341,7 +397,8 @@ const styles = StyleSheet.create({
   msg: { marginBottom: space[3] },
   retry: { gap: space[2], marginTop: space[2] },
   readyHint: { marginTop: space[2] },
-  endFace: { minHeight: 36, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  // flexGrow 0: the raised face must not stretch to the header's height
+  endFace: { flexGrow: 0, minHeight: 36, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
   goalWrap: { paddingHorizontal: layout.gutter, paddingBottom: space[2], width: '100%', maxWidth: layout.maxWidth + 40, alignSelf: 'center' },
   goal: { backgroundColor: color.soft, borderRadius: radius.md, paddingHorizontal: space[4], paddingVertical: space[3] },
   goalHead: { flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 20 },

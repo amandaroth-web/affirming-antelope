@@ -1,20 +1,32 @@
 import { SCENARIOS, getScenario, type Debrief as DebriefData, type MoveTallies, type ScenarioSpec, type SelfReflection, type Turn } from '@antelope/core';
-import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useIsFocused, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  Keyframe,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { usePracticeSnapshot } from '@/components/practice-loop/Completion';
 import { friendlyError, withTimeout, type FriendlyError } from '@/components/practice-loop/errors';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
+import { SessionSurface, useSessionClose } from '@/components/practice-loop/SessionSurface';
 import { CoachThinking } from '@/components/practice-loop/Thinking';
 import { Brief } from '@/components/roleplay/Brief';
 import { Conversation } from '@/components/roleplay/Conversation';
 import { Debrief, type NextChoice } from '@/components/roleplay/Debrief';
 import { Reflection } from '@/components/roleplay/Reflection';
-import { Button, Raised, Text, WifiSlashIcon, color, haptic, layout, space } from '@/design';
+import { Avatar, Button, Raised, Text, WifiSlashIcon, color, haptic, layout, space } from '@/design';
 import { openDrill, openRoleplay, pickDrill, type PracticeSource } from '@/data/routes';
 import { postJson } from '@/lib/api';
-import { FADE_MS, spring, useReduceMotion } from '@/motion';
+import { FADE_MS, useReduceMotion } from '@/motion';
+import type { Rect } from '@/motion/launch';
 import { useLearner } from '@/state/store';
 
 type Params = { scenarioId: string; activityId?: string; minutes?: string; source?: string };
@@ -23,8 +35,7 @@ export default function RoleplayScreen() {
   const params = useLocalSearchParams<Params>();
   const scenario = getScenario(params.scenarioId);
   // a fresh flow per scenario (e.g. after "Try a harder scenario" replaces this screen)
-  if (!scenario) return <Missing />;
-  return <RoleplayFlow key={scenario.id} scenario={scenario} params={params} />;
+  return <SessionSurface>{scenario ? <RoleplayFlow key={scenario.id} scenario={scenario} params={params} /> : <Missing />}</SessionSurface>;
 }
 
 type Phase = 'brief' | 'chat' | 'reflect' | 'thinking' | 'debrief';
@@ -41,6 +52,11 @@ const THINKING_LINES = [
  * Reflection always comes before AI feedback; the debrief request carries it.
  */
 function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Params }) {
+  const close = useSessionClose();
+  const root = useRef<View>(null);
+  // brief → conversation: the person's portrait walks with you into the meeting and takes its seat in the header
+  const [flight, setFlight] = useState<{ from: Rect; to?: Rect } | null>(null);
+  const [entered, setEntered] = useState(false);
   const opening: Turn[] = [{ id: 't0', speaker: 'employee', text: scenario.openingLine }];
   const [phase, setPhase] = useState<Phase>('brief');
   const [session, setSession] = useState(0);
@@ -113,7 +129,27 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   };
 
   let body: ReactNode;
-  if (phase === 'brief') body = <Brief scenario={scenario} onStart={() => setPhase('chat')} onClose={() => router.back()} />;
+  const startChat = (avatar: View | null) => {
+    setEntered(true);
+    const node = root.current;
+    if (!avatar || !node) return setPhase('chat');
+    avatar.measureLayout(
+      node,
+      (x, y, width, height) => {
+        setFlight({ from: { x, y, width, height } });
+        setPhase('chat');
+      },
+      () => setPhase('chat'),
+    );
+  };
+
+  const onSeat = useCallback((avatar: View | null) => {
+    const node = root.current;
+    if (!avatar || !node) return;
+    avatar.measureLayout(node, (x, y, width, height) => setFlight((f) => (f && !f.to ? { ...f, to: { x, y, width, height } } : f)), () => setFlight(null));
+  }, []);
+
+  if (phase === 'brief') body = <Brief scenario={scenario} onStart={startChat} onClose={close} />;
   else if (phase === 'chat')
     body = (
       <Conversation
@@ -125,7 +161,10 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
           setTurns(t);
           setPhase('reflect');
         }}
-        onLeave={() => router.back()}
+        onLeave={close}
+        arriving={entered && !!flight}
+        seatHidden={!!flight}
+        onSeat={onSeat}
       />
     );
   else if (phase === 'reflect')
@@ -133,7 +172,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
       <Reflection
         name={scenario.persona.name}
         initial={reflection}
-        onClose={() => router.back()}
+        onClose={close}
         onSubmit={(r) => {
           setReflection(r);
           requestDebrief(r, turns);
@@ -150,7 +189,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
           setError(null);
           setPhase('reflect');
         }}
-        onClose={() => router.back()}
+        onClose={close}
       />
     );
   else if (debrief && reflection)
@@ -168,22 +207,102 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
           setReviewSent(true);
         }}
         onNext={next}
-        onClose={() => router.back()}
+        onClose={close}
       />
     );
 
-  return <PhaseFade key={`${phase}-${session}`}>{body}</PhaseFade>;
+  return (
+    <View ref={root} collapsable={false} style={styles.fill}>
+      {/* the first phase arrives with the screen itself (SessionSurface), so it doesn't animate twice */}
+      <Phase
+        key={`${phase}-${session}`}
+        enter={phase === 'brief' ? 'none' : phase === 'chat' && session === 0 ? 'meeting' : 'step'}
+        exit={phase === 'brief' ? 'meeting' : 'step'}
+      >
+        {body}
+      </Phase>
+      {flight?.to ? <AvatarFlight seed={scenario.persona.avatarSeed} from={flight.from} to={flight.to} onLanded={() => setFlight(null)} /> : null}
+    </View>
+  );
 }
 
-/** Each phase arrives with a short rise; a cross-fade under reduced motion. */
-function PhaseFade({ children }: { children: ReactNode }) {
+/*
+ * Phase transitions.
+ *
+ *   step     (chat → reflect → thinking → debrief): the old phase fades out (120ms) while the new one rises
+ *            16pt into place (spring-like ease, 300ms). Reads as "next page", not "new screen".
+ *   meeting  (brief → conversation, "walking into the meeting"):
+ *            0-240   the brief moves past you: scales up 6%, drifts up and fades (ease-in, like stepping through it)
+ *            60-420  the conversation comes into focus: from 96% scale + transparent to rest (ease-out)
+ *            0-460   the person's portrait flies from the brief into its seat in the header (AvatarFlight)
+ *            ~400    they speak: the opening line rises in once you've sat down
+ * Reduced motion: cross-fades only.
+ */
+const STEP_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 16 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }], easing: Easing.out(Easing.cubic) },
+})
+  .duration(300)
+  .reduceMotion(ReduceMotion.Never);
+const STEP_OUT = FadeOut.duration(120).reduceMotion(ReduceMotion.Never);
+const MEETING_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.96 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }], easing: Easing.out(Easing.cubic) },
+})
+  .duration(360)
+  .delay(60)
+  .reduceMotion(ReduceMotion.Never);
+const MEETING_OUT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+  100: { opacity: 0, transform: [{ translateY: -14 }, { scale: 1.06 }], easing: Easing.in(Easing.quad) },
+})
+  .duration(240)
+  .reduceMotion(ReduceMotion.Never);
+const FADE_IN = FadeIn.duration(FADE_MS).reduceMotion(ReduceMotion.Never);
+
+function Phase({ enter, exit, children }: { enter: 'none' | 'step' | 'meeting'; exit: 'step' | 'meeting'; children: ReactNode }) {
   const reduce = useReduceMotion();
-  const p = useSharedValue(0);
+  const entering = enter === 'none' ? undefined : reduce ? FADE_IN : enter === 'meeting' ? MEETING_IN : STEP_IN;
+  const exiting = reduce || exit === 'step' ? STEP_OUT : MEETING_OUT;
+  return (
+    // phases stack (absolute) so an exiting phase never holds layout space from the arriving one
+    <Animated.View entering={entering} exiting={exiting} style={[StyleSheet.absoluteFill, styles.phase]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** The persona's portrait travelling from the brief to the conversation header. */
+function AvatarFlight({ seed, from, to, onLanded }: { seed: string; from: Rect; to: Rect; onLanded: () => void }) {
+  const reduce = useReduceMotion();
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const s = useSharedValue(0);
   useEffect(() => {
-    p.value = reduce ? withTiming(1, { duration: FADE_MS }) : withSpring(1, spring.gentle);
-  }, [p, reduce]);
-  const style = useAnimatedStyle(() => (reduce ? { opacity: p.value } : { opacity: Math.min(1, p.value * 1.5), transform: [{ translateY: (1 - p.value) * 16 }] }));
-  return <Animated.View style={[styles.fill, style]}>{children}</Animated.View>;
+    if (reduce) return onLanded();
+    const landed = (f?: boolean) => {
+      'worklet';
+      if (f) scheduleOnRN(onLanded);
+    };
+    // y leads x slightly (stiffer), so the path curves up and over rather than cutting a straight diagonal
+    x.value = withSpring(1, { damping: 26, stiffness: 190, mass: 1 });
+    y.value = withSpring(1, { damping: 26, stiffness: 260, mass: 1 });
+    s.value = withSpring(1, { damping: 24, stiffness: 230, mass: 1 }, landed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const size = from.width;
+  const style = useAnimatedStyle(() => {
+    const cx = from.x + from.width / 2 + (to.x + to.width / 2 - (from.x + from.width / 2)) * x.value;
+    const cy = from.y + from.height / 2 + (to.y + to.height / 2 - (from.y + from.height / 2)) * y.value;
+    const k = 1 + (to.width / from.width - 1) * s.value;
+    return { transform: [{ translateX: cx - size / 2 }, { translateY: cy - size / 2 }, { scale: k }] };
+  });
+  if (reduce) return null;
+  return (
+    <Animated.View pointerEvents="none" style={[styles.flight, { width: size, height: size }, style]}>
+      <Avatar seed={seed} size={size} ring={color.white} />
+    </Animated.View>
+  );
 }
 
 function Thinking({ error, onRetry, onBack, onClose }: { error: FriendlyError | null; onRetry: () => void; onBack: () => void; onClose: () => void }) {
@@ -242,9 +361,10 @@ function normalize(d: DebriefData): DebriefData {
 }
 
 function Missing() {
+  const close = useSessionClose();
   return (
     <View style={sessionStyles.root}>
-      <SessionHeader onClose={() => router.back()} />
+      <SessionHeader onClose={close} />
       <View style={styles.center}>
         <Text variant="heading" align="center">
           That scenario isn’t here yet.
@@ -256,6 +376,8 @@ function Missing() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: color.white },
+  flight: { position: 'absolute', left: 0, top: 0, zIndex: 20 },
+  phase: { backgroundColor: color.white },
   center: { flex: 1, justifyContent: 'center', paddingHorizontal: layout.gutter },
   errorFace: { alignItems: 'center', gap: space[3], padding: space[6] },
   second: { marginTop: space[3] },

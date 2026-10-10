@@ -52,3 +52,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Simulator motion captures (large; regenerate with apps/mobile/scripts/sim-capture.sh)
+apps/mobile/docs/motion/*.gif
+apps/mobile/docs/motion/*.mp4
+apps/mobile/docs/motion/*.png

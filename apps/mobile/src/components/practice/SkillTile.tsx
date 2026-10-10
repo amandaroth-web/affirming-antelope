@@ -1,6 +1,6 @@
 import { getSkillLevel, type Skill } from '@antelope/core';
 import type { DemoSkillProgress } from '@antelope/core';
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { CheckIcon, LevelPips, PressableSurface, Text, color, radius, space } from '@/design';
@@ -12,11 +12,14 @@ export function SkillTile({
   progress,
   selected,
   onPress,
+  heroRefs,
 }: {
   skill: Skill;
   progress: DemoSkillProgress;
   selected: boolean;
   onPress: () => void;
+  /** Practice's START launches the session out of the selected tile (see motion/launch). */
+  heroRefs?: { card: RefObject<View | null>; title: RefObject<View | null> };
 }) {
   const reduce = useReduceMotion();
   const pop = useSharedValue(selected ? 1 : 0);
@@ -28,6 +31,7 @@ export function SkillTile({
   const lvl = getSkillLevel(progress.level);
 
   return (
+    <View ref={heroRefs?.card} collapsable={false} style={styles.tile}>
     <PressableSurface
       onPress={onPress}
       haptic="tick"
@@ -39,12 +43,14 @@ export function SkillTile({
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={`${skill.name}, ${fresh ? 'not started' : `level ${progress.level}, ${lvl.name}`}`}
-      style={styles.tile}
+      style={styles.fill}
       contentStyle={styles.face}
     >
-      <Text variant="subheading" color={selected ? color.primaryShadow : color.ink} numberOfLines={2} style={styles.name}>
-        {skill.name}
-      </Text>
+      <View ref={heroRefs?.title} collapsable={false} style={styles.name}>
+        <Text variant="subheading" color={selected ? color.primaryShadow : color.ink} numberOfLines={2}>
+          {skill.name}
+        </Text>
+      </View>
       <Text variant="caption" color={color.muted}>
         {fresh ? 'Not started' : `Level ${progress.level} · ${lvl.name}`}
       </Text>
@@ -62,13 +68,15 @@ export function SkillTile({
         <CheckIcon size={13} weight="bold" color={color.white} />
       </Animated.View>
     </PressableSurface>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   tile: { width: '48%', flexGrow: 1 },
   face: { padding: space[4], paddingRight: space[6], minHeight: 104 },
-  name: { marginBottom: 2 },
+  fill: { flexGrow: 1 },
+  name: { marginBottom: 2, alignSelf: 'flex-start' },
   pips: { marginTop: space[3] },
   badge: {
     position: 'absolute',

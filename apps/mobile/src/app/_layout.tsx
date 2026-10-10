@@ -14,6 +14,13 @@ import { useLearner } from '@/state/store';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+const SESSION = {
+  presentation: 'transparentModal',
+  animation: 'none',
+  gestureEnabled: false,
+  contentStyle: { backgroundColor: 'transparent' },
+} as const;
+
 function useHydrated() {
   const [done, setDone] = useState(() => useLearner.persist.hasHydrated());
   useEffect(() => {
@@ -50,9 +57,11 @@ export default function RootLayout() {
       <Animated.View style={[styles.root, app]}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.white } }}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="drill/[id]" options={{ animation: 'slide_from_bottom', gestureEnabled: true }} />
-          <Stack.Screen name="roleplay/[scenarioId]" options={{ animation: 'slide_from_bottom', gestureEnabled: true }} />
-          <Stack.Screen name="lesson/[id]" options={{ animation: "slide_from_bottom", gestureEnabled: true }} />
+          {/* Practice screens: transparent modals with no native animation. SessionSurface owns the
+              transition (container transform from the source, swipe-down dismiss, collapse on close). */}
+          <Stack.Screen name="drill/[id]" options={SESSION} />
+          <Stack.Screen name="roleplay/[scenarioId]" options={SESSION} />
+          <Stack.Screen name="lesson/[id]" options={SESSION} />
         </Stack>
       </Animated.View>
       {!splashGone && <BrandSplash reduce={reduce} onDone={onSplashDone} />}

@@ -93,13 +93,39 @@ export interface Band {
   y: number;
   d: string;
   fill: string;
-  /** Parallax factor: 0 moves with content, higher lags further behind (feels distant). */
-  speed: number;
+}
+
+/** Band spacing, pt. Each band is 2.4 gaps tall, so every point is covered by two or three bands. */
+export const BAND_GAP = 300;
+/** How far (pt) a ridge lags behind the trail by the time it reaches the top of the viewport. */
+export const PARALLAX_DEPTH = 44;
+/** Sun and birds in the sky: the farthest layer. Fraction of scroll they lag by. */
+export const SKY_LAG = 0.35;
+
+/**
+ * Parallax lag for a ridge whose crest sits at `bandY` in content space.
+ *
+ * Depth comes from where a ridge is on screen, not from which band it is: the
+ * top of the viewport is the horizon (the sky and sun are up there), so a ridge
+ * lags more the higher it climbs, and ridges at the bottom move with the trail.
+ * The lag is quadratic in screen position p (0 top, 1 bottom), so its rate
+ * (≈ 2·D·(1.2 − p) / (1.44·H)) eases from ~1.5% of scroll at the bottom edge to
+ * ~9% at the top: distant hills slow down, nearby ones keep pace, nothing sways.
+ *
+ * No gaps: lag is capped at 2.25·D ≈ 99pt and neighbouring ridges differ by
+ * < 0.85·D ≈ 37pt, far less than the 300pt gap minus the 80pt hill swing, and
+ * every band runs 720pt below its crest, so a band never uncovers a hole.
+ */
+export function ridgeLag(bandY: number, scrollY: number, viewportH: number): number {
+  'worklet';
+  const p = Math.min(1.2, Math.max(-0.6, (bandY - scrollY) / viewportH));
+  const q = (1.2 - p) / 1.2;
+  return PARALLAX_DEPTH * q * q;
 }
 
 export function layoutBands(width: number, height: number, palette: string[]): Band[] {
   const bands: Band[] = [];
-  const gap = 300;
+  const gap = BAND_GAP;
   let i = 0;
   for (let y = 210; y < height; y += gap, i++) {
     const h = gap * 2.4;
@@ -114,7 +140,7 @@ export function layoutBands(width: number, height: number, palette: string[]): B
       d += ` Q${xm.toFixed(1)} ${hill(xm).toFixed(1)} ${x1.toFixed(1)} ${hill(x1).toFixed(1)}`;
     }
     d += ` L${width} ${h} L0 ${h} Z`;
-    bands.push({ y, d, fill: palette[i % palette.length], speed: i % 2 === 0 ? 0.08 : 0.02 });
+    bands.push({ y, d, fill: palette[i % palette.length] });
   }
   return bands;
 }

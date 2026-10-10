@@ -1,30 +1,48 @@
 import { getSkill, type ScenarioSpec } from '@antelope/core';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
+import { HeroTarget, useSession } from '@/components/practice-loop/SessionSurface';
 import { ArrowRightIcon, Avatar, Button, ChatCircleDotsIcon, Chip, FlagPennantIcon, Raised, TargetIcon, Text, UserIcon, color, space } from '@/design';
 import { Enter } from '@/motion';
 
 export const DIFFICULTY: Record<ScenarioSpec['difficulty'], string> = { intro: 'Intro', intermediate: 'Intermediate', advanced: 'Advanced' };
 
 /** Before the conversation: who, what's going on, your goal, and how it works. One action: start. */
-export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; onStart: () => void; onClose: () => void }) {
+export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; onStart: (avatar: View | null) => void; onClose: () => void }) {
   const p = scenario.persona;
+  const avatar = useRef<View>(null);
+  const heroTitle = useSession()?.title;
   const first = p.name.split(' ')[0];
   return (
     <View style={sessionStyles.root}>
       <SessionHeader
         onClose={onClose}
         center={
-          <Text variant="overline" color={color.muted}>
-            Role-play
-          </Text>
+          heroTitle ? (
+            <View style={styles.headCenter}>
+              <HeroTarget name="title" fontSize={18}>
+                <Text variant="subheading" numberOfLines={1}>
+                  {heroTitle}
+                </Text>
+              </HeroTarget>
+              <Text variant="caption" color={color.muted}>
+                Role-play
+              </Text>
+            </View>
+          ) : (
+            <Text variant="overline" color={color.muted}>
+              Role-play
+            </Text>
+          )
         }
       />
       <ScrollView contentContainerStyle={[sessionStyles.scroll, styles.content]} showsVerticalScrollIndicator={false}>
         <View style={sessionStyles.column}>
           <Enter from="scale" style={styles.person}>
-            <Avatar seed={p.avatarSeed} size={96} ring={color.white} accessibilityLabel={p.name} />
+            <View ref={avatar} collapsable={false}>
+              <Avatar seed={p.avatarSeed} size={96} ring={color.white} accessibilityLabel={p.name} />
+            </View>
             <View style={styles.personCopy}>
               <Text variant="title" accessibilityRole="header">
                 {p.name}
@@ -81,7 +99,9 @@ export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; 
         </View>
       </ScrollView>
       <Dock>
-        <Button label="Start conversation" fullWidth onPress={onStart} icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />} />
+        <HeroTarget name="cta">
+          <Button label="Start conversation" fullWidth onPress={() => onStart(avatar.current)} icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />} />
+        </HeroTarget>
       </Dock>
     </View>
   );
@@ -100,6 +120,7 @@ function Step({ icon, text }: { icon: ReactNode; text: string }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  headCenter: { alignItems: 'center', maxWidth: 240 },
   content: { paddingTop: space[2], paddingBottom: space[7] },
   person: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   personCopy: { flex: 1, gap: 2 },

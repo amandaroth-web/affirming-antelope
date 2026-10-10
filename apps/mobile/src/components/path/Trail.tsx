@@ -20,15 +20,16 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 /**
  * The trail draws itself in as you scroll: the drawn length follows the bottom
  * of the viewport (strokeDashoffset). The walked part is ochre; ahead is cobalt tint.
+ * `walked` is a shared value so the Path unlock can draw the ochre on the UI thread.
  */
 export const Trail = memo(function Trail({
   layout,
-  walkedLen,
+  walked,
   scrollY,
   viewportH,
 }: {
   layout: TrailLayout;
-  walkedLen: number;
+  walked: SharedValue<number>;
   scrollY: SharedValue<number>;
   viewportH: number;
 }) {
@@ -46,7 +47,7 @@ export const Trail = memo(function Trail({
   });
 
   const ahead = useAnimatedProps(() => ({ strokeDashoffset: L - drawn.value }));
-  const walked = useAnimatedProps(() => ({ strokeDashoffset: L - Math.min(drawn.value, walkedLen) }));
+  const walkedProps = useAnimatedProps(() => ({ strokeDashoffset: L - Math.min(drawn.value, walked.value) }));
 
   return (
     <Svg width={layout.width} height={layout.height} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -69,7 +70,7 @@ export const Trail = memo(function Trail({
         strokeLinecap="round"
         fill="none"
         strokeDasharray={`${L} ${L}`}
-        animatedProps={walked}
+        animatedProps={walkedProps}
       />
     </Svg>
   );

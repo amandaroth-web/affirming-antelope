@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, type ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -13,7 +13,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Mascot, type MascotHandle, type MascotMood, type MascotPose } from '@/components/mascot';
 import { Avatar, QuotesIcon, TargetIcon, Text, border, color, radius, space } from '@/design';
-import { FADE_MS, spring, useReduceMotion } from '@/motion';
+import { FADE_MS, spring, useFades, useListLayout, useReduceMotion } from '@/motion';
+import { takeLaunchPad } from './Composer';
+import { HeroTarget, useSession } from './SessionSurface';
 
 // ---------------------------------------------------------------------------
 // Bubble entrance: rises from the speaker's side with a soft overshoot.
@@ -36,6 +38,55 @@ export function useBubbleEntrance(side: 'left' | 'right', delay = 0, skip = fals
       transform: [{ translateY: (1 - v) * 18 }, { translateX: (1 - v) * (side === 'left' ? -10 : 10) }, { scale: 0.88 + 0.12 * v }],
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// The learner's bubble launches out of the composer: it starts exactly where
+// the words were in the field (left and bottom edges aligned, so the text
+// lifts straight out), then springs to its place in the thread while the
+// thread scrolls to meet it. Without a launch pad (history, opening line) it
+// falls back to the speaker-side rise.
+// ---------------------------------------------------------------------------
+
+const LAUNCH = { damping: 20, stiffness: 250, mass: 0.85 };
+
+export function useComposerLaunch(skip = false) {
+  const reduce = useReduceMotion();
+  const [pad] = useState(() => (skip ? null : takeLaunchPad()));
+  const ref = useRef<View>(null);
+  const dx = useSharedValue(0);
+  const dy = useSharedValue(0);
+  const p = useSharedValue(skip ? 1 : 0);
+  const shown = useSharedValue(skip || !pad ? 1 : 0);
+  const fallback = useBubbleEntrance('right', 0, skip || !!pad);
+  const measured = useRef(false);
+
+  const onLayout = (_e: LayoutChangeEvent) => {
+    if (!pad || measured.current) return;
+    measured.current = true;
+    if (reduce) {
+      shown.value = 1;
+      p.value = withTiming(1, { duration: FADE_MS });
+      return;
+    }
+    ref.current?.measureInWindow((x, y, w, h) => {
+      dx.value = pad.x - x + (pad.width - w > 0 ? 0 : 0);
+      dy.value = pad.y + pad.height - (y + h);
+      shown.value = 1;
+      p.value = withSpring(1, LAUNCH);
+    });
+  };
+
+  const launched = useAnimatedStyle(() => {
+    const k = p.value;
+    if (reduce) return { opacity: k };
+    return {
+      opacity: shown.value,
+      transform: [{ translateX: dx.value * (1 - k) }, { translateY: dy.value * (1 - k) }, { scale: 0.96 + 0.04 * k }],
+    };
+  });
+
+  return { ref, onLayout, style: pad ? launched : fallback };
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +138,35 @@ export function EmployeeBubble({
   );
 }
 
+/**
+ * The employee's bubble while they're replying. One element from the typing
+ * dots to the finished line: its frame springs (layout transition) as the dots
+ * give way to words and as each word arrives, so it grows instead of jumping;
+ * text is clipped to the growing frame, so a new line is revealed, not dropped in.
+ */
+export function LiveEmployeeBubble({ text, typing, seed, name }: { text: string; typing: boolean; seed: string; name?: string }) {
+  const layout = useListLayout();
+  const fades = useFades(200, 90);
+  return (
+    <View style={styles.employeeRow}>
+      <Avatar seed={seed} size={34} accessibilityLabel={name} />
+      <Animated.View layout={layout} style={[styles.employee, styles.live]}>
+        {typing ? (
+          <Animated.View key="dots" exiting={fades.exiting}>
+            <TypingDots />
+          </Animated.View>
+        ) : (
+          <Animated.View key="text" entering={fades.entering}>
+            <Text variant="body" selectable>
+              {text}
+            </Text>
+          </Animated.View>
+        )}
+      </Animated.View>
+    </View>
+  );
+}
+
 /** Three dots that rise in turn: someone is about to speak. */
 export function TypingDots({ tint = color.faint }: { tint?: string }) {
   return (
@@ -119,9 +199,15 @@ function Dot({ i, tint }: { i: number; tint: string }) {
 
 export function SpeechCard({ speaker, seed, line, context }: { speaker: string; seed: string; line: string; context?: string }) {
   const reduce = useReduceMotion();
+  // arriving from Home's START: the button itself becomes this bubble, so it doesn't rise in
+  const heroed = !!useSession()?.hasPiece('cta');
   const avatar = useSharedValue(0);
-  const bubble = useSharedValue(0);
+  const bubble = useSharedValue(heroed ? 1 : 0);
   useEffect(() => {
+    if (heroed) {
+      avatar.value = withDelay(260, withSpring(1, spring.bouncy));
+      return;
+    }
     if (reduce) {
       avatar.value = withTiming(1, { duration: FADE_MS });
       bubble.value = withDelay(80, withTiming(1, { duration: FADE_MS }));
@@ -129,7 +215,7 @@ export function SpeechCard({ speaker, seed, line, context }: { speaker: string; 
     }
     avatar.value = withDelay(60, withSpring(1, spring.bouncy));
     bubble.value = withDelay(220, withSpring(1, { damping: 14, stiffness: 190, mass: 0.9 }));
-  }, [reduce, avatar, bubble]);
+  }, [reduce, heroed, avatar, bubble]);
 
   const avatarStyle = useAnimatedStyle(() => (reduce ? { opacity: avatar.value } : { opacity: Math.min(1, avatar.value * 2), transform: [{ scale: 0.6 + 0.4 * avatar.value }] }));
   const bubbleStyle = useAnimatedStyle(() =>
@@ -151,13 +237,15 @@ export function SpeechCard({ speaker, seed, line, context }: { speaker: string; 
           {speaker}
         </Text>
       </Animated.View>
-      <Animated.View style={[styles.speechWrap, { transformOrigin: '12% 0%' }, bubbleStyle]}>
-        <View style={styles.speechTail} />
-        <View style={styles.speech}>
-          <Text variant="subheading" style={[styles.speechText, line.length > 120 && styles.speechLong]} maxScale={1.5}>
-            “{line}”
-          </Text>
-        </View>
+      <Animated.View style={[{ transformOrigin: '12% 0%' }, bubbleStyle]}>
+        <HeroTarget name="cta" insetTop={8} style={styles.speechWrap}>
+          <View style={styles.speechTail} />
+          <View style={styles.speech}>
+            <Text variant="subheading" style={[styles.speechText, line.length > 120 && styles.speechLong]} maxScale={1.5}>
+              “{line}”
+            </Text>
+          </View>
+        </HeroTarget>
       </Animated.View>
     </View>
   );
@@ -249,6 +337,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4],
     paddingVertical: space[3],
   },
+  live: { overflow: 'hidden' },
   compact: { paddingHorizontal: space[3], paddingVertical: space[2], borderRadius: radius.md },
   compactText: { fontSize: 14, lineHeight: 19 },
   dots: { flexDirection: 'row', gap: 6, paddingVertical: 7, paddingHorizontal: 2 },

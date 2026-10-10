@@ -1,18 +1,28 @@
 import { getLesson, getUnit } from '@antelope/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { CardStack, type CardStackHandle } from '@/components/lesson/CardStack';
 import { CompletionMoment, usePracticeSnapshot } from '@/components/practice-loop/Completion';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
-import { ArrowRightIcon, Button, CaretLeftIcon, Text, color, haptic, layout, space } from '@/design';
+import { SessionSurface, useSessionClose } from '@/components/practice-loop/SessionSurface';
+import { ArrowRightIcon, Button, CaretLeftIcon, Text, color, layout, space } from '@/design';
 import { findActivity, openActivity } from '@/data/routes';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
 import { nextActivity } from '@/state/selectors';
 import { useLearner } from '@/state/store';
 
 export default function LessonScreen() {
+  return (
+    <SessionSurface>
+      <LessonSession />
+    </SessionSurface>
+  );
+}
+
+function LessonSession() {
+  const close = useSessionClose();
   const { id, activityId, minutes } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string }>();
   const lesson = getLesson(id);
   const stack = useRef<CardStackHandle>(null);
@@ -28,7 +38,7 @@ export default function LessonScreen() {
 
   const finish = () => {
     if (done) return;
-    haptic.success();
+    // the completion stamp lands with its own haptic (PracticeTicks); one beat, not two
     recordPractice({
       kind: 'learn',
       skill: unit?.skills[0],
@@ -44,7 +54,7 @@ export default function LessonScreen() {
     const up = activityId && unit ? nextActivity(unit, completed) : undefined;
     return (
       <View style={sessionStyles.root}>
-        <SessionHeader onClose={() => router.back()} />
+        <SessionHeader onClose={close} />
         <View style={styles.doneBody}>
           <CompletionMoment title="Lesson done" subtitle={`${lesson.title}. Now try it out loud.`} before={before}>
             <Dock rule={false} style={styles.flush}>
@@ -61,10 +71,10 @@ export default function LessonScreen() {
               <Button
                 label={up ? 'Start next' : 'Done'}
                 fullWidth
-                onPress={() => (up ? openActivity(up, 'path', { replace: true }) : router.back())}
+                onPress={() => (up ? openActivity(up, 'path', { replace: true }) : close())}
                 icon={up ? <ArrowRightIcon size={20} weight="bold" color={color.white} /> : undefined}
               />
-              {up ? <Button variant="secondary" label="Back to my path" fullWidth onPress={() => router.back()} style={styles.second} /> : null}
+              {up ? <Button variant="secondary" label="Back to my path" fullWidth onPress={close} style={styles.second} /> : null}
             </Dock>
           </CompletionMoment>
         </View>
@@ -75,7 +85,7 @@ export default function LessonScreen() {
   return (
     <View style={sessionStyles.root}>
       <SessionHeader
-        onClose={() => router.back()}
+        onClose={close}
         center={<Progress count={lesson.cards.length} index={index} />}
         trailing={
           <Text variant="caption" color={color.muted}>
@@ -143,9 +153,10 @@ function ProgressDot({ state }: { state: 'done' | 'now' | 'todo' }) {
 }
 
 function Missing() {
+  const close = useSessionClose();
   return (
     <View style={sessionStyles.root}>
-      <SessionHeader onClose={() => router.back()} />
+      <SessionHeader onClose={close} />
       <View style={styles.doneBody}>
         <Text variant="heading" align="center">
           That lesson isn’t here yet.

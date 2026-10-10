@@ -1,5 +1,6 @@
 import { DAILY_DRILL_ORDER, DRILLS, MI_FOR_LEADERS, SCENARIOS, type PathActivity, type ScenarioSpec, type SkillId, type SkillLevelNumber } from '@antelope/core';
 import { router } from 'expo-router';
+import { markReplace } from '@/motion/launch';
 
 /**
  * Route contract for the practice loop. Screens that launch practice call
@@ -20,7 +21,18 @@ export type PracticeSource = 'today' | 'path' | 'assignment' | 'practice' | 'cha
  * returns to where the learner started.
  */
 type Nav = { replace?: boolean };
-const go = (nav: Nav | undefined, href: Parameters<typeof router.push>[0]) => (nav?.replace ? router.replace(href) : router.push(href));
+
+// Rapid taps never stack two practice screens: one launch per transition window.
+let lockedUntil = 0;
+const go = (nav: Nav | undefined, href: Parameters<typeof router.push>[0]) => {
+  const now = Date.now();
+  if (now < lockedUntil) return;
+  lockedUntil = now + 650;
+  if (nav?.replace) {
+    markReplace();
+    router.replace(href);
+  } else router.push(href);
+};
 
 export function openDrill(id: string, opts: { activityId?: string; minutes?: number; source: PracticeSource } & Nav) {
   go(opts, {

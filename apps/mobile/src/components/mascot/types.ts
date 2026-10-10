@@ -1,11 +1,12 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 
 export type MascotPose = 'wave' | 'celebrate' | 'head';
-export type MascotMood = 'idle' | 'listening' | 'cheer';
+/** `thinking`: head tilted the other way, eyes up, while the coach works something out. */
+export type MascotMood = 'idle' | 'listening' | 'thinking' | 'cheer';
 
 /**
- * Stable mascot API. The sprite rig (MascotSprite) implements it today; a Rive
- * implementation can drop in behind the same props and handle later.
+ * Stable mascot API. RiveMascot implements it on native dev/release builds; the sprite rig
+ * (MascotSprite) is the fallback for Expo Go, Expo web and Rive load failures.
  */
 export interface MascotProps {
   pose?: MascotPose;
@@ -29,4 +30,8 @@ export interface MascotHandle {
   hop: () => void;
   /** Quick turn toward the viewer, then a wave. */
   turn: () => void;
+  /** "Yes, that's it": a head nod with a soft squint. */
+  nod: () => void;
+  /** One big jump for joy (the wave pose switches to the celebrate drawing mid-air). */
+  cheer: () => void;
 }

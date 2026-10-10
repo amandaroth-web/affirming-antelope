@@ -1,10 +1,18 @@
-import { forwardRef, useEffect, useState } from 'react';
-import { Platform, StyleSheet, TextInput, View, type NativeSyntheticEvent, type TextInputKeyPressEventData } from 'react-native';
+import { forwardRef, useEffect, useRef, useState } from 'react';
+import { Platform, StyleSheet, Text, TextInput, View, type NativeSyntheticEvent, type TextInputKeyPressEventData } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { ArrowUpIcon, PressableSurface, border, color, font, haptic, radius, space } from '@/design';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
 
 const MIN_H = 48;
+
+/** Where the last sent message left the composer (window coords), for the bubble's launch. */
+let launchPad: { x: number; y: number; width: number; height: number; at: number } | null = null;
+export function takeLaunchPad() {
+  const l = launchPad;
+  launchPad = null;
+  return l && Date.now() - l.at < 1500 ? l : null;
+}
 const MAX_H = 132;
 
 export interface ComposerProps {
@@ -30,10 +38,13 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
   const reduce = useReduceMotion();
   const [h, setH] = useState(MIN_H);
   const [focused, setFocused] = useState(false);
+  const [lifted, setLifted] = useState(false);
+  useEffect(() => setLifted(false), [value]);
   const ready = value.trim().length > 0 && !busy;
   const live = useSharedValue(ready ? 1 : 0);
   const pop = useSharedValue(1);
   const focus = useSharedValue(0);
+  const fieldRef = useRef<View>(null);
 
   useEffect(() => {
     live.value = reduce ? withTiming(ready ? 1 : 0, { duration: FADE_MS }) : withSpring(ready ? 1 : 0, spring.snappy);
@@ -62,7 +73,22 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
       haptic.warn();
       return;
     }
-    onSend();
+    // remember where the words leave from, so the bubble can launch out of the field
+    const node = fieldRef.current;
+    if (!node) return onSend();
+    let sent = false;
+    const go = () => {
+      if (sent) return;
+      sent = true;
+      onSend();
+    };
+    node.measureInWindow((x, y, width, height) => {
+      if (width > 0) launchPad = { x, y, width, height, at: Date.now() };
+      // the words have left the field: hide them so they aren't on screen twice while the bubble lifts off
+      setLifted(true);
+      go();
+    });
+    setTimeout(go, 40);
   };
 
   const onKeyPress =
@@ -78,7 +104,21 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
 
   return (
     <View style={styles.row}>
-      <Animated.View style={[styles.field, fieldStyle]}>
+      <Animated.View ref={fieldRef} collapsable={false} style={[styles.field, fieldStyle]}>
+        {/* invisible mirror of the text: its height drives the field (TextInput contentSize isn't reliable here) */}
+        <Text
+          style={[styles.input, styles.mirror]}
+          onLayout={(e) => {
+            const next = Math.max(MIN_H, Math.min(MAX_H, Math.ceil(e.nativeEvent.layout.height)));
+            setH((prev) => (Math.abs(next - prev) < 2 ? prev : next));
+          }}
+          maxFontSizeMultiplier={1.4}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {value || ' '}
+          {value.endsWith('\n') ? ' ' : ''}
+        </Text>
         <TextInput
           ref={ref}
           value={value}
@@ -90,11 +130,10 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyPress={onKeyPress}
-          onContentSizeChange={(e) => setH(Math.max(MIN_H, Math.min(MAX_H, e.nativeEvent.contentSize.height + 2)))}
           scrollEnabled={h >= MAX_H}
           maxFontSizeMultiplier={1.4}
           accessibilityLabel={accessibilityLabel ?? placeholder}
-          style={[styles.input, { height: h }]}
+          style={[styles.input, { height: h }, lifted && styles.lifted]}
           textAlignVertical="top"
         />
       </Animated.View>
@@ -136,5 +175,7 @@ const styles = StyleSheet.create({
     // web: no focus ring, no resize grip
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', resize: 'none' } as object) : null),
   },
+  lifted: { color: 'transparent' },
+  mirror: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
   sendFace: { width: 48, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

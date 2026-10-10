@@ -1,18 +1,20 @@
 import type { MoveTallies } from '@antelope/core';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { MoveMarker } from '@/components/practice-loop/MoveMarker';
 import { TALLY_ROWS } from '@/components/practice-loop/moves';
-import { Text, border, color, moveColor, radius, space } from '@/design';
-import { FADE_MS, RollingNumber, STAGGER, useReduceMotion } from '@/motion';
+import { Text, border, color, haptic, moveColor, radius, space } from '@/design';
+import { FADE_MS, RollingNumber, useReduceMotion } from '@/motion';
 
 /**
  * "Your moves": counts per move as rolling counters (staggered), then a
  * reflections-vs-questions balance beam that tips toward the heavier side.
  * A balance to notice, not a grade.
  */
-export function MovesPanel({ tallies, name }: { tallies: MoveTallies; name: string }) {
+export function MovesPanel({ tallies, name, play = true, settled }: { tallies: MoveTallies; name: string; play?: boolean; settled?: boolean }) {
+  const live = play || !!settled;
   const reflections = tallies.simpleReflections + tallies.complexReflections + tallies.summaries;
   const questions = tallies.openQuestions + tallies.closedQuestions;
   const first = name.split(' ')[0];
@@ -27,13 +29,13 @@ export function MovesPanel({ tallies, name }: { tallies: MoveTallies; name: stri
               <Text variant="caption" color={v ? color.ink : color.muted} style={styles.cellLabel} numberOfLines={2}>
                 {r.label}
               </Text>
-              <RollingNumber value={v} variant="subheading" delay={300 + i * STAGGER * 1.5} color={v ? color.ink : color.faint} />
+              <RollingNumber value={live ? v : 0} from={settled ? v : 0} variant="subheading" delay={settled ? 0 : 80 + i * 70} color={v ? color.ink : color.faint} />
             </View>
           );
         })}
       </View>
 
-      <Balance reflections={reflections} questions={questions} />
+      <Balance reflections={reflections} questions={questions} play={live} settled={settled} wait={80 + TALLY_ROWS.length * 70 + 220} />
       <Text variant="body" color={color.muted} style={styles.balanceCopy}>
         {reflections === 0 && questions === 0
           ? `This one was mostly statements. Next time, try one question and one reflection with ${first}.`
@@ -45,13 +47,26 @@ export function MovesPanel({ tallies, name }: { tallies: MoveTallies; name: stri
   );
 }
 
-function Balance({ reflections, questions }: { reflections: number; questions: number }) {
+function Balance({ reflections, questions, play, settled, wait }: { reflections: number; questions: number; play: boolean; settled?: boolean; wait: number }) {
   const reduce = useReduceMotion();
-  const tilt = useSharedValue(0);
   const target = Math.max(-12, Math.min(12, (questions - reflections) * 4));
+  const tilt = useSharedValue(settled ? target : 0);
   useEffect(() => {
-    tilt.value = reduce ? withTiming(target, { duration: FADE_MS }) : withDelay(700, withSpring(target, { damping: 7, stiffness: 90, mass: 1.1 }));
-  }, [target, reduce, tilt]);
+    if (!play || settled) return;
+    // the beam waits for the tallies to land, then tips under their weight
+    tilt.value = reduce ? withTiming(target, { duration: FADE_MS }) : withDelay(wait, withSpring(target, { damping: 7, stiffness: 90, mass: 1.1 }));
+  }, [target, reduce, tilt, play, settled, wait]);
+  // one light tick the first time the beam reaches its lean (its visual peak), not on every wobble
+  const peaked = useSharedValue(settled || reduce || target === 0 ? 1 : 0);
+  useAnimatedReaction(
+    () => Math.abs(tilt.value) >= Math.abs(target) * 0.98,
+    (hit, prev) => {
+      if (hit && !prev && !peaked.value) {
+        peaked.value = 1;
+        scheduleOnRN(haptic.tick);
+      }
+    },
+  );
   const beam = useAnimatedStyle(() => ({ transform: [{ rotate: `${tilt.value}deg` }] }));
   // pans hang level while the beam tips
   const panL = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.sin((tilt.value * Math.PI) / 180) * 100 }] }));

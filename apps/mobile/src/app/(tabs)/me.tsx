@@ -100,6 +100,15 @@ export default function Me() {
               router.navigate('/path');
             }}
           />
+          {__DEV__ ? (
+            <LinkRow
+              title="Replay path unlock"
+              onPress={() => {
+                s.replayPathUnlock();
+                router.navigate('/path');
+              }}
+            />
+          ) : null}
           <LinkRow title="Reset demo data" onPress={() => s.resetDemo()} last />
         </Raised>
       </Enter>

@@ -8,7 +8,8 @@
     "scheme": "antelope",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anonymous.affirming-antelope"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +31,8 @@
           "image": "./assets/images/splash-icon-deep.png",
           "imageWidth": 200
         }
-      ]
+      ],
+      "./plugins/with-ios-scene-lifecycle"
     ],
     "experiments": {
       "typedRoutes": true,
