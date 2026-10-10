@@ -46,8 +46,8 @@ The mascot is the expressive version of the antelope character. `public/brand-ch
 - Navy: `#0A284E` for the logo, illustration contours, and dark brand applications.
 - Ochre: `#E8A638` for achievement, emphasis, and the antelope.
 - Pale periwinkle: `#EEF1FF` for learning surfaces.
-- Ink: `#3C3C3C` for primary text.
-- Muted: `#687568` for secondary text.
+- Ink: `#2E3448` for primary text. A cool near-navy so text sits with the periwinkle surfaces.
+- Muted: `#68708C` for secondary text (4.9:1 on white, 4.4:1 on pale periwinkle; use ink for small text on periwinkle).
 - White: `#FFFFFF` for the page and raised surfaces.
 
 Use cobalt as the primary UI color. Ochre is an accent, not a second call-to-action color.
@@ -64,7 +64,7 @@ Use cobalt as the primary UI color. Ochre is an accent, not a second call-to-act
 - Standard surface radius: 20px.
 - Large illustration radius: 32px.
 - Standard border: 2px.
-- Raised surfaces use a 5-6px bottom shadow in the related darker token.
+- Raised surfaces sit on a solid bottom shadow in the related darker token. The depth scale is 3 (small: learner bubble, compact controls), 4 (medium: choice tiles, medium buttons), 5 (large: standard surfaces, large buttons, bubbles) and 6 (extra large: hero cards). Mobile tokens: `depth.sm/md/lg/xl`; web: `--depth-sm/md/lg/xl`.
 - Interactive controls lose their bottom shadow and move down when pressed.
 
 ## Voice

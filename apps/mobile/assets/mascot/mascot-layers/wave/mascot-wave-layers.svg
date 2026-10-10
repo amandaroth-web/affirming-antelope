@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="674" height="978" viewBox="0 0 674 978">
+  <!-- Wave pose, unflattened. Stack back ’ front. Hide 08-lids for the still; show it to blink. -->
+  <g id="body"><image href="00-body.png" width="674" height="978"/></g>
+  <g id="upper-arm"><image href="01-upper-arm.png" width="674" height="978"/></g>
+  <g id="forearm"><image href="02-forearm.png" width="674" height="978"/></g>
+  <g id="hoof"><image href="03-hoof.png" width="674" height="978"/></g>
+  <g id="neckerchief"><image href="04-neckerchief.png" width="674" height="978"/></g>
+  <g id="head"><image href="05-head.png" width="674" height="978"/></g>
+  <g id="ears"><image href="06-ears.png" width="674" height="978"/></g>
+  <g id="eyes"><image href="07-eyes.png" width="674" height="978"/></g>
+  <g id="lids" opacity="0"><image href="08-lids.png" width="674" height="978"/></g>
+</svg>
