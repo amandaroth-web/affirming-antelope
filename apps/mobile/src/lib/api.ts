@@ -23,6 +23,18 @@ function apiBase(): string {
   return `http://localhost:${DEV_API_PORT}`;
 }
 
+/**
+ * Headers sent on every API call. `x-antelope-key` carries the shared app
+ * token (`EXPO_PUBLIC_APP_TOKEN`) when set. It ships inside the app binary, so
+ * it only deters casual abuse; real per-user auth arrives with accounts.
+ */
+function apiHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = process.env.EXPO_PUBLIC_APP_TOKEN;
+  if (token) headers['x-antelope-key'] = token;
+  return headers;
+}
+
 export function apiUrl(path: string): string {
   return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }
@@ -45,7 +57,7 @@ async function failure(res: { status: number; text(): Promise<string> }): Promis
 export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(apiUrl(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders(),
     body: JSON.stringify(body),
     signal,
   });
@@ -72,7 +84,7 @@ export async function postStream(
   const doFetch = (expoFetch as unknown as typeof fetch) ?? fetch;
   const res = await doFetch(apiUrl(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: apiHeaders(),
     body: JSON.stringify(body),
     signal,
   });
