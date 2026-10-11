@@ -61,11 +61,14 @@ returns 404.
 ## AI API auth
 
 The three AI routes (`/api/roleplay/turn`, `/api/roleplay/debrief`, `/api/drill/feedback`)
-call `authorize()` from `src/lib/ai/auth.ts`:
+call `authenticate()` and then `chargeQuota()` from `src/lib/ai/auth.ts`. Full design:
+`docs/anonymous-auth.md`.
 
-- `Authorization: Bearer <supabase access token>` is verified with `supabase.auth.getClaims(token)`, which checks it against the project JWKS, with no session stored. Each user is rate limited (`{bucket}:user:{id}`, same per-minute limits as guests). A malformed, expired or forged token gets `401 {"error":"invalid_token"}`; it never falls back to guest.
-- Otherwise the request is a guest: the `x-antelope-key` app token is required when `APP_CLIENT_TOKEN` is set (`401 {"error":"unauthorized"}`), and guests are limited per IP. With `APP_CLIENT_TOKEN` unset (local dev), guests stay allowed.
-- CORS now allows the `Authorization` header. Mock mode (`AI_MOCK`) is unchanged.
+- `Authorization: Bearer <supabase access token>` is required (guests are Supabase anonymous users). It is verified with `supabase.auth.getClaims(token)`; a malformed, expired or forged token gets `401 {"error":"invalid_token"}`, no token gets `401 auth_required`.
+- After validating the body, `chargeQuota()` calls `consume_ai_quota(bucket)` with the caller's JWT: durable daily + per-minute limits per user (lower for anonymous users) and a global daily ceiling. Over a limit: `429 quota_exceeded` with `retry_after`; over the ceiling: `503 ai_resting`.
+- Legacy: the `x-antelope-key` app token still works until 2026-10-25 (`ALLOW_LEGACY_APP_TOKEN`), with a per-IP durable quota that needs the secret key.
+- Local dev with no Supabase env at all: calls are allowed with in-memory limits. CORS and mock mode (`AI_MOCK`) are unchanged; quotas apply in mock mode too.
+- Route tests: `apps/web/scripts/test-ai-auth.mjs` (local only).
 
 ## Env
 
@@ -73,7 +76,9 @@ call `authorize()` from `src/lib/ai/auth.ts`:
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | web | Local: `http://127.0.0.1:54321` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | web | Local: the publishable key from `supabase status` (a public default). Safe in the browser. |
-| `APP_CLIENT_TOKEN`, `ANTHROPIC_API_KEY`, `AI_MOCK`, … | web | Unchanged; see `.env.example`. |
+| `SUPABASE_SECRET_KEY` | web, server only | The secret key (or legacy `SUPABASE_SERVICE_ROLE_KEY`). merge-anonymous and the legacy quota return 503 without it. |
+| `APP_CLIENT_TOKEN`, `ALLOW_LEGACY_APP_TOKEN` | web | Legacy guest token, until 2026-10-25. |
+| `ANTHROPIC_API_KEY`, `AI_MOCK`, … | web | Unchanged; see `.env.example`. |
 
 ## Run it locally
 
