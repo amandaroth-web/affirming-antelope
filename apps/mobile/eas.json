@@ -11,12 +11,19 @@
     },
     "preview": {
       "distribution": "internal",
-      "environment": "preview"
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://affirmingantelope.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fiuqpmzqelzlxjcbdjac.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW"
+      }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://affirming-antelope-ruby.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://affirmingantelope.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://fiuqpmzqelzlxjcbdjac.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW"
       },
       "environment": "production"
     }
