@@ -61,6 +61,8 @@ interface OutboxState {
   markStateDirty: (userId: string, dirty: boolean) => void;
   /** Hand one user's waiting ops to another (a guest merged into an account). Rows carry no user id. */
   rekey: (fromUserId: string, toUserId: string) => void;
+  /** Sign-out: forget every waiting op, whoever it belonged to. */
+  clear: () => void;
 }
 
 export const useOutbox = create<OutboxState>()(
@@ -83,6 +85,7 @@ export const useOutbox = create<OutboxState>()(
             })),
           ],
         })),
+      clear: () => set({ entries: [], stateDirty: {}, dropped: [], stalled: false }),
       markStateDirty: (userId, dirty) => set((s) => ({ stateDirty: { ...s.stateDirty, [userId]: dirty } })),
       rekey: (fromUserId, toUserId) =>
         set((s) => {

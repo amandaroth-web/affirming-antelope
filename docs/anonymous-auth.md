@@ -137,14 +137,32 @@ What the server does (`public.merge_anonymous_user`, which only the service role
 
 ### Sign out
 
-- Call `supabase.auth.signOut({ scope: 'local' })`. The engine then calls
-  `signInAnonymously()` for a fresh guest with a new uid. Local practice stays on the
-  device (as before: "Your practice stays on this phone"); the device's progress document
-  becomes the new guest's first `learner_state`, and the account's records stay local
-  without syncing to the guest. If the sign-in fails, stay local-only until it succeeds.
+Sign out starts a **clean guest**. Clinicians share devices, so the next person must not
+see or inherit the signed-out account's practice, history, cohort, inbox or name. The
+account's practice lives on the server, so signing back in restores it.
+
+1. **Flush first** (`flushBeforeSignOut`, 8 s timeout): the outbox and `learner_state` go
+   to the server. If something can't be sent (offline), the confirm sheet says "Some
+   practice hasn't synced yet. Sign out anyway?" with **Wait** (stay signed in, keep
+   retrying) and **Sign out anyway**.
+2. `supabase.auth.signOut({ scope: 'local' })`.
+3. **Wipe** (`resetDevice` in `sync/engine.ts`): learner store back to a new install's state
+   (device settings stay), outbox, cached profile / cohorts / assignments / submissions /
+   reviews, the welcome (`onboarded: false`, so the next person sees the welcome and track
+   step), and the analytics identity (`reset()`). The persisted AsyncStorage / localStorage
+   copies of the learner store and outbox are removed; the account store keeps only its
+   emptied state.
+4. `ensureSession()` quietly creates a new anonymous user (new uid, no data).
+5. Signing back in is the "Existing account" flow above with a guest that has nothing to
+   merge: `adoptOnSignIn` takes the account's progress from the server.
+
+The same wipe runs if an account's session is revoked while signed in (SIGNED_OUT without
+`signOut`). A guest that only loses its session keeps its practice: the next guest adopts it
+(`anonymousId` hand-over), since that data was never an account's.
+
 - Don't sign out an anonymous user who has progress unless they confirm. Their data is
   only reachable through that session, so signing out loses it. Offer "Save your
-  progress" (upgrade) first.
+  progress" (upgrade) first. (The app only offers sign out to signed-in accounts.)
 
 ### Installs from before this change
 

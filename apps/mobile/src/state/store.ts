@@ -141,6 +141,8 @@ export interface LearnerActions {
   setDemo: (on: boolean) => void;
   /** Start over on the active track (keeps settings and the track choice). */
   resetProgress: () => void;
+  /** Sign-out: back to a brand-new install's state (no track, no practice). Only device settings stay. */
+  wipe: () => void;
   previewPathwayComplete: () => void;
 }
 
@@ -328,6 +330,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
           if (on) return { ...demoSeed(weekdayIndex()), ...keep };
           return { ...freshSeed(s.activePathwayId, s.pathwayChosenAt ?? new Date().toISOString()), ...keep };
         }),
+      wipe: () => set((s) => ({ ...seed(), settings: s.settings })),
       resetProgress: () =>
         set((s) => ({
           ...(s.demo ? demoSeed(weekdayIndex()) : freshSeed(s.activePathwayId, s.pathwayChosenAt)),
