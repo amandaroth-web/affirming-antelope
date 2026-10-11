@@ -57,11 +57,19 @@ rate limits, so review the diff), or set these by
 hand in the hosted dashboard:
 
 - **Auth > Sign In / Providers > Email**: enabled, signups on, email OTP length 6,
-  OTP expiry 600 s, confirm email off.
+  OTP expiry 600 s, **confirm email on** (required once anonymous sign-ins are on; see
+  `docs/anonymous-auth.md`).
+- **Auth > Sign In / Providers > Allow anonymous sign-ins**: on when the anonymous-auth
+  mobile release ships.
 - **Auth > Email Templates**: "Magic Link" and "Confirm signup" use the subject
-  `Your Affirming Antelope code: {{ .Token }}` and the body in `templates/otp.html`.
+  `Your Affirming Antelope code: {{ .Token }}`, "Change Email Address" uses
+  `Confirm your new email: {{ .Token }}`, all with the body in `templates/otp.html`.
 - **Auth > URL Configuration**: Site URL = the web app's URL; redirect URLs add
   `antelope://**` and any web origins.
 - **Auth > SMTP**: a real SMTP provider (the built-in sender is heavily rate limited).
 - **Auth > Rate Limits**: keep the hosted defaults; the local values are loosened for dev.
+  Anonymous users: 30/hour/IP. CAPTCHA (Turnstile) is documented for later in
+  `docs/anonymous-auth.md`.
+- AI quotas and the global ceiling: `app_private.ai_quota_limits` / `ai_global_limits`
+  (edit from the SQL editor).
 - Trainer codes: insert into `app_private.trainer_codes` from the SQL editor.

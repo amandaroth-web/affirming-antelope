@@ -183,8 +183,9 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
-# Allow/disallow anonymous sign-ins to your project.
-enable_anonymous_sign_ins = false
+# Allow/disallow anonymous sign-ins to your project. On: every app user is a Supabase user
+# from first launch (guests are anonymous users). See docs/anonymous-auth.md.
+enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
@@ -209,6 +210,9 @@ email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
+# A device signs in anonymously once and then refreshes, so 30/hour/IP covers a clinic or
+# classroom behind one NAT while capping account farming. Hosted: Auth > Rate Limits
+# (docs/anonymous-auth.md). AI spend is capped separately by consume_ai_quota().
 anonymous_users = 30
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
@@ -232,7 +236,13 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Must be on with anonymous sign-ins: with it off, Supabase Auth lets an anonymous user
+# attach ANY unclaimed email via updateUser({ email }) with no code (and lets password
+# sign-ups skip verification), so someone could pre-claim another person's address.
+# On, the email change sends a code (email_change template) and verifyOtp completes it.
+# signInWithOtp is unaffected: new users get the `confirmation` template, which has the
+# same 6-digit code. Hosted: Auth > Sign In / Providers > Email > "Confirm email" on.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
