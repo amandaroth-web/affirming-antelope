@@ -180,6 +180,9 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', resize: 'none' } as object) : null),
   },
   lifted: { color: 'transparent' },
-  mirror: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0 },
+  // Measuring only. On the web an absolutely positioned sibling paints above the
+  // in-flow <textarea>, so without these the invisible mirror swallowed every tap
+  // on the field and it could never be focused by touch or click.
+  mirror: { position: 'absolute', left: 0, right: 0, top: 0, opacity: 0, zIndex: -1, pointerEvents: 'none' },
   sendFace: { width: 48, height: 44, alignItems: 'center', justifyContent: 'center' },
 });
