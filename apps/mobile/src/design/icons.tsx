@@ -6,6 +6,8 @@ import { color } from './tokens';
  * weight="bold" for UI, "fill" for the active tab. Never emoji.
  */
 export {
+  ArrowsLeftRightIcon,
+  StethoscopeIcon,
   ArrowCounterClockwiseIcon,
   ArrowLeftIcon,
   ArrowRightIcon,

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     if (!spec) throw new ApiError(404, `Unknown scenario "${id}".`);
     const turns = parseTurns(obj.turns, { lastMustBeLearner: true });
 
-    if (mode === "mock") return streamResponse(req, mockStream(mockEmployeeReply(turns), req.signal));
+    if (mode === "mock") return streamResponse(req, mockStream(mockEmployeeReply(turns, spec.setting), req.signal));
     return streamResponse(req, await streamEmployeeReply(spec, turns, req.signal));
   } catch (err) {
     return errorResponse(req, err);

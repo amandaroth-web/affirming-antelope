@@ -15,10 +15,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
+import { callName } from '@/components/practice-loop/names';
 import { MoveMarker } from '@/components/practice-loop/MoveMarker';
 import { FAMILY, MOVE, ZONE, moveLabel, stanceLabel, type MoveFamily, type ZoneKey } from '@/components/practice-loop/moves';
 import { EmployeeBubble, LearnerBubble } from '@/components/practice-loop/Speech';
-import { ChartLineIcon, ListBulletsIcon, Text, border, color, haptic, radius, space, zone as zoneTint } from '@/design';
+import { ChartLineIcon, ListBulletsIcon, Text, border, color, haptic, radius, space, zone as zoneTint, type AvatarIdentity } from '@/design';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -118,13 +119,13 @@ function segLen(seg: [Pt, Pt, Pt, Pt], to = 1) {
 export function ReplayChart({
   exchanges,
   name,
-  seed,
+  avatar,
   play = true,
   settled,
 }: {
   exchanges: Exchange[];
   name: string;
-  seed: string;
+  avatar: AvatarIdentity;
   /** Hold the trace until the chart is on screen and it's its turn. */
   play?: boolean;
   /** Already seen: draw it finished. */
@@ -239,7 +240,7 @@ export function ReplayChart({
   const first = exchanges[0];
   const lastEx = exchanges[n - 1];
   const summary = n
-    ? `${name} started ${stanceLabel(first.stance, first.value).toLowerCase()} and ended ${stanceLabel(lastEx.stance, lastEx.value).toLowerCase()}, over ${n - 1} ${n - 1 === 1 ? 'exchange' : 'exchanges'}.`
+    ? `${callName(name)} started ${stanceLabel(first.stance, first.value).toLowerCase()} and ended ${stanceLabel(lastEx.stance, lastEx.value).toLowerCase()}, over ${n - 1} ${n - 1 === 1 ? 'exchange' : 'exchanges'}.`
     : '';
   const s = sel !== null ? exchanges[sel] : null;
 
@@ -247,7 +248,7 @@ export function ReplayChart({
     <View>
       <View style={styles.toggleRow}>
         <Text variant="caption" color={color.muted} style={styles.flex}>
-          {asList ? 'Each exchange, in order.' : 'How open Darnell was after each of your replies.'.replace('Darnell', name.split(' ')[0])}
+          {asList ? 'Each exchange, in order.' : `How open ${callName(name)} was after each of your replies.`}
         </Text>
         <Pressable
           onPress={() => setAsList((v) => !v)}
@@ -264,7 +265,7 @@ export function ReplayChart({
       </View>
 
       {asList ? (
-        <ExchangeList exchanges={exchanges} seed={seed} name={name} />
+        <ExchangeList exchanges={exchanges} avatar={avatar} name={name} />
       ) : (
         <>
           <GestureDetector gesture={gesture}>
@@ -333,7 +334,7 @@ export function ReplayChart({
             <View style={styles.legendItem}>
               <View style={[styles.point, styles.legendPoint]} />
               <Text variant="caption" color={color.muted}>
-                {name.split(' ')[0]}’s replies
+                {callName(name)}’s replies
               </Text>
             </View>
             {families.map((f) => (
@@ -358,7 +359,7 @@ export function ReplayChart({
             {s ? (
               <Animated.View style={[styles.callout, { width: cw }, callout]} accessibilityLiveRegion="polite">
                 <Animated.View style={[styles.caret, caret]} />
-                <ExchangeDetail e={s} seed={seed} name={name} />
+                <ExchangeDetail e={s} avatar={avatar} name={name} />
               </Animated.View>
             ) : (
               <Text variant="caption" color={color.muted} align="center" style={styles.hint}>
@@ -410,8 +411,8 @@ function PopIn({
   );
 }
 
-function ExchangeDetail({ e, seed, name }: { e: Exchange; seed: string; name: string }) {
-  const first = name.split(' ')[0];
+function ExchangeDetail({ e, avatar, name }: { e: Exchange; avatar: AvatarIdentity; name: string }) {
+  const first = callName(name);
   return (
     <View style={styles.detail}>
       <View style={styles.detailHead}>
@@ -433,7 +434,7 @@ function ExchangeDetail({ e, seed, name }: { e: Exchange; seed: string; name: st
           <LearnerBubble text={e.learner.text} compact />
         </>
       ) : null}
-      <EmployeeBubble text={e.employee.text} seed={seed} name={name} compact />
+      <EmployeeBubble text={e.employee.text} avatar={avatar} name={name} compact />
       {e.learnerNote || e.employeeNote ? (
         <Text variant="caption" color={color.muted} style={styles.note}>
           {[e.learnerNote, e.employeeNote].filter(Boolean).join(' ')}
@@ -443,12 +444,12 @@ function ExchangeDetail({ e, seed, name }: { e: Exchange; seed: string; name: st
   );
 }
 
-function ExchangeList({ exchanges, seed, name }: { exchanges: Exchange[]; seed: string; name: string }) {
+function ExchangeList({ exchanges, avatar, name }: { exchanges: Exchange[]; avatar: AvatarIdentity; name: string }) {
   return (
     <View style={styles.list}>
       {exchanges.map((e) => (
         <View key={e.index} style={styles.listItem}>
-          <ExchangeDetail e={e} seed={seed} name={name} />
+          <ExchangeDetail e={e} avatar={avatar} name={name} />
         </View>
       ))}
     </View>

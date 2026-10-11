@@ -11,6 +11,7 @@ export * from './IconButton';
 export * from './LevelPips';
 export * from './ListRow';
 export * from './Pip';
+export * from './personaAge';
 export * from './PressableSurface';
 export * from './ProgressBar';
 export * from './ProgressRing';

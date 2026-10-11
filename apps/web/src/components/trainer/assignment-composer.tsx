@@ -8,10 +8,8 @@ import { createAssignment } from "@/app/trainer/actions";
 import { track } from "@/lib/analytics/client";
 import {
   DIFFICULTY,
-  DRILL_OPTIONS,
-  DRILL_SKILLS,
-  LESSON_OPTIONS,
-  SCENARIO_OPTIONS,
+  catalogFor,
+  counterpartOf,
   dueLabel,
   itemDetail,
   itemTitle,
@@ -26,12 +24,19 @@ import { fieldClass, hintClass, labelClass } from "./fields";
 
 type Mode = "skill" | "drill" | "roleplay" | "learn";
 
-const MODES: { id: Mode; label: string; hint: string }[] = [
-  { id: "skill", label: "Drills on a skill", hint: "Any N short practices on one skill. Learners pick which." },
-  { id: "drill", label: "A specific drill", hint: "One exact prompt everyone answers." },
-  { id: "roleplay", label: "An AI role-play", hint: "A full practice conversation with an AI employee." },
-  { id: "learn", label: "A pathway lesson", hint: "A short card lesson from MI for Leaders." },
-];
+/** Tab copy follows the cohort's pathway: the role-play is with an AI patient or an AI employee. */
+function modesFor(catalog: { pathwayTitle: string; setting: "workplace" | "clinical" }): { id: Mode; label: string; hint: string }[] {
+  return [
+    { id: "skill", label: "Drills on a skill", hint: "Any N short practices on one skill. Learners pick which." },
+    { id: "drill", label: "A specific drill", hint: "One exact prompt everyone answers." },
+    {
+      id: "roleplay",
+      label: "An AI role-play",
+      hint: `A full practice conversation with an AI ${counterpartOf(catalog.setting).toLowerCase()}.`,
+    },
+    { id: "learn", label: "A pathway lesson", hint: `A short card lesson from ${catalog.pathwayTitle}.` },
+  ];
+}
 
 type Keyed = ItemDraft & { key: string };
 
@@ -44,7 +49,20 @@ function dueIso(date: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { cohortId: string; trainerName: string; defaultDue: string }) {
+export function AssignmentComposer({
+  cohortId,
+  pathwayId,
+  trainerName,
+  defaultDue,
+}: {
+  cohortId: string;
+  pathwayId: string;
+  trainerName: string;
+  defaultDue: string;
+}) {
+  const catalog = useMemo(() => catalogFor(pathwayId), [pathwayId]);
+  const MODES = useMemo(() => modesFor(catalog), [catalog]);
+  const firstSkill: SkillId = catalog.drillSkills.includes("evoking") ? "evoking" : (catalog.drillSkills[0] ?? "evoking");
   const router = useRouter();
   const reduce = useReducedMotion();
   const uid = useId();
@@ -53,9 +71,9 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
   const [due, setDue] = useState(defaultDue);
   const [items, setItems] = useState<Keyed[]>([]);
   const [mode, setMode] = useState<Mode>("skill");
-  const [skill, setSkill] = useState<SkillId>("evoking");
+  const [skill, setSkill] = useState<SkillId>(firstSkill);
   const [qty, setQty] = useState(2);
-  const [drillSkill, setDrillSkill] = useState<SkillId | "all">("evoking");
+  const [drillSkill, setDrillSkill] = useState<SkillId | "all">(firstSkill);
   const [drillId, setDrillId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [lessonId, setLessonId] = useState<string | null>(null);
@@ -65,7 +83,13 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
   const seq = useRef(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const drills = useMemo(() => DRILL_OPTIONS.filter((d) => drillSkill === "all" || d.skill === drillSkill), [drillSkill]);
+  const drills = useMemo(
+    () => catalog.drills.filter((d) => drillSkill === "all" || d.skill === drillSkill),
+    [catalog, drillSkill],
+  );
+  // "Any N drills" only counts this pathway's drills, so N can't exceed what exists on the skill.
+  const skillDrills = catalog.drillCounts[skill] ?? 0;
+  const maxQty = Math.max(1, Math.min(10, skillDrills));
   const summary = summarizeItems(items);
   const dueText = dueLabel(dueIso(due));
 
@@ -203,7 +227,7 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
             <h3 id={`${uid}-add`} className="font-display text-[19px] font-bold text-ink">
               Add practice
             </h3>
-            <p className="mt-1 text-[14px] font-semibold text-muted">Everything here comes from the MI for Leaders library.</p>
+            <p className="mt-1 text-[14px] font-semibold text-muted">Everything here comes from the {catalog.pathwayTitle} library.</p>
           </div>
           <div role="tablist" aria-label="Kind of practice" className="mt-4 flex flex-wrap gap-2 px-6">
             {MODES.map((m, idx) => (
@@ -243,12 +267,22 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
                     <fieldset>
                       <legend className={labelClass}>Skill</legend>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {DRILL_SKILLS.map((s) => (
+                        {catalog.drillSkills.map((s) => (
                           <label
                             key={s}
                             className="cursor-pointer rounded-xl border-2 border-line bg-white px-3 py-1.5 text-[14px] font-extrabold text-ink/80 transition-colors hover:border-primary-tint has-[:checked]:border-primary has-[:checked]:bg-primary-tint/40 has-[:checked]:text-primary-shadow has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-primary/40"
                           >
-                            <input type="radio" name={`${uid}-skill`} value={s} checked={skill === s} onChange={() => setSkill(s)} className="sr-only" />
+                            <input
+                              type="radio"
+                              name={`${uid}-skill`}
+                              value={s}
+                              checked={skill === s}
+                              onChange={() => {
+                                setSkill(s);
+                                setQty((q) => Math.min(q, Math.max(1, Math.min(10, catalog.drillCounts[s] ?? 0))));
+                              }}
+                              className="sr-only"
+                            />
                             {skillName(s)}
                           </label>
                         ))}
@@ -258,7 +292,10 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
                       <span className={labelClass} id={`${uid}-qty`}>
                         How many
                       </span>
-                      <Stepper value={qty} onChange={setQty} min={1} max={10} labelledBy={`${uid}-qty`} unit={qty === 1 ? "practice" : "practices"} />
+                      <Stepper value={qty} onChange={setQty} min={1} max={maxQty} labelledBy={`${uid}-qty`} unit={qty === 1 ? "practice" : "practices"} />
+                      <p className={hintClass}>
+                        Learners choose from the {skillDrills} {skillName(skill)} {skillDrills === 1 ? "drill" : "drills"} in {catalog.pathwayTitle}.
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -279,7 +316,7 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
                         className={`${fieldClass} w-[260px]`}
                       >
                         <option value="all">All skills</option>
-                        {DRILL_SKILLS.map((s) => (
+                        {catalog.drillSkills.map((s) => (
                           <option key={s} value={s}>
                             {skillName(s)}
                           </option>
@@ -308,7 +345,7 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
                   <fieldset>
                     <legend className="sr-only">Role-play scenario</legend>
                     <div className="grid gap-2">
-                      {SCENARIO_OPTIONS.map((s) => (
+                      {catalog.scenarios.map((s) => (
                         <ChoiceCard key={s.id} name={`${uid}-scenario`} value={s.id} checked={scenarioId === s.id} onChange={() => setScenarioId(s.id)}>
                           <span className="flex flex-wrap items-center gap-2">
                             <span className="font-display text-[17px] font-bold text-ink">{s.title}</span>
@@ -334,7 +371,7 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
                   <fieldset>
                     <legend className="sr-only">Lesson</legend>
                     <div className="grid max-h-[340px] gap-2 overflow-y-auto pr-1">
-                      {LESSON_OPTIONS.map((l) => (
+                      {catalog.lessons.map((l) => (
                         <ChoiceCard key={l.id} name={`${uid}-lesson`} value={l.id} checked={lessonId === l.id} onChange={() => setLessonId(l.id)}>
                           <span className="text-[14px] font-extrabold text-ink">{l.title}</span>
                           <span className="mt-0.5 block text-[13px] font-semibold text-muted">

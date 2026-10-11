@@ -1,4 +1,5 @@
-import type { SkillId } from '@antelope/core';
+import type { PathwayId, SkillId } from '@antelope/core';
+import { isPathwayId } from '@/data/pathways';
 import { errorCode, isTransient, supabase } from '@/lib/supabase';
 import {
   useAccount,
@@ -36,7 +37,7 @@ async function fetchProfile(userId: string, email: string): Promise<Profile> {
 async function fetchCohorts(userId: string): Promise<Cohort[]> {
   const { data, error } = await supabase
     .from('cohort_members')
-    .select('role, joined_at, cohort:cohorts(id, name, join_code, trainer_id, archived_at)')
+    .select('role, joined_at, cohort:cohorts(id, name, join_code, trainer_id, archived_at, pathway_id)')
     .eq('user_id', userId)
     .eq('role', 'learner');
   if (error) throw error;
@@ -50,6 +51,7 @@ async function fetchCohorts(userId: string): Promise<Cohort[]> {
       trainerId: r.cohort!.trainer_id,
       trainerName: names.get(r.cohort!.trainer_id) ?? FALLBACK_TRAINER,
       joinedAt: r.joined_at,
+      pathwayId: isPathwayId(r.cohort!.pathway_id) ? r.cohort!.pathway_id : 'mi-for-leaders',
     }))
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
 }
@@ -195,7 +197,7 @@ export async function refreshCloud(userId: string, email: string): Promise<boole
 // Direct actions (need an immediate answer, so they don't queue)
 // ---------------------------------------------------------------------------
 
-export type JoinResult = { ok: true; cohort: { id: string; name: string } } | { ok: false; reason: 'not-found' | 'offline' | 'error' };
+export type JoinResult = { ok: true; cohort: { id: string; name: string; pathwayId: PathwayId } } | { ok: false; reason: 'not-found' | 'offline' | 'error' };
 
 /** "mil demo", "MIL-DEMO", "demo" → "MIL-DEMO". */
 export function normalizeJoinCode(raw: string): string {
@@ -212,7 +214,7 @@ export async function joinCohort(code: string): Promise<JoinResult> {
     if (errorCode(error) === 'PT404') return { ok: false, reason: 'not-found' };
     return { ok: false, reason: isTransient(error) ? 'offline' : 'error' };
   }
-  return { ok: true, cohort: { id: data.id, name: data.name } };
+  return { ok: true, cohort: { id: data.id, name: data.name, pathwayId: isPathwayId(data.pathway_id) ? data.pathway_id : 'mi-for-leaders' } };
 }
 
 export async function leaveCohort(userId: string, cohortId: string): Promise<boolean> {

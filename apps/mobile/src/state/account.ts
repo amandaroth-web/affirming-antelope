@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { SkillId } from '@antelope/core';
+import type { PathwayId, SkillId } from '@antelope/core';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -30,6 +30,8 @@ export interface Cohort {
   /** "Dr. Rosa Lin"; "Your trainer" when the profile isn't readable. */
   trainerName: string;
   joinedAt: string;
+  /** cohorts.pathway_id: the track the cohort runs. Older caches lack it (MI for Leaders). */
+  pathwayId?: PathwayId;
 }
 
 export type AssignmentItemKind = 'drill' | 'roleplay' | 'learn' | 'any-drill' | 'any-roleplay';

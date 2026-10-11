@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Mascot, type MascotHandle, type MascotMood, type MascotPose } from '@/components/mascot';
+import { callName } from '@/components/practice-loop/names';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { Button, CheckIcon, CloudRainIcon, CloudSunIcon, PressableSurface, SunIcon, Text, border, color, font, radius, space } from '@/design';
 import { Enter, FADE_MS, spring, useReduceMotion } from '@/motion';
@@ -58,7 +59,7 @@ export function Reflection({
   const [feeling, setFeeling] = useState<Feeling | null>(initial?.feeling ?? null);
   const [text, setText] = useState(initial?.text ?? '');
   const opt = OPTIONS.find((o) => o.value === feeling);
-  const first = name.split(' ')[0];
+  const first = callName(name);
 
   const choose = (f: Feeling) => {
     setFeeling(f);

@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type N
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Composer } from '@/components/practice-loop/Composer';
 import { ConfirmSheet } from '@/components/practice-loop/ConfirmSheet';
+import { callName, conversationLabel } from '@/components/practice-loop/names';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { EmployeeBubble, LearnerBubble, LiveEmployeeBubble, useBubbleEntrance, useComposerLaunch } from '@/components/practice-loop/Speech';
 import {
@@ -19,6 +20,8 @@ import {
   layout,
   radius,
   space,
+  personaAvatar,
+  type AvatarIdentity,
 } from '@/design';
 import { track } from '@/lib/analytics';
 import { FADE_MS, spring, useFades, useListLayout, useReduceMotion, useTickSwap } from '@/motion';
@@ -59,7 +62,8 @@ export function Conversation({
   const layout = useListLayout();
   const fades = useFades();
   const p = scenario.persona;
-  const first = p.name.split(' ')[0];
+  const avatar = personaAvatar(p, scenario.setting);
+  const first = callName(p.name);
   const { pending, error, request, cut, clearError } = useEmployeeReply(scenario.id);
   const [draft, setDraft] = useState('');
   const [confirm, setConfirm] = useState<'end' | 'leave' | null>(null);
@@ -130,7 +134,7 @@ export function Conversation({
         center={
           <View style={styles.who}>
             <View ref={seat} collapsable={false} onLayout={() => onSeat?.(seat.current)} style={seatHidden ? styles.hidden : undefined}>
-              <Avatar seed={p.avatarSeed} size={36} />
+              <Avatar {...avatar} size={36} />
             </View>
             <View style={styles.whoCopy}>
               <Text variant="label" numberOfLines={1}>
@@ -164,13 +168,13 @@ export function Conversation({
           >
             <View style={sessionStyles.column}>
               <Text variant="caption" color={color.muted} align="center" style={styles.stamp}>
-                One-on-one with {first}
+                {conversationLabel(scenario.setting)} with {first}
               </Text>
               {rows.map((r, i) => (
                 <Message
                   key={r.id}
                   row={r}
-                  seed={p.avatarSeed}
+                  avatar={avatar}
                   name={p.name}
                   delay={i === 0 ? (arriving ? 400 : 250) : r.live ? 120 : 0}
                   settled={!r.live && streamed.current.has(r.id)}
@@ -262,10 +266,10 @@ type Row = { id: string; speaker: Turn['speaker']; text: string; live: boolean; 
  * their side as typing dots and stays the same element while the words arrive.
  * Rows carry a layout spring so anything that changes size above them moves them, not snaps them.
  */
-function Message({ row, seed, name, delay, settled }: { row: Row; seed: string; name: string; delay: number; settled: boolean }) {
+function Message({ row, avatar, name, delay, settled }: { row: Row; avatar: AvatarIdentity; name: string; delay: number; settled: boolean }) {
   const layout = useListLayout();
   if (row.speaker === 'learner') return <LearnerMessage text={row.text} layout={layout} />;
-  return <EmployeeMessage row={row} seed={seed} name={name} delay={delay} settled={settled} layout={layout} />;
+  return <EmployeeMessage row={row} avatar={avatar} name={name} delay={delay} settled={settled} layout={layout} />;
 }
 
 function LearnerMessage({ text, layout }: { text: string; layout: ReturnType<typeof useListLayout> }) {
@@ -279,14 +283,14 @@ function LearnerMessage({ text, layout }: { text: string; layout: ReturnType<typ
 
 function EmployeeMessage({
   row,
-  seed,
+  avatar,
   name,
   delay,
   settled,
   layout,
 }: {
   row: Row;
-  seed: string;
+  avatar: AvatarIdentity;
   name: string;
   delay: number;
   settled: boolean;
@@ -297,7 +301,7 @@ function EmployeeMessage({
   const [wasLive] = useState(row.live);
   return (
     <Animated.View layout={layout} style={[styles.msg, enter]} accessibilityLiveRegion={row.live ? 'polite' : undefined}>
-      {wasLive ? <LiveEmployeeBubble seed={seed} name={name} text={row.text} typing={row.typing} /> : <EmployeeBubble text={row.text} seed={seed} name={name} />}
+      {wasLive ? <LiveEmployeeBubble avatar={avatar} name={name} text={row.text} typing={row.typing} /> : <EmployeeBubble text={row.text} avatar={avatar} name={name} />}
     </Animated.View>
   );
 }

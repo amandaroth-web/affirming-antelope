@@ -87,6 +87,29 @@ export function JoinCohortCard({ onJoin }: { onJoin: () => void }) {
   );
 }
 
+/**
+ * Guests: there's no trainer yet, so no sample assignment either. An invitation to
+ * join a cohort (sign in, then the code) instead of someone else's homework.
+ */
+export function GuestJoinCard({ onJoin }: { onJoin: () => void }) {
+  return (
+    <Raised contentStyle={styles.join}>
+      <View style={styles.joinHead}>
+        <View style={styles.icon}>
+          <UsersThreeIcon size={24} weight="fill" color={color.primary} />
+        </View>
+        <View style={styles.flex}>
+          <Text variant="subheading">Practicing with a trainer?</Text>
+          <Text variant="caption" color={color.muted}>
+            Join their cohort and your assignments and feedback show up here. Until then, every practice counts.
+          </Text>
+        </View>
+      </View>
+      <Button variant="secondary" size="md" label="Join a cohort" fullWidth onPress={onJoin} style={styles.joinBtn} />
+    </Raised>
+  );
+}
+
 /** In a cohort, nothing assigned right now. */
 export function NothingAssigned({ trainerName }: { trainerName: string }) {
   return (

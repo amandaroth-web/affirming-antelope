@@ -2,6 +2,9 @@
 // All people, workplaces, and situations are fictional.
 
 import type { Lesson } from "./types";
+import { CLINICIAN_LESSONS } from "./lessons-clinicians";
+
+export { CLINICIAN_LESSONS };
 
 export const LESSONS: Lesson[] = [
   // -------------------------------------------------------------------------
@@ -321,6 +324,9 @@ export const LESSONS: Lesson[] = [
       },
     ],
   },
+
+  // MI for Clinicians lessons live in lessons-clinicians.ts.
+  ...CLINICIAN_LESSONS,
 ];
 
 export function getLesson(id: string): Lesson | undefined {

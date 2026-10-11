@@ -31,6 +31,7 @@ export function UnitSheet({
   open = !!unit,
   origin,
   status,
+  weeks,
   completed,
   onClose,
   onStart,
@@ -40,6 +41,8 @@ export function UnitSheet({
   /** Window centre of the tapped node; the sheet grows out of it. */
   origin?: { x: number; y: number };
   status: WeekStatus;
+  /** Weeks in the active course ("Week 3 of 8"). */
+  weeks?: number;
   completed: string[];
   onClose: () => void;
   onStart: (activityId: string) => void;
@@ -52,7 +55,7 @@ export function UnitSheet({
       onClose={onClose}
       origin={origin}
       originColor={status === 'complete' ? color.gold : color.primary}
-      accessibilityLabel={unit ? `Week ${unit.week}, ${unit.title}` : undefined}
+      accessibilityLabel={unit ? `Week ${unit.week}${weeks ? ` of ${weeks}` : ''}, ${unit.title}` : undefined}
     >
       {unit ? (
         <View>

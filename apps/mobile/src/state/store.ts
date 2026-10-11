@@ -1,12 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  DEMO_LEARNER,
-  MI_FOR_LEADERS,
   type ActivityKind,
   type DemoSkillProgress,
   type DemoTrainerAssignment,
   type Debrief,
   type DrillFeedback,
+  type PathwayId,
   type SelfReflection,
   type SkillId,
   type SkillLevelNumber,
@@ -14,8 +13,10 @@ import {
 } from '@antelope/core';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { track } from '@/lib/analytics';
+import { findActivityIn, getPathway } from '@/data/pathways';
+import { setPerson, track } from '@/lib/analytics';
 import { isUuid, uuid } from '@/lib/uuid';
+import { demoSeed, EMPTY_PROGRESS, emptyProgress, freshSeed, upgradeDoc } from './learnerDoc';
 
 export const LEARNER_KEY = 'antelope.learner.v1';
 
@@ -79,26 +80,11 @@ export interface Settings {
   haptics: boolean;
 }
 
-export interface LearnerState {
-  firstName: string;
-  role: string;
-  pathwayId: string;
-  /** 1..12, or 13 once the pathway is complete. */
+/** One pathway's place in its course. Kept per pathway, so switching tracks loses nothing. */
+export interface PathwayProgress {
+  /** 1..units, or units + 1 once the pathway is complete. */
   currentWeek: number;
   completedActivityIds: string[];
-  skills: Record<SkillId, DemoSkillProgress>;
-  streak: { days: number; lastPracticeDay: string | null };
-  /** Monday-start: which days this week had practice. */
-  weekDays: boolean[];
-  weeklyGoal: { target: number; done: number; hitCount: number };
-  scenariosCompleted: number;
-  assignment: DemoTrainerAssignment;
-  practiceLog: PracticeRecord[];
-  /** Finished drill reps and role-plays (newest first), kept so they can sync and be sent for review. */
-  sessions: PracticeSession[];
-  settings: Settings;
-  /** Day the mascot last waved on Home; it greets once per day. */
-  lastGreetedDay: string | null;
   /**
    * The week the Path screen last showed as current. When `currentWeek` moves
    * past it, Path plays the unlock choreography once and then marks it seen.
@@ -106,8 +92,39 @@ export interface LearnerState {
   pathSeenWeek: number;
 }
 
+export type PathwayChoiceSource = 'onboarding' | 'me' | 'cohort';
+
+export interface LearnerState {
+  /** Only the demo learner has a local name; real learners are greeted by their account name. */
+  firstName: string;
+  role: string;
+  /** The track Home, Path and Practice follow. */
+  activePathwayId: PathwayId;
+  /** When the learner last picked a track (ISO). null until the welcome's track step. */
+  pathwayChosenAt: string | null;
+  /** Course progress per pathway. */
+  progress: Partial<Record<PathwayId, PathwayProgress>>;
+  /** Global: a skill is the same skill in either setting. */
+  skills: Record<SkillId, DemoSkillProgress>;
+  streak: { days: number; lastPracticeDay: string | null };
+  /** Monday-start: which days this week had practice. */
+  weekDays: boolean[];
+  weeklyGoal: { target: number; done: number; hitCount: number };
+  scenariosCompleted: number;
+  /** The sample trainer assignment. Demo learner only; real learners get theirs from a cohort. */
+  assignment: DemoTrainerAssignment | null;
+  /** Me › Demo › "Demo learner" (dev builds): Amanda's seeded state, for demos. Never synced. */
+  demo: boolean;
+  practiceLog: PracticeRecord[];
+  /** Finished drill reps and role-plays (newest first), kept so they can sync and be sent for review. */
+  sessions: PracticeSession[];
+  settings: Settings;
+  /** Day the mascot last waved on Home; it greets once per day. */
+  lastGreetedDay: string | null;
+}
+
 export interface LearnerActions {
-  /** Mark a path activity done. Advances the week when every activity in the unit is done. */
+  /** Mark a path activity done in whichever pathway owns it. Advances that pathway's week when its unit is done. */
   completeActivity: (activityId: string) => void;
   /** Log any finished practice (drill, role-play, lesson). Updates streak, weekly goal, and skill progress. */
   recordPractice: (p: Omit<PracticeRecord, 'id' | 'at' | 'ownerId'> & { at?: string }) => PracticeRecord;
@@ -117,33 +134,36 @@ export interface LearnerActions {
   claimRecords: (userId: string, completionIds: string[], sessionIds: string[]) => void;
   /** Replace the synced part of the state (sign-in adoption, merges from the server). */
   applySynced: (synced: SyncedState) => void;
+  /** Pick (or switch) the active track. Progress on the other track stays where it was. */
+  choosePathway: (id: PathwayId, source: PathwayChoiceSource) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   markGreeted: () => void;
   /** Path played the unlock for the current week. */
   markPathSeen: () => void;
   /** Dev: rewind `pathSeenWeek` one week so Path replays the latest unlock. */
   replayPathUnlock: () => void;
-  /** Demo helpers (Me > Settings). */
-  resetDemo: () => void;
+  /** Dev (Me › Demo): become Amanda, the seeded demo learner, or go back to a fresh start. */
+  setDemo: (on: boolean) => void;
+  /** Start over on the active track (keeps settings and the track choice). */
+  resetProgress: () => void;
   previewPathwayComplete: () => void;
 }
 
 /**
  * The part of the store mirrored to `learner_state` so progress follows the account.
- * Practice history goes to its own tables; settings and greetings stay on the device.
+ * Practice history goes to its own tables; settings, greetings and the demo flag stay on the device.
  */
 export const SYNCED_KEYS = [
   'firstName',
   'role',
-  'pathwayId',
-  'currentWeek',
-  'completedActivityIds',
+  'activePathwayId',
+  'pathwayChosenAt',
+  'progress',
   'skills',
   'streak',
   'weekDays',
   'weeklyGoal',
   'scenariosCompleted',
-  'pathSeenWeek',
 ] as const satisfies readonly (keyof LearnerState)[];
 export type SyncedState = Pick<LearnerState, (typeof SYNCED_KEYS)[number]>;
 
@@ -153,50 +173,48 @@ export function syncedState(s: LearnerState): SyncedState {
   return out as SyncedState;
 }
 
+/** The active pathway's progress (a stable empty object before the first practice). */
+export function progressOf(s: Pick<LearnerState, 'progress' | 'activePathwayId'>, id: PathwayId = s.activePathwayId): PathwayProgress {
+  return s.progress[id] ?? EMPTY_PROGRESS;
+}
+
 /** Who's signed in, if anyone. Set by the auth listener; new records are stamped with it. */
 let currentOwner: string | undefined;
 export function setRecordOwner(userId: string | undefined) {
   currentOwner = userId;
 }
 
+const LOCAL_DEFAULTS = (): Pick<LearnerState, 'practiceLog' | 'sessions' | 'settings' | 'lastGreetedDay'> => ({
+  practiceLog: [],
+  sessions: [],
+  settings: { motion: 'system', haptics: true },
+  lastGreetedDay: null,
+});
+
+/** A new install: a fresh learner who picks a track in the welcome (MI for Leaders until then). */
 function seed(): LearnerState {
-  const d = DEMO_LEARNER;
-  const completed = [
-    ...MI_FOR_LEADERS.units.filter((u) => d.completedUnitIds.includes(u.id)).flatMap((u) => u.activities.map((a) => a.id)),
-    ...d.currentUnitCompletedActivityIds,
-  ];
-  // Demo week: practiced Monday through yesterday; today is still open.
-  const todayIdx = weekdayIndex();
-  const weekDays = Array.from({ length: 7 }, (_, i) => i < todayIdx && i < d.weeklyGoal.done + 2);
-  return {
-    firstName: d.user.firstName,
-    role: d.user.role,
-    pathwayId: d.pathwayId,
-    currentWeek: d.currentWeek,
-    completedActivityIds: completed,
-    skills: structuredClone(d.skills),
-    streak: { days: d.streakDays, lastPracticeDay: null },
-    weekDays,
-    weeklyGoal: { ...d.weeklyGoal, hitCount: 3 },
-    scenariosCompleted: 4,
-    assignment: structuredClone(d.trainerAssignment),
-    practiceLog: [],
-    sessions: [],
-    settings: { motion: 'system', haptics: true },
-    lastGreetedDay: null,
-    pathSeenWeek: d.currentWeek,
-  };
+  return { ...freshSeed('mi-for-leaders', null), ...LOCAL_DEFAULTS() };
 }
 
-function bumpSkill(p: DemoSkillProgress, minutes: number): DemoSkillProgress {
-  if (p.status === 'locked') return p;
-  let percent = p.percent + Math.max(6, Math.round(minutes * 2.5));
-  let level = p.level;
+function bumpSkill(p: DemoSkillProgress | undefined, minutes: number): DemoSkillProgress {
+  // practising a skill starts it, even before its week on the path
+  const from: DemoSkillProgress = !p || p.status === 'locked' ? { level: 1, percent: 0, status: 'in-progress' } : p;
+  let percent = from.percent + Math.max(6, Math.round(minutes * 2.5));
+  let level = from.level;
   if (percent >= 100 && level < 6) {
     level = (level + 1) as SkillLevelNumber;
     percent -= 100;
   }
   return { level, percent: Math.min(percent, 100), status: 'in-progress' };
+}
+
+/** A skill the course has reached unlocks (level 1), so the ladder shows it as started. */
+function unlockSkills(skills: LearnerState['skills'], ids: readonly SkillId[]): LearnerState['skills'] {
+  let out = skills;
+  for (const id of ids) {
+    if (out[id]?.status === 'locked') out = { ...out, [id]: { ...out[id], status: 'in-progress' } };
+  }
+  return out;
 }
 
 export const useLearner = create<LearnerState & LearnerActions>()(
@@ -206,13 +224,19 @@ export const useLearner = create<LearnerState & LearnerActions>()(
 
       completeActivity: (activityId) =>
         set((s) => {
-          if (s.completedActivityIds.includes(activityId)) return s;
-          const completedActivityIds = [...s.completedActivityIds, activityId];
-          const unit = MI_FOR_LEADERS.units.find((u) => u.week === s.currentWeek);
-          const unitDone = unit?.activities.every((a) => completedActivityIds.includes(a.id));
+          const owner = findActivityIn(activityId);
+          if (!owner) return s;
+          const id = owner.pathway.id;
+          const p = s.progress[id] ?? emptyProgress();
+          if (p.completedActivityIds.includes(activityId)) return s;
+          const completedActivityIds = [...p.completedActivityIds, activityId];
+          const unit = owner.pathway.units.find((u) => u.week === p.currentWeek);
+          const unitDone = !!unit && unit.activities.every((a) => completedActivityIds.includes(a.id));
+          const currentWeek = unitDone ? p.currentWeek + 1 : p.currentWeek;
+          const next = owner.pathway.units.find((u) => u.week === currentWeek);
           return {
-            completedActivityIds,
-            currentWeek: unitDone ? s.currentWeek + 1 : s.currentWeek,
+            progress: { ...s.progress, [id]: { ...p, completedActivityIds, currentWeek } },
+            skills: unitDone && next ? unlockSkills(s.skills, next.skills) : s.skills,
           };
         }),
 
@@ -226,7 +250,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
           weekDays[weekdayIndex()] = true;
           const done = s.weeklyGoal.done + 1;
           const justHit = done === s.weeklyGoal.target;
-          const assignment = {
+          const assignment = s.assignment && {
             ...s.assignment,
             items: s.assignment.items.map((it) => (it.refId === input.refId ? { ...it, done: true } : it)),
           };
@@ -249,6 +273,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
           minutes: input.minutes,
           ...(input.activityId ? { activity_id: input.activityId } : {}),
           in_course: !!input.activityId,
+          pathway_id: before.activePathwayId,
         });
         const after = get();
         if (after.streak.days > before.streak.days) track('streak_extended', { streak_days: after.streak.days });
@@ -276,30 +301,101 @@ export const useLearner = create<LearnerState & LearnerActions>()(
 
       applySynced: (synced) => set(synced),
 
+      choosePathway: (id, source) => {
+        set((s) => {
+          const pathway = getPathway(id);
+          const progress = s.progress[id] ? s.progress : { ...s.progress, [id]: emptyProgress() };
+          const week = progress[id]!.currentWeek;
+          const unit = pathway.units.find((u) => u.week === week);
+          return {
+            activePathwayId: id,
+            pathwayChosenAt: new Date().toISOString(),
+            progress,
+            skills: unit ? unlockSkills(s.skills, unit.skills) : s.skills,
+          };
+        });
+        track('pathway_chosen', { pathway_id: id, source });
+        setPerson({ pathway_id: id });
+      },
+
       setSetting: (key, value) => set((s) => ({ settings: { ...s.settings, [key]: value } })),
       markGreeted: () => set({ lastGreetedDay: today() }),
-      markPathSeen: () => set((s) => (s.pathSeenWeek === s.currentWeek ? s : { pathSeenWeek: s.currentWeek })),
-      replayPathUnlock: () => set((s) => (s.currentWeek > 1 ? { pathSeenWeek: s.currentWeek - 1 } : s)),
-      resetDemo: () => set(seed()),
+      markPathSeen: () =>
+        set((s) => {
+          const p = progressOf(s);
+          if (p.pathSeenWeek === p.currentWeek) return s;
+          return { progress: { ...s.progress, [s.activePathwayId]: { ...p, pathSeenWeek: p.currentWeek } } };
+        }),
+      replayPathUnlock: () =>
+        set((s) => {
+          const p = progressOf(s);
+          if (p.currentWeek <= 1) return s;
+          return { progress: { ...s.progress, [s.activePathwayId]: { ...p, pathSeenWeek: p.currentWeek - 1 } } };
+        }),
+      setDemo: (on) =>
+        set((s) => {
+          const keep = { settings: s.settings, lastGreetedDay: null, practiceLog: [], sessions: [] };
+          if (on) return { ...demoSeed(weekdayIndex()), ...keep };
+          return { ...freshSeed(s.activePathwayId, s.pathwayChosenAt ?? new Date().toISOString()), ...keep };
+        }),
+      resetProgress: () =>
+        set((s) => ({
+          ...(s.demo ? demoSeed(weekdayIndex()) : freshSeed(s.activePathwayId, s.pathwayChosenAt)),
+          settings: s.settings,
+          lastGreetedDay: null,
+        })),
       previewPathwayComplete: () =>
-        set({
-          currentWeek: MI_FOR_LEADERS.units.length + 1,
-          completedActivityIds: MI_FOR_LEADERS.units.flatMap((u) => u.activities.map((a) => a.id)),
+        set((s) => {
+          const pathway = getPathway(s.activePathwayId);
+          const week = pathway.units.length + 1;
+          return {
+            progress: {
+              ...s.progress,
+              [s.activePathwayId]: {
+                currentWeek: week,
+                completedActivityIds: pathway.units.flatMap((u) => u.activities.map((a) => a.id)),
+                pathSeenWeek: progressOf(s).pathSeenWeek,
+              },
+            },
+          };
         }),
     }),
     {
       name: LEARNER_KEY,
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
-      // v2 (accounts): every record gets a uuid client id; sessions replace the local-only review queue.
+      version: 3,
       migrate: (persisted, from) => {
-        const s = (persisted ?? {}) as Partial<LearnerState> & { reviews?: unknown };
+        const s = (persisted ?? {}) as Record<string, unknown> & Partial<LearnerState> & { reviews?: unknown };
+        // v2 (accounts): every record gets a uuid client id; sessions replace the local-only review queue.
         if (from < 2) {
           s.practiceLog = (s.practiceLog ?? []).map((r) => (isUuid(r.id) ? r : { ...r, id: uuid() }));
           s.sessions = [];
           delete s.reviews;
         }
-        return s as LearnerState & LearnerActions;
+        // v3 (pathways): progress per pathway. An untouched demo seed (every install used to start
+        // as Amanda) becomes a fresh learner who picks a track; real progress moves under its pathway.
+        if (from < 3) {
+          const up = upgradeDoc(s);
+          const untouched = up.pathwayChosenAt === null;
+          const fresh = freshSeed('mi-for-leaders', null);
+          const next: LearnerState = {
+            ...fresh,
+            ...up,
+            // the demo identity was never theirs: no "Amanda", no sample trainer assignment. Real
+            // practice (streak, levels, the course) stays.
+            firstName: '',
+            role: '',
+            skills: { ...fresh.skills, ...(up.skills ?? {}) },
+            assignment: null,
+            demo: false,
+            practiceLog: s.practiceLog ?? [],
+            sessions: s.sessions ?? [],
+            settings: s.settings ?? LOCAL_DEFAULTS().settings,
+            lastGreetedDay: untouched ? null : (s.lastGreetedDay ?? null),
+          };
+          return next as LearnerState & LearnerActions;
+        }
+        return s as unknown as LearnerState & LearnerActions;
       },
     },
   ),
@@ -311,4 +407,9 @@ export function weekStatus(week: number, currentWeek: number): WeekStatus {
   if (week < currentWeek) return 'complete';
   if (week === currentWeek) return 'current';
   return 'locked';
+}
+
+/** The active track right now (for analytics and launchers outside React). */
+export function activePathwayId(): PathwayId {
+  return useLearner.getState().activePathwayId;
 }

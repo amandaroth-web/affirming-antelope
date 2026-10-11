@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Mascot, type MascotHandle, type MascotMood, type MascotPose } from '@/components/mascot';
-import { Avatar, Bubble, Callout, QuotesIcon, TargetIcon, Text, border, color, space } from '@/design';
+import { Avatar, Bubble, Callout, QuotesIcon, TargetIcon, Text, border, color, space, type AvatarIdentity } from '@/design';
 import { FADE_MS, spring, useFades, useListLayout, useReduceMotion } from '@/motion';
 import { takeLaunchPad } from './Composer';
 import { HeroTarget, useSession } from './SessionSurface';
@@ -109,7 +109,7 @@ export function LearnerBubble({ text, compact, style }: { text: string; compact?
 /** The employee's words: white, raised, with the persona avatar. Children replace the text (typing dots). */
 export function EmployeeBubble({
   text,
-  seed,
+  avatar,
   name,
   compact,
   showAvatar = true,
@@ -117,7 +117,7 @@ export function EmployeeBubble({
   style,
 }: {
   text?: string;
-  seed: string;
+  avatar: AvatarIdentity;
   name?: string;
   compact?: boolean;
   showAvatar?: boolean;
@@ -126,7 +126,7 @@ export function EmployeeBubble({
 }) {
   return (
     <View style={[styles.employeeRow, style]}>
-      {showAvatar ? <Avatar seed={seed} size={compact ? 26 : 34} accessibilityLabel={name} /> : null}
+      {showAvatar ? <Avatar {...avatar} size={compact ? 26 : 34} accessibilityLabel={name} /> : null}
       <Bubble side="other" compact={compact}>
         {children ?? (
           <Text variant="body" style={compact ? styles.compactText : undefined} selectable>
@@ -144,12 +144,12 @@ export function EmployeeBubble({
  * give way to words and as each word arrives, so it grows instead of jumping;
  * text is clipped to the growing frame, so a new line is revealed, not dropped in.
  */
-export function LiveEmployeeBubble({ text, typing, seed, name }: { text: string; typing: boolean; seed: string; name?: string }) {
+export function LiveEmployeeBubble({ text, typing, avatar, name }: { text: string; typing: boolean; avatar: AvatarIdentity; name?: string }) {
   const layout = useListLayout();
   const fades = useFades(200, 90);
   return (
     <View style={styles.employeeRow}>
-      <Avatar seed={seed} size={34} accessibilityLabel={name} />
+      <Avatar {...avatar} size={34} accessibilityLabel={name} />
       <Bubble side="other" layout={layout} style={styles.live}>
         {typing ? (
           <Animated.View key="dots" exiting={fades.exiting}>
@@ -197,7 +197,17 @@ function Dot({ i, tint }: { i: number; tint: string }) {
 // Drill speech card: the line the learner responds to, entering with presence.
 // ---------------------------------------------------------------------------
 
-export function SpeechCard({ speaker, seed, line, context }: { speaker: string; seed: string; line: string; context?: string }) {
+export function SpeechCard({
+  speaker,
+  avatar: identity,
+  line,
+  context,
+}: {
+  speaker: string;
+  avatar: AvatarIdentity;
+  line: string;
+  context?: string;
+}) {
   const reduce = useReduceMotion();
   // arriving from Home's START: the button itself becomes this bubble, so it doesn't rise in
   const heroed = !!useSession()?.hasPiece('cta');
@@ -232,7 +242,7 @@ export function SpeechCard({ speaker, seed, line, context }: { speaker: string; 
         </Text>
       ) : null}
       <Animated.View style={[styles.speakerRow, avatarStyle]}>
-        <Avatar seed={seed} size={44} />
+        <Avatar {...identity} size={44} />
         <Text variant="label" color={color.ink}>
           {speaker}
         </Text>

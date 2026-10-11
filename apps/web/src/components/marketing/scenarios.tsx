@@ -1,10 +1,11 @@
-import { SCENARIOS } from "@antelope/core";
+import { SCENARIOS, scenariosForSetting, type Setting } from "@antelope/core";
 import { Reveal } from "@/components/reveal";
 
 const difficultyLabel = { intro: "Intro", intermediate: "Intermediate", advanced: "Advanced" } as const;
 
 /** The role-play library from @antelope/core: who learners actually talk to. */
-export function Scenarios({ heading, body }: { heading: string; body: string }) {
+export function Scenarios({ heading, body, setting }: { heading: string; body: string; setting?: Setting }) {
+  const scenarios = setting ? scenariosForSetting(setting) : SCENARIOS;
   return (
     <section aria-labelledby="scenarios-heading">
       <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-24">
@@ -18,7 +19,7 @@ export function Scenarios({ heading, body }: { heading: string; body: string }) 
           <p className="mt-3 max-w-[48ch] text-lg font-semibold text-ink/80">{body}</p>
         </Reveal>
         <ul className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {SCENARIOS.map((s, i) => (
+          {scenarios.map((s, i) => (
             <li key={s.id}>
               <Reveal
                 delay={0.04 * i}
@@ -38,7 +39,7 @@ export function Scenarios({ heading, body }: { heading: string; body: string }) 
                 </div>
                 <h3 className="mt-4 font-display text-lg font-bold text-ink">{s.title}</h3>
                 <p className="mt-1 text-sm font-bold text-muted">
-                  {s.leadershipIssue} · {difficultyLabel[s.difficulty]}
+                  {s.issue} · {difficultyLabel[s.difficulty]}
                 </p>
                 <p className="mt-4 rounded-2xl rounded-tl-md border-2 border-line bg-soft px-4 py-3 font-bold leading-snug text-ink">
                   “{s.openingLine}”

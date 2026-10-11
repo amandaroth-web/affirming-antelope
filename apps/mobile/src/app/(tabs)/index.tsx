@@ -1,5 +1,4 @@
 import { getSkill } from '@antelope/core';
-import { DEMO_LEARNER } from '@antelope/core';
 import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
@@ -22,15 +21,17 @@ import { useSeen } from '@/components/home/motion';
 import { ProgressList } from '@/components/home/ProgressList';
 import { ThisWeek } from '@/components/home/ThisWeek';
 import { TodayHero } from '@/components/home/TodayHero';
-import { FeedbackCard, GuestCohortPrompt, JoinCohortCard, NothingAssigned } from '@/components/home/TrainerCards';
+import { FeedbackCard, GuestCohortPrompt, GuestJoinCard, JoinCohortCard, NothingAssigned } from '@/components/home/TrainerCards';
 import { assignmentView, demoAssignmentView } from '@/data/assignments';
+import { getPathway } from '@/data/pathways';
+import { todaysPractice } from '@/data/today';
 import { firstNameOf, unseenReviews, useAccount } from '@/state/account';
 import { syncNow } from '@/sync/engine';
 import { Mascot } from '@/components/mascot';
 import { ChatsCircleIcon, Hoofprint, LightningIcon, Screen, ShuffleIcon, SparkleIcon, Text, border, color, layout, space } from '@/design';
 import { openDrill, openRoleplay, pickDrill, pickScenario } from '@/data/routes';
 import { Enter, FADE_MS, RollingNumber, useListLayout, useReduceMotion } from '@/motion';
-import { TOTAL_WEEKS, useCurrentUnit, useProgressRows } from '@/state/selectors';
+import { useActivePathway, useCurrentUnit, useCurrentWeek, useProgressRows, weekLabel } from '@/state/selectors';
 import { today, useLearner } from '@/state/store';
 
 function greeting(d = new Date()) {
@@ -55,7 +56,10 @@ export default function Home() {
   const reviews = useAccount((s) => s.reviews);
   const submissions = useAccount((s) => s.submissions);
   const practiceLog = useLearner((s) => s.practiceLog);
-  const firstName = (signedIn && firstNameOf(profile?.displayName)) || localName;
+  const demo = useLearner((s) => s.demo);
+  // the account's name when signed in (not the email-derived default), the demo learner's, or none
+  const firstName = signedIn ? (!profile?.needsName ? firstNameOf(profile?.displayName) : undefined) : demo ? localName : undefined;
+  const hello = firstName ? `${greeting()}, ${firstName}` : greeting();
   const unseen = useMemo(() => unseenReviews(reviews), [reviews]);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
@@ -68,13 +72,14 @@ export default function Home() {
   const weekDays = useLearner((s) => s.weekDays);
   const assignment = useLearner((s) => s.assignment);
   const skills = useLearner((s) => s.skills);
-  const currentWeek = useLearner((s) => s.currentWeek);
+  const currentWeek = useCurrentWeek();
+  const pathway = useActivePathway();
   const markGreeted = useLearner((s) => s.markGreeted);
   const liveRows = useProgressRows();
   const unit = useCurrentUnit();
   const reduce = useReduceMotion();
   const listLayout = useListLayout();
-  const practice = DEMO_LEARNER.todaysPractice;
+  const practice = useMemo(() => todaysPractice(pathway.id, practiceLog, demo), [pathway.id, practiceLog, demo]);
 
   // The coach waves on the first visit of the day only.
   const [greet] = useState(() => useLearner.getState().lastGreetedDay !== today());
@@ -88,12 +93,14 @@ export default function Home() {
   // it's back in view, so each change animates once, where it can be seen.
   // signed in: real assignments, with progress topped up by practice on this phone that hasn't synced yet
   const seen = useSeen(
-    { streak, goal, weekDays, assignment, skills, rows: liveRows, currentWeek, assignments, cohorts, practiceLog, unseen, signedIn },
+    { streak, goal, weekDays, assignment, skills, rows: liveRows, currentWeek, pathwayId: pathway.id, assignments, cohorts, practiceLog, unseen, signedIn },
     focused,
   );
   const views = seen.signedIn
     ? seen.assignments.map((a) => assignmentView(a, seen.cohorts.find((c) => c.id === a.cohortId), seen.practiceLog, profile?.id))
-    : [demoAssignmentView(seen.assignment)];
+    : seen.assignment
+      ? [demoAssignmentView(seen.assignment)]
+      : [];
   const newest = seen.unseen[0];
 
   // Header handoff: the big greeting leaves under a compact title bar.
@@ -130,7 +137,7 @@ export default function Home() {
     <Screen
       scrollHandler={onScroll}
       refreshControl={signedIn ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.primary} /> : undefined}
-      overlay={<CompactBar title={`${greeting()}, ${firstName}`} streak={seen.streak} scrollY={scrollY} greetH={greetH} reduce={reduce} />}
+      overlay={<CompactBar title={hello} streak={seen.streak} scrollY={scrollY} greetH={greetH} reduce={reduce} />}
     >
       <Enter style={styles.header}>
         <Animated.View
@@ -143,8 +150,14 @@ export default function Home() {
             {dateLine()}
           </Text>
           <Text variant="title" accessibilityRole="header" style={styles.hello}>
-            {greeting()},{'\n'}
-            {firstName}
+            {firstName ? (
+              <>
+                {greeting()},{'\n'}
+                {firstName}
+              </>
+            ) : (
+              greeting()
+            )}
           </Text>
         </Animated.View>
         <Mascot
@@ -188,10 +201,14 @@ export default function Home() {
         <Enter index={3}>
           <SectionHeader title="From your trainer" />
           {!seen.signedIn ? (
-            <>
-              <AssignmentCard assignment={views[0]} />
-              <GuestCohortPrompt onPress={() => router.push({ pathname: '/sign-in', params: { reason: 'cohort' } })} />
-            </>
+            views[0] ? (
+              <>
+                <AssignmentCard assignment={views[0]} />
+                <GuestCohortPrompt onPress={() => router.push({ pathname: '/sign-in', params: { reason: 'cohort' } })} />
+              </>
+            ) : (
+              <GuestJoinCard onJoin={() => router.push({ pathname: '/sign-in', params: { reason: 'cohort' } })} />
+            )
           ) : !seen.cohorts.length ? (
             <JoinCohortCard onJoin={() => router.push('/join')} />
           ) : views.length ? (
@@ -210,7 +227,7 @@ export default function Home() {
         <Enter index={4}>
           <SectionHeader
             title="Your progress"
-            action={seen.currentWeek > TOTAL_WEEKS ? 'Pathway complete' : `Week ${seen.currentWeek} of ${TOTAL_WEEKS}`}
+            action={seen.currentWeek > getPathway(seen.pathwayId).units.length ? 'Pathway complete' : weekLabel(getPathway(seen.pathwayId), seen.currentWeek)}
             onAction={() => router.navigate('/path')}
           />
           <ProgressList rows={seen.rows} skills={seen.skills} />

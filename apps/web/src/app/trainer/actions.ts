@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer, isUuid } from "@/lib/trainer/dal";
 import { RATINGS, validateItem, type ItemDraft, type ItemKind } from "@/lib/trainer/content";
-import { getDrill, getLesson, getScenario, type SkillId } from "@antelope/core";
+import { PATHWAYS, getDrill, getLesson, getScenario, type SkillId } from "@antelope/core";
 
 // Every action re-checks the session (Server Actions are public POST endpoints) and
 // relies on RLS for row access. Returns are shaped for the UI, never raw rows.
@@ -59,7 +59,7 @@ export async function claimTrainer(_prev: ActionResult | null, form: FormData): 
 // Cohorts
 // ---------------------------------------------------------------------------
 
-export async function createCohort(input: { name: string; startsOn?: string | null }): Promise<
+export async function createCohort(input: { name: string; startsOn?: string | null; pathwayId?: string | null }): Promise<
   ActionResult<{ id: string; name: string; joinCode: string }>
 > {
   const ctx = await trainerClient();
@@ -69,7 +69,10 @@ export async function createCohort(input: { name: string; startsOn?: string | nu
   if (name.length > 120) return fail("Keep the name under 120 characters.");
   const startsOn = input.startsOn && /^\d{4}-\d{2}-\d{2}$/.test(input.startsOn) ? input.startsOn : undefined;
 
-  const { data, error } = await ctx.supabase.rpc("create_cohort", { name, starts_on: startsOn });
+  const pathwayId = input.pathwayId ?? "mi-for-leaders";
+  if (!Object.hasOwn(PATHWAYS, pathwayId)) return fail("Pick a pathway for this cohort.");
+
+  const { data, error } = await ctx.supabase.rpc("create_cohort", { name, starts_on: startsOn, pathway_id: pathwayId });
   if (error) {
     return fail(error.code === "42501" ? "Only trainers can create cohorts." : "We couldn't create the cohort. Try again.");
   }
@@ -133,6 +136,11 @@ export async function createAssignment(input: {
 
   const items = Array.isArray(input.items) ? input.items.slice(0, 20) : [];
   if (!items.length) return fail("Add at least one practice.");
+
+  // The cohort's pathway decides which drills, role-plays, and lessons are allowed. RLS
+  // hides cohorts this trainer doesn't train, so a missing row is "not yours".
+  const { data: cohort } = await ctx.supabase.from("cohorts").select("pathway_id").eq("id", input.cohortId).maybeSingle();
+  if (!cohort) return fail("Unknown cohort.");
   const clean: ItemDraft[] = [];
   for (const raw of items) {
     const item: ItemDraft = {
@@ -146,7 +154,7 @@ export async function createAssignment(input: {
     if (item.kind === "roleplay" && item.refId) item.skill = getScenario(item.refId)?.primaryChallenge ?? null;
     if (item.kind === "learn" && item.refId && !getLesson(item.refId)) return fail("Unknown lesson.");
     if (item.kind === "learn") item.skill = null;
-    const problem = validateItem(item);
+    const problem = validateItem(item, cohort.pathway_id);
     if (problem) return fail(problem);
     clean.push(item);
   }

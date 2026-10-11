@@ -4,7 +4,7 @@ import { ArrowLeft, Clock, Keyboard, Microphone } from "@phosphor-icons/react/di
 import { getDrill, getScenario, type Debrief, type DrillFeedback, type SelfReflection, type Turn } from "@antelope/core";
 import { createClient } from "@/lib/supabase/server";
 import { isUuid, requireTrainedCohort, requireTrainer } from "@/lib/trainer/dal";
-import { DIFFICULTY, FEELING, ago, duration, skillName } from "@/lib/trainer/content";
+import { DIFFICULTY, FEELING, ago, counterpartOf, duration, skillName } from "@/lib/trainer/content";
 import { buildExchanges } from "@/lib/trainer/exchanges";
 import { Avatar, Badge, Card, Eyebrow, SectionTitle, buttonClass } from "@/components/trainer/ui";
 import { FadeIn } from "@/components/trainer/motion";
@@ -62,7 +62,9 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
   const drillFeedback = !debrief && isDrillFeedback(session.debrief) ? session.debrief : null;
   const reflection = (session.self_reflection ?? null) as unknown as SelfReflection | null;
   const exchanges = debrief ? buildExchanges(turns, debrief) : [];
-  const personaName = scenario?.persona.name ?? "The employee";
+  // "Patient" or "Employee", from the conversation's own setting.
+  const counterpart = counterpartOf(scenario?.setting ?? drill?.setting);
+  const personaName = scenario?.persona.name ?? `The ${counterpart.toLowerCase()}`;
 
   const existing: ExistingReview | null = review
     ? {
@@ -105,7 +107,10 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
                 <h1 className="mt-1 font-display text-[32px] font-bold leading-[1.08] tracking-tight text-ink">{title}</h1>
                 {scenario ? (
                   <p className="mt-1.5 text-[16px] font-bold text-ink/75">
-                    {scenario.persona.name}, {scenario.persona.role} · {scenario.context}: {scenario.leadershipIssue}
+                    {scenario.persona.role.toLowerCase().startsWith(counterpart.toLowerCase()) ? null : (
+                      <span className="text-muted">{counterpart}: </span>
+                    )}
+                    {scenario.persona.name}, {scenario.persona.role} · {scenario.context}: {scenario.issue}
                   </p>
                 ) : drill ? (
                   <p className="mt-1.5 text-[16px] font-bold text-ink/75">{drill.context}</p>
@@ -122,7 +127,9 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
                   <li>
                     <Badge>
                       <ModeIcon size={13} weight="bold" aria-hidden />
-                      {session.kind === "roleplay" ? (session.mode === "voice" ? "Voice role-play" : "Text role-play") : "Drill"}
+                      {session.kind === "roleplay"
+                        ? `${session.mode === "voice" ? "Voice" : "Text"} role-play with ${/^[aeiou]/i.test(counterpart) ? "an" : "a"} ${counterpart.toLowerCase()}`
+                        : "Drill"}
                     </Badge>
                   </li>
                   <li>
@@ -183,7 +190,14 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
 
           {/* AI feedback */}
           {debrief ? (
-            <AiFeedback debrief={debrief} turns={turns} exchanges={exchanges} personaName={personaName} learnerFirst={first} />
+            <AiFeedback
+              debrief={debrief}
+              turns={turns}
+              exchanges={exchanges}
+              personaName={personaName}
+              counterpart={counterpart}
+              learnerFirst={first}
+            />
           ) : drillFeedback && drill ? (
             <Card className="p-6" aria-labelledby="drill-fb">
               <SectionTitle id="drill-fb">AI practice feedback</SectionTitle>
@@ -211,6 +225,7 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
               annotations={debrief?.annotations ?? []}
               keyMomentIds={(debrief?.keyMoments ?? []).map((k) => k.turnId)}
               personaName={personaName}
+              counterpart={counterpart}
               learnerName={first}
             />
           ) : null}
@@ -224,6 +239,7 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
           status={sub.status as "submitted" | "reviewed"}
           sessionSkill={session.skill ?? ""}
           scenarioId={scenario?.id ?? null}
+          pathwayId={cohort.pathwayId}
           existing={existing}
         />
       </div>

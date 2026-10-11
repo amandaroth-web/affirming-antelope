@@ -22,13 +22,14 @@ import { Brief } from '@/components/roleplay/Brief';
 import { Conversation } from '@/components/roleplay/Conversation';
 import { Debrief, type NextChoice } from '@/components/roleplay/Debrief';
 import { Reflection } from '@/components/roleplay/Reflection';
-import { Avatar, Button, Raised, Text, WifiSlashIcon, color, haptic, layout, space } from '@/design';
+import { Avatar, Button, Raised, Text, WifiSlashIcon, color, haptic, layout, personaAvatar, space, type AvatarIdentity } from '@/design';
+import { scenariosForSetting } from '@/data/pathways';
 import { openDrill, openRoleplay, pickDrill } from '@/data/routes';
 import { postJson } from '@/lib/api';
 import { practiceSource, track } from '@/lib/analytics';
 import { FADE_MS, useReduceMotion } from '@/motion';
 import type { Rect } from '@/motion/launch';
-import { useLearner, type PracticeSession } from '@/state/store';
+import { activePathwayId, useLearner, type PracticeSession } from '@/state/store';
 
 type Params = { scenarioId: string; activityId?: string; minutes?: string; source?: string };
 
@@ -77,7 +78,13 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
 
   // one start per role-play screen; "Try again" reports its own below
   useEffect(() => {
-    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: practiceSource(params.source) });
+    track('practice_started', {
+      kind: 'roleplay',
+      ref_id: scenario.id,
+      skill: scenario.primaryChallenge,
+      source: practiceSource(params.source),
+      pathway_id: activePathwayId(),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -97,7 +104,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
       const nd = normalize(d);
       setDebrief(nd);
       setPhase('debrief');
-      track('debrief_viewed', { scenario_id: scenario.id, latency_ms: latency, suggested_next_step: nd.suggestedNextStep });
+      track('debrief_viewed', { scenario_id: scenario.id, latency_ms: latency, suggested_next_step: nd.suggestedNextStep, pathway_id: activePathwayId() });
       const ended = new Date();
       // the conversation itself, kept so it syncs and can be shared with a trainer
       setSaved(
@@ -130,7 +137,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   };
 
   const restart = () => {
-    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: 'next_step' });
+    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: 'next_step', pathway_id: activePathwayId() });
     setTurns(opening);
     setReflection(null);
     setDebrief(null);
@@ -148,14 +155,9 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
     if (c === 'try-again') return restart();
     if (c === 'same-skill') {
       const lvl = useLearner.getState().skills[scenario.primaryChallenge]?.level ?? 1;
-      return openDrill(pickDrill(scenario.primaryChallenge, lvl), { minutes: 5, source: 'next_step', replace: true });
+      return openDrill(pickDrill(scenario.primaryChallenge, lvl, scenario.setting), { minutes: 5, source: 'next_step', replace: true });
     }
-    const target =
-      c === 'harder'
-        ? scenario.harderId
-        : c === 'easier'
-          ? scenario.easierId
-          : SCENARIOS.filter((s) => s.id !== scenario.id)[Math.floor(Math.random() * (SCENARIOS.length - 1))]?.id;
+    const target = c === 'harder' ? scenario.harderId : c === 'easier' ? scenario.easierId : randomOther(scenario);
     if (target) openRoleplay(target, { minutes: 12, source: 'next_step', replace: true });
   };
 
@@ -249,7 +251,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
       >
         {body}
       </Phase>
-      {flight?.to ? <AvatarFlight seed={scenario.persona.avatarSeed} from={flight.from} to={flight.to} onLanded={() => setFlight(null)} /> : null}
+      {flight?.to ? <AvatarFlight avatar={personaAvatar(scenario.persona, scenario.setting)} from={flight.from} to={flight.to} onLanded={() => setFlight(null)} /> : null}
     </View>
   );
 }
@@ -301,7 +303,7 @@ function Phase({ enter, exit, children }: { enter: 'none' | 'step' | 'meeting'; 
 }
 
 /** The persona's portrait travelling from the brief to the conversation header. */
-function AvatarFlight({ seed, from, to, onLanded }: { seed: string; from: Rect; to: Rect; onLanded: () => void }) {
+function AvatarFlight({ avatar, from, to, onLanded }: { avatar: AvatarIdentity; from: Rect; to: Rect; onLanded: () => void }) {
   const reduce = useReduceMotion();
   const x = useSharedValue(0);
   const y = useSharedValue(0);
@@ -328,7 +330,7 @@ function AvatarFlight({ seed, from, to, onLanded }: { seed: string; from: Rect; 
   if (reduce) return null;
   return (
     <Animated.View pointerEvents="none" style={[styles.flight, { width: size, height: size }, style]}>
-      <Avatar seed={seed} size={size} ring={color.white} />
+      <Avatar {...avatar} size={size} ring={color.white} />
     </Animated.View>
   );
 }
@@ -386,6 +388,13 @@ function normalize(d: DebriefData): DebriefData {
     tryNext: d.tryNext ?? '',
     suggestedNextStep: d.suggestedNextStep ?? 'try-again',
   };
+}
+
+/** A different scenario in the same setting (all scenarios if that setting has no other). */
+function randomOther(scenario: ScenarioSpec): string | undefined {
+  const same = scenariosForSetting(scenario.setting).filter((s) => s.id !== scenario.id);
+  const pool = same.length ? same : SCENARIOS.filter((s) => s.id !== scenario.id);
+  return pool[Math.floor(Math.random() * pool.length)]?.id;
 }
 
 function Missing() {

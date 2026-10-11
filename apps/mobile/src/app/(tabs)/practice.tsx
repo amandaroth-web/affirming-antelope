@@ -2,10 +2,12 @@ import { SKILLS, getSkill, type SkillId } from '@antelope/core';
 import { useLocalSearchParams } from 'expo-router';
 import { createRef, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/common/SectionHeader';
 import { ChallengeSheet } from '@/components/practice/ChallengeSheet';
 import { SkillTile } from '@/components/practice/SkillTile';
+import { SETTING_COPY, availability, challengeReason, planFor, tileNote } from '@/components/practice/plan';
 import {
   ArrowRightIcon,
   Avatar,
@@ -16,18 +18,21 @@ import {
   SegmentedControl,
   ShuffleIcon,
   Text,
+  TextLink,
   color,
+  haptic,
   layout,
+  personaAvatar,
   radius,
   space,
   type as typeScale,
 } from '@/design';
 import { openDrill, openRoleplay, pickDrill, pickScenario } from '@/data/routes';
-import { Enter } from '@/motion';
+import { otherSetting, scenariosForSetting } from '@/data/pathways';
+import { Enter, useTickSwap } from '@/motion';
 import { launchFrom } from '@/motion/launch';
-import { useCurrentUnit } from '@/state/selectors';
+import { useCurrentUnit, useSetting } from '@/state/selectors';
 import { useLearner } from '@/state/store';
-import { SCENARIOS } from '@antelope/core';
 
 type Minutes = 5 | 10 | 15;
 
@@ -35,6 +40,19 @@ export default function Practice() {
   const insets = useSafeAreaInsets();
   const skills = useLearner((s) => s.skills);
   const unit = useCurrentUnit();
+  const activeSetting = useSetting();
+  const tick = useTickSwap();
+  // Which setting this tab is showing. Defaults to the active track's; the quiet link flips it.
+  const [setting, setSetting] = useState(activeSetting);
+  useEffect(() => setSetting(activeSetting), [activeSetting]);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
+  const pool = useMemo(() => scenariosForSetting(setting), [setting]);
+  const noChallenge = challengeReason(pool, setting);
+  const other = otherSetting(setting);
+  const toggleLabel = setting === activeSetting ? `Try ${SETTING_COPY[other].track} instead` : `Back to ${SETTING_COPY[activeSetting].track}`;
   const [minutes, setMinutes] = useState<Minutes>(5);
   const [skill, setSkill] = useState<SkillId>(unit?.skills[0] ?? 'oars');
   const [challenge, setChallenge] = useState(false);
@@ -46,6 +64,8 @@ export default function Practice() {
   }, [challengeParam]);
 
   const isDrill = minutes === 5;
+  const plan = planFor(skill, setting, isDrill);
+  const sessionMinutes = plan.kind === 'roleplay' && isDrill ? 10 : minutes;
   const tiles = useMemo(() => Object.fromEntries(SKILLS.map((s) => [s.id, { card: createRef<View>(), title: createRef<View>() }])), []);
   const startRef = useRef<View>(null);
   // the session opens out of the selected skill tile; for a role-play, START also becomes the brief's START
@@ -58,11 +78,11 @@ export default function Practice() {
         face: color.soft,
         radius: radius.surface,
         title: { ref: tiles[skill].title, text: name, style: { ...typeScale.subheading, color: color.primaryShadow } },
-        cta: isDrill ? undefined : { ref: startRef, face: color.primary, radius: radius.md, label: 'START', labelStyle: { ...typeScale.button, color: color.white } },
+        cta: plan.kind === 'drill' ? undefined : { ref: startRef, face: color.primary, radius: radius.md, label: 'START', labelStyle: { ...typeScale.button, color: color.white } },
       },
       () => {
-        if (isDrill) openDrill(pickDrill(skill, skills[skill].level), { minutes, source: 'practice' });
-        else openRoleplay(pickScenario(skill).id, { minutes, source: 'practice' });
+        if (plan.kind === 'drill') openDrill(pickDrill(skill, skills[skill].level, plan.setting), { minutes: sessionMinutes, source: 'practice' });
+        else openRoleplay(pickScenario(skill, plan.setting).id, { minutes: sessionMinutes, source: 'practice' });
       },
     );
   };
@@ -77,6 +97,23 @@ export default function Practice() {
           <Text variant="body" color={color.muted} style={styles.lede}>
             Pick your time and a skill. We’ll find the right rep.
           </Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingNow}>
+              <Animated.View key={setting} entering={mounted.current ? tick.entering : undefined}>
+                <Text variant="label" color={color.muted} numberOfLines={1}>
+                  {SETTING_COPY[setting].with}
+                </Text>
+              </Animated.View>
+            </View>
+            <TextLink
+              label={toggleLabel}
+              onPress={() => {
+                haptic.tick();
+                setSetting(other);
+              }}
+              entering={mounted.current ? tick.entering : undefined}
+            />
+          </View>
         </Enter>
 
         <Enter index={1} style={styles.block}>
@@ -101,29 +138,34 @@ export default function Practice() {
             depth={5}
             radius={radius.surface}
             onPress={() => setChallenge(true)}
-            accessibilityLabel="Challenge me: a random role-play scenario"
+            disabled={!!noChallenge}
+            accessibilityLabel={noChallenge ? `Challenge me. ${noChallenge}.` : 'Challenge me: a random role-play scenario'}
             style={styles.challenge}
             contentStyle={styles.challengeFace}
           >
-            <View style={styles.shuffle}>
-              <ShuffleIcon size={24} weight="bold" color={color.navy} />
+            <View style={[styles.shuffle, noChallenge ? styles.shuffleOff : null]}>
+              <ShuffleIcon size={24} weight="bold" color={noChallenge ? color.muted : color.navy} />
             </View>
             <View style={styles.challengeCopy}>
-              <Text variant="subheading" color={color.white}>
+              <Text variant="subheading" color={noChallenge ? color.ink : color.white}>
                 Challenge me
               </Text>
-              <Text variant="caption" color="rgba(255,255,255,0.75)">
-                A random scenario, any skill
-              </Text>
+              <Animated.View key={noChallenge ?? 'ready'} entering={mounted.current ? tick.entering : undefined}>
+                <Text variant="caption" color={noChallenge ? color.muted : 'rgba(255,255,255,0.75)'}>
+                  {noChallenge ?? 'A random scenario, any skill'}
+                </Text>
+              </Animated.View>
             </View>
-            <View style={styles.cast}>
-              {SCENARIOS.slice(0, 3).map((s, i) => (
-                <View key={s.id} style={[styles.castItem, { marginLeft: i ? -14 : 0, zIndex: 3 - i }]}>
-                  <Avatar seed={s.persona.avatarSeed} size={34} />
-                </View>
-              ))}
-            </View>
-            <CaretRightIcon size={18} weight="bold" color="rgba(255,255,255,0.7)" />
+            {noChallenge ? null : (
+              <Animated.View key={setting} entering={mounted.current ? tick.entering : undefined} style={styles.cast}>
+                {pool.slice(0, 3).map((s, i) => (
+                  <View key={s.id} style={[styles.castItem, { marginLeft: i ? -14 : 0, zIndex: 3 - i }]}>
+                    <Avatar {...personaAvatar(s.persona, s.setting)} size={34} />
+                  </View>
+                ))}
+              </Animated.View>
+            )}
+            {noChallenge ? null : <CaretRightIcon size={18} weight="bold" color="rgba(255,255,255,0.7)" />}
           </PressableSurface>
         </Enter>
 
@@ -131,7 +173,15 @@ export default function Practice() {
           <SectionHeader title="What do you want to practice?" />
           <View style={styles.grid} accessibilityRole="radiogroup">
             {SKILLS.map((s) => (
-              <SkillTile key={s.id} skill={s} progress={skills[s.id]} selected={s.id === skill} onPress={() => setSkill(s.id)} heroRefs={tiles[s.id]} />
+              <SkillTile
+                key={s.id}
+                skill={s}
+                progress={skills[s.id]}
+                selected={s.id === skill}
+                note={tileNote(availability(s.id, setting), setting)}
+                onPress={() => setSkill(s.id)}
+                heroRefs={tiles[s.id]}
+              />
             ))}
           </View>
         </Enter>
@@ -140,8 +190,9 @@ export default function Practice() {
       <View style={[styles.dock, { bottom: insets.bottom + layout.tabBarHeight }]}>
         <View style={styles.dockInner}>
           <View style={styles.dockCopy}>
-            <Text variant="caption" color={color.muted}>
-              {isDrill ? '5-minute drill' : `${minutes}-minute role-play`}
+            <Text variant="caption" color={color.muted} numberOfLines={1}>
+              {plan.kind === 'drill' ? `${sessionMinutes}-minute drill` : `${sessionMinutes}-minute role-play`}
+              {plan.note ? ` · ${plan.note}` : ''}
             </Text>
             <Text variant="bodyStrong" numberOfLines={1}>
               {getSkill(skill).name}
@@ -152,7 +203,7 @@ export default function Practice() {
             label="Start"
             onPress={start}
             icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />}
-            accessibilityLabel={`Start a ${minutes}-minute ${isDrill ? 'drill' : 'role-play'} on ${getSkill(skill).name}`}
+            accessibilityLabel={`Start a ${sessionMinutes}-minute ${plan.kind === 'drill' ? 'drill' : 'role-play'} on ${getSkill(skill).name}${plan.note ? `, ${plan.note}` : ''}`}
           />
           </View>
         </View>
@@ -161,6 +212,8 @@ export default function Practice() {
       <ChallengeSheet
         open={challenge}
         onClose={() => setChallenge(false)}
+        scenarios={pool}
+        setting={setting}
         onStart={(s) => {
           setChallenge(false);
           setTimeout(() => openRoleplay(s.id, { minutes: 12, source: 'challenge' }), 180);
@@ -173,6 +226,8 @@ export default function Practice() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.white },
   lede: { marginTop: space[1] },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], marginTop: space[2] },
+  settingNow: { flexShrink: 1 },
   block: { marginTop: space[6] },
   q: { marginBottom: space[3] },
   challenge: { marginTop: space[5] },
@@ -185,6 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shuffleOff: { backgroundColor: color.line },
   challengeCopy: { flex: 1 },
   cast: { flexDirection: 'row' },
   castItem: { borderRadius: 19, borderWidth: 2, borderColor: color.navy },

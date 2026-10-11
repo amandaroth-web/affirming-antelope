@@ -1,7 +1,10 @@
 // DRAFT — pending trainer review
 // All people, workplaces, and situations are fictional.
 
-import type { ScenarioSpec } from "./types";
+import type { ScenarioSpec, Setting } from "./types";
+import { CLINICIAN_SCENARIOS } from "./scenarios-clinicians";
+
+export { CLINICIAN_SCENARIOS };
 
 export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
@@ -9,9 +12,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
   {
     id: "EN-003",
+    setting: "workplace",
     title: "Quieter than usual",
     context: "Check-in",
-    leadershipIssue: "A reliable team member has gone quiet",
+    issue: "A reliable team member has gone quiet",
     persona: {
       name: "Lucia Ortega",
       role: "Medical assistant, family medicine clinic",
@@ -55,9 +59,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
   {
     id: "PM-017",
+    setting: "workplace",
     title: "The reports are late again",
     context: "Performance management",
-    leadershipIssue: "Missed deadlines",
+    issue: "Missed deadlines",
     persona: {
       name: "Darnell Brooks",
       role: "Revenue cycle analyst",
@@ -106,9 +111,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
   {
     id: "BO-008",
+    setting: "workplace",
     title: "I'll just do it myself",
     context: "Burnout and workload",
-    leadershipIssue: "Overwhelmed but won't delegate",
+    issue: "Overwhelmed but won't delegate",
     persona: {
       name: "Angela Okafor",
       role: "Practice manager, outpatient cardiology",
@@ -156,9 +162,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
   {
     id: "CR-012",
+    setting: "workplace",
     title: "The new check-in kiosks",
     context: "Leading change",
-    leadershipIssue: "Resistance to a new workflow",
+    issue: "Resistance to a new workflow",
     persona: {
       name: "Kevin Tran",
       role: "Front desk supervisor, urgent care",
@@ -205,9 +212,10 @@ export const SCENARIOS: ScenarioSpec[] = [
   // -------------------------------------------------------------------------
   {
     id: "DC-021",
+    setting: "workplace",
     title: "Decided without us",
     context: "Leading change",
-    leadershipIssue: "Open conflict over a new staffing model",
+    issue: "Open conflict over a new staffing model",
     persona: {
       name: "Tom Kowalski",
       role: "Night charge nurse, medical-surgical unit",
@@ -248,8 +256,16 @@ export const SCENARIOS: ScenarioSpec[] = [
     ],
     easierId: "PM-017",
   },
+
+  // MI for Clinicians scenarios live in scenarios-clinicians.ts.
+  ...CLINICIAN_SCENARIOS,
 ];
 
 export function getScenario(id: string): ScenarioSpec | undefined {
   return SCENARIOS.find((s) => s.id === id);
+}
+
+/** Every scenario written for a setting (workplace or clinical). */
+export function scenariosForSetting(setting: Setting): ScenarioSpec[] {
+  return SCENARIOS.filter((s) => s.setting === setting);
 }

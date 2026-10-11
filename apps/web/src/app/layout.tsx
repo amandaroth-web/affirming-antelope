@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   },
   applicationName: "Affirming Antelope",
   description:
-    "Free Motivational Interviewing practice: five-minute OARS drills, live AI role-plays with realistic employees, and opt-in trainer review. Works in your browser.",
+    "Free Motivational Interviewing practice for clinicians and leaders: five-minute OARS drills, live AI role-plays with realistic patients and employees, and opt-in trainer review. Works in your browser.",
   openGraph: {
     type: "website",
     siteName: "Affirming Antelope",

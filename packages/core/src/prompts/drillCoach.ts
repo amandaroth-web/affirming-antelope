@@ -1,14 +1,35 @@
 // DRAFT — pending trainer review
 // Drill coach: quick feedback on a single drill response. Same coaching
-// voice as the debrief Coach, much shorter.
+// voice as the debrief Coach, much shorter. Wording follows the drill's
+// setting; the workplace output is unchanged.
 
-import type { Drill } from "../types";
+import { SETTING_LABELS, type Drill, type Setting } from "../types";
 import { LEARNER_MOVES, type JsonObjectSchema } from "./observer";
 
-export function drillCoachSystemPrompt(): string {
-  return `You are the coach in Affirming Antelope, a practice app where leaders rehearse Motivational Interviewing with short daily drills. You speak as the app's antelope mascot: a thoughtful coach who is warm, direct, specific, and encouraging. You are a practice partner, not the authority; MI allows many good responses, and the learner's human trainer has the final word.
+const DRILL_COACH_COPY: Record<Setting, { learners: string; moment: string; voiceExtra: string; choiceSpeaker: string }> = {
+  workplace: {
+    learners: "leaders",
+    moment: "a short workplace moment, what the employee said",
+    voiceExtra: "",
+    choiceSpeaker: "the employee",
+  },
+  clinical: {
+    learners: "clinicians",
+    moment: "a short clinical moment, what the patient (or family member) said",
+    voiceExtra: `
+- Coach the conversation, not the medicine. Don't add medical advice or judge clinical content. Possible responses should be things a clinician could say in a short visit.
+- Never call the patient an employee or the learner a leader or manager.`,
+    choiceSpeaker: "the patient",
+  },
+};
 
-For each drill you receive a short workplace moment, what the employee said, what the learner was asked to try, a few example responses, and the learner's response. Give quick feedback.
+/** Pass the drill's setting. Defaults to workplace for older callers. */
+export function drillCoachSystemPrompt(setting: Setting = "workplace"): string {
+  const who = SETTING_LABELS[setting].counterpart;
+  const copy = DRILL_COACH_COPY[setting];
+  return `You are the coach in Affirming Antelope, a practice app where ${copy.learners} rehearse Motivational Interviewing with short daily drills. You speak as the app's antelope mascot: a thoughtful coach who is warm, direct, specific, and encouraging. You are a practice partner, not the authority; MI allows many good responses, and the learner's human trainer has the final word.
+
+For each drill you receive ${copy.moment}, what the learner was asked to try, a few example responses, and the learner's response. Give quick feedback.
 
 <fields>
 move: The one code that best describes the learner's response:
@@ -25,11 +46,11 @@ move: The one code that best describes the learner's response:
 - advice-without-permission: suggestions, arguments, or "have you tried" when not asked.
 - confront: arguing, correcting, criticizing, warning, or "I understand, but..."
 - other: anything else.
-If a response mixes moves, choose the one that will most shape how the employee hears it, putting confront and advice-without-permission first.
+If a response mixes moves, choose the one that will most shape how the ${who} hears it, putting confront and advice-without-permission first.
 
 hitTarget: true if the response does what the instruction asked, even if it's worded differently from the examples. This is not a grade. Be generous with wording and strict with the move: a reflection with a question mark does not hit a "reflect" instruction; a reflection followed by "but" does not hit "without arguing."
 
-observation: At most two sentences. Say what the response does and how the employee might hear it. Quote the learner's words when useful.
+observation: At most two sentences. Say what the response does and how the ${who} might hear it. Quote the learner's words when useful.
 
 strength: Optional. One short sentence naming something specific that works in the response. Omit if nothing genuinely fits; don't invent praise.
 
@@ -43,7 +64,7 @@ tryNext: One short sentence with a concrete thing to try on the next attempt.
 - Course vocabulary is fine (open question, reflection, affirmation, change talk, sustain talk, discord, asking permission). No other jargon.
 - Never give scores or ratings. Never say "correct," "incorrect," "wrong," "right answer," or "should have." Use "one option," "you might try."
 - Never shame. Never exaggerate ("perfect," "nailed it").
-- Plain text in each field. No markdown, no emoji.
+- Plain text in each field. No markdown, no emoji.${copy.voiceExtra}
 </voice>`;
 }
 
@@ -51,10 +72,17 @@ export function drillCoachUserPrompt(drill: Drill, response: string): string {
   const choiceBlock = drill.choices
     ? `\n<options_shown>\n${drill.choices
         .map((c) => `- ${c.text}${c.isTarget ? " (a target answer)" : ""}`)
-        .join("\n")}\n</options_shown>\nThis was a multiple-choice drill. The learner's response is the option they chose; code the move of that option (use other if the options are things the employee said) and set hitTarget to whether it is a target answer.\n`
+        .join("\n")}\n</options_shown>\nThis was a multiple-choice drill. The learner's response is the option they chose; code the move of that option (use other if the options are things ${DRILL_COACH_COPY[drill.setting].choiceSpeaker} said) and set hitTarget to whether it is a target answer.\n`
     : "";
 
-  return `<drill>
+  // Clinical drills restate their setting here too, so feedback stays clinical
+  // even if the caller hasn't passed the setting to the system prompt.
+  const settingNote =
+    drill.setting === "clinical"
+      ? "<setting>\nThis is a clinical drill: the learner is a clinician and the speaker is a patient or family member, not an employee. Write about the patient (or family member), and keep suggestions to things a clinician could say in a visit. Coach the conversation, not the medicine.\n</setting>\n\n"
+      : "";
+
+  return `${settingNote}<drill>
 Setting: ${drill.context}
 ${drill.speaker} says: "${drill.prompt}"
 Instruction to the learner: ${drill.instruction}

@@ -1,10 +1,10 @@
 import { getSkillLevel, type Skill } from '@antelope/core';
 import type { DemoSkillProgress } from '@antelope/core';
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
 import { CheckIcon, LevelPips, PressableSurface, Text, color, radius, space } from '@/design';
-import { spring, useReduceMotion } from '@/motion';
+import { spring, useFades, useReduceMotion, useTickSwap } from '@/motion';
 
 /** Selectable skill with its current level. Selection pops the check badge in. */
 export function SkillTile({
@@ -12,16 +12,25 @@ export function SkillTile({
   progress,
   selected,
   onPress,
+  note,
   heroRefs,
 }: {
   skill: Skill;
   progress: DemoSkillProgress;
   selected: boolean;
   onPress: () => void;
+  /** What this setting can't do for the skill ("Role-play only", "Coming soon for patients"). Ticks over when the setting changes. */
+  note?: string;
   /** Practice's START launches the session out of the selected tile (see motion/launch). */
   heroRefs?: { card: RefObject<View | null>; title: RefObject<View | null> };
 }) {
   const reduce = useReduceMotion();
+  const tick = useTickSwap();
+  const fades = useFades();
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+  }, []);
   const pop = useSharedValue(selected ? 1 : 0);
   useEffect(() => {
     pop.value = reduce ? (selected ? 1 : 0) : selected ? withSequence(withSpring(1.2, spring.snappy), withSpring(1, spring.bouncy)) : withSpring(0, spring.snappy);
@@ -42,7 +51,7 @@ export function SkillTile({
       radius={radius.surface}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${skill.name}, ${fresh ? 'not started' : `level ${progress.level}, ${lvl.name}`}`}
+      accessibilityLabel={`${skill.name}, ${fresh ? 'not started' : `level ${progress.level}, ${lvl.name}`}${note ? `. ${note}` : ''}`}
       style={styles.fill}
       contentStyle={styles.face}
     >
@@ -64,6 +73,13 @@ export function SkillTile({
           gap={3}
         />
       </View>
+      {note ? (
+        <Animated.View key={note} entering={mounted.current ? tick.entering : undefined} exiting={fades.exiting} style={styles.note}>
+          <Text variant="caption" color={color.muted} numberOfLines={2}>
+            {note}
+          </Text>
+        </Animated.View>
+      ) : null}
       <Animated.View style={[styles.badge, badge]} pointerEvents="none">
         <CheckIcon size={13} weight="bold" color={color.white} />
       </Animated.View>
@@ -78,6 +94,7 @@ const styles = StyleSheet.create({
   fill: { flexGrow: 1 },
   name: { marginBottom: 2, alignSelf: 'flex-start' },
   pips: { marginTop: space[3] },
+  note: { marginTop: space[2] },
   badge: {
     position: 'absolute',
     top: 10,

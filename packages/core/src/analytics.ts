@@ -6,7 +6,7 @@
 // or names. The types below make that hard to get wrong: there is no `string` property
 // that could hold free text, only unions and content ids.
 
-import type { SkillId, SkillLevelNumber } from "./types";
+import type { PathwayId, SkillId, SkillLevelNumber } from "./types";
 
 // ---------------------------------------------------------------------------
 // Shared value types
@@ -66,6 +66,8 @@ export interface AnalyticsEvents {
     skill?: SkillId;
     level?: SkillLevelNumber;
     source: PracticeSource;
+    /** The learner's active track when it happened. */
+    pathway_id: PathwayId;
   };
   drill_answered: {
     drill_id: string;
@@ -78,7 +80,7 @@ export interface AnalyticsEvents {
   roleplay_turn_sent: { scenario_id: string; turn_index: number };
   roleplay_ended: { scenario_id: string; learner_turns: number; ended_early: boolean };
   reflection_submitted: { scenario_id: string; feeling: ReflectionFeeling };
-  debrief_viewed: { scenario_id: string; latency_ms: number; suggested_next_step: string };
+  debrief_viewed: { scenario_id: string; latency_ms: number; suggested_next_step: string; pathway_id: PathwayId };
   next_step_chosen: { from: NextStepFrom; choice: NextStepChoice };
   practice_completed: {
     kind: PracticeKind;
@@ -87,10 +89,13 @@ export interface AnalyticsEvents {
     minutes: number;
     activity_id?: string;
     in_course: boolean;
+    pathway_id: PathwayId;
   };
   streak_extended: { streak_days: number };
   weekly_goal_hit: { target: number };
   cohort_joined: { cohort_id: string };
+  /** The learner picked (or switched) their track. */
+  pathway_chosen: { pathway_id: PathwayId; source: "onboarding" | "me" | "cohort" };
   submission_created: { kind: "roleplay" | "drill"; ref_id: string };
   submission_withdrawn: undefined;
   review_viewed: { rating?: ReviewRating; has_audio: boolean; try_again: boolean };
@@ -144,6 +149,8 @@ export interface AnalyticsPersonProps {
   cohort_count?: number;
   /** ISO date. */
   signed_up_at?: string;
+  /** The learner's active track. */
+  pathway_id?: PathwayId;
 }
 
 /** Query params a CTA appends so the app can continue the visitor's anonymous identity. */
