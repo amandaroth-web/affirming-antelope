@@ -30,6 +30,9 @@ export const color = {
   onPrimaryMuted: '#DCE2FF', // overlines on cobalt
   onPrimaryBody: '#F0F3FF', // body copy on cobalt
   onPrimaryChip: '#6A82F0', // chip face on cobalt
+  // system notices (a code that didn't work, offline). Warm, never red; never on a learner's practice
+  notice: '#B4562B', // text, borders (4.9:1 on white)
+  noticeTint: '#FBEDE5', // the cell face behind a notice
 } as const;
 
 export type ColorToken = keyof typeof color;

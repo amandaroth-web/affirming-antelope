@@ -1,9 +1,14 @@
 import { SKILLS } from '@antelope/core';
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SectionHeader } from '@/components/common/SectionHeader';
+import { AccountSection, ProfileHead } from '@/components/me/AccountSection';
 import { SkillLadder } from '@/components/me/SkillLadder';
+import { TrainerInbox } from '@/components/me/TrainerInbox';
+import { isSimulatedOffline, setSimulatedOffline, supabaseConfigured } from '@/lib/supabase';
+import { syncNow } from '@/sync/engine';
+import { personSeed, useAccount } from '@/state/account';
 import {
   Avatar,
   CaretRightIcon,
@@ -24,22 +29,38 @@ import { useLearner } from '@/state/store';
 
 export default function Me() {
   const s = useLearner();
-  const pending = s.reviews.filter((r) => r.status === 'pending').length;
+  const signedIn = useAccount((a) => a.status === 'signed-in');
+  const cohorts = useAccount((a) => a.cohorts);
+  const pending = useAccount((a) => a.submissions.filter((x) => x.status === 'submitted').length);
   const weekLabel = s.currentWeek > TOTAL_WEEKS ? 'MI for Leaders · Complete' : `MI for Leaders · Week ${s.currentWeek} of ${TOTAL_WEEKS}`;
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncNow();
+    setRefreshing(false);
+  }, []);
+  const trainer = signedIn ? cohorts[0] : null;
+  const showTrainer = !signedIn || !!trainer;
 
   return (
-    <Screen>
-      <Enter style={styles.profile}>
-        <Avatar seed="amanda-demo-learner" size={72} accessibilityLabel="Amanda" />
-        <View style={styles.profileCopy}>
-          <Text variant="title" accessibilityRole="header">
-            {s.firstName}
-          </Text>
-          <Text variant="caption" color={color.muted}>
-            {s.role}
-          </Text>
-          <Chip label={weekLabel} tone="soft" style={styles.course} />
-        </View>
+    <Screen refreshControl={signedIn ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.primary} /> : undefined}>
+      <Enter>
+        {signedIn ? (
+          <ProfileHead courseChip={<Chip label={weekLabel} tone="soft" style={styles.course} />} />
+        ) : (
+          <View style={styles.profile}>
+            <Avatar seed="amanda-demo-learner" size={72} accessibilityLabel={s.firstName} />
+            <View style={styles.profileCopy}>
+              <Text variant="title" accessibilityRole="header">
+                {s.firstName}
+              </Text>
+              <Text variant="caption" color={color.muted}>
+                {s.role}
+              </Text>
+              <Chip label={weekLabel} tone="soft" style={styles.course} />
+            </View>
+          </View>
+        )}
       </Enter>
 
       <Enter index={1} style={styles.stats}>
@@ -60,21 +81,45 @@ export default function Me() {
         </Raised>
       </Enter>
 
-      <Enter index={3}>
-        <SectionHeader title="Your trainer" />
-        <Raised contentStyle={styles.trainer}>
-          <Avatar seed="rosa-lin-trainer" size={52} accessibilityLabel={s.assignment.assignedBy.name} />
-          <View style={styles.flex}>
-            <Text variant="bodyStrong">{s.assignment.assignedBy.name}</Text>
-            <Text variant="caption" color={color.muted}>
-              {s.assignment.assignedBy.role} · reviews your role-plays
-            </Text>
-          </View>
-          <Chip label={pending ? `${pending} in review` : 'Nothing waiting'} tone={pending ? 'gold' : 'neutral'} />
-        </Raised>
-      </Enter>
+      {signedIn ? (
+        <Enter index={3}>
+          <SectionHeader title="From your trainer" />
+          <TrainerInbox />
+        </Enter>
+      ) : null}
 
-      <Enter index={4}>
+      {showTrainer ? (
+        <Enter index={3}>
+          <SectionHeader title="Your trainer" />
+          <Raised contentStyle={styles.trainer}>
+            <Avatar
+              seed={trainer ? personSeed(trainer.trainerName) : 'rosa-lin-trainer'}
+              size={52}
+              accessibilityLabel={trainer?.trainerName ?? s.assignment.assignedBy.name}
+            />
+            <View style={styles.flex}>
+              <Text variant="bodyStrong">{trainer?.trainerName ?? s.assignment.assignedBy.name}</Text>
+              <Text variant="caption" color={color.muted} numberOfLines={2}>
+                {trainer ? `${trainer.name} · reviews what you share` : `${s.assignment.assignedBy.role} · reviews your role-plays`}
+              </Text>
+            </View>
+            {signedIn ? (
+              <Chip label={pending ? `${pending} in review` : 'Nothing waiting'} tone={pending ? 'primary' : 'neutral'} />
+            ) : (
+              <Chip label="Sample" tone="neutral" />
+            )}
+          </Raised>
+        </Enter>
+      ) : null}
+
+      {supabaseConfigured ? (
+        <Enter index={4}>
+          <SectionHeader title="Account" />
+          <AccountSection />
+        </Enter>
+      ) : null}
+
+      <Enter index={5}>
         <SectionHeader title="Settings" />
         <Raised contentStyle={styles.settings}>
           <SettingRow title="Reduce motion" detail="Cross-fades instead of movement">
@@ -89,30 +134,55 @@ export default function Me() {
           </SettingRow>
         </Raised>
 
-        <Text variant="overline" color={color.muted} style={styles.demoLabel}>
-          Demo
-        </Text>
-        <Raised contentStyle={styles.settings}>
-          <LinkRow
-            title="Preview the completed pathway"
-            onPress={() => {
-              s.previewPathwayComplete();
-              router.navigate('/path');
-            }}
-          />
-          {__DEV__ ? (
-            <LinkRow
-              title="Replay path unlock"
-              onPress={() => {
-                s.replayPathUnlock();
-                router.navigate('/path');
-              }}
-            />
-          ) : null}
-          <LinkRow title="Reset demo data" onPress={() => s.resetDemo()} last />
-        </Raised>
+        {/* signed in, progress lives on the account, so the demo tools are dev-only there */}
+        {signedIn && !__DEV__ ? null : (
+          <>
+            <Text variant="overline" color={color.muted} style={styles.demoLabel}>
+              Demo
+            </Text>
+            <Raised contentStyle={styles.settings}>
+              {__DEV__ && supabaseConfigured ? <OfflineToggle /> : null}
+              <LinkRow
+                title="Preview the completed pathway"
+                onPress={() => {
+                  s.previewPathwayComplete();
+                  router.navigate('/path');
+                }}
+              />
+              {__DEV__ ? (
+                <LinkRow
+                  title="Replay path unlock"
+                  onPress={() => {
+                    s.replayPathUnlock();
+                    router.navigate('/path');
+                  }}
+                />
+              ) : null}
+              {/* a local reset would just sync back from the account */}
+              {signedIn ? null : <LinkRow title="Reset demo data" onPress={() => s.resetDemo()} last />}
+            </Raised>
+          </>
+        )}
       </Enter>
     </Screen>
+  );
+}
+
+/** Dev only: make every Supabase request fail like a dropped connection, to watch the outbox work. */
+function OfflineToggle() {
+  const [on, setOn] = useState(isSimulatedOffline());
+  useEffect(() => setOn(isSimulatedOffline()), []);
+  return (
+    <SettingRow title="Simulate offline" detail="Supabase requests fail until you turn this off">
+      <Switch
+        accessibilityLabel="Simulate offline"
+        value={on}
+        onChange={(v) => {
+          setSimulatedOffline(v);
+          setOn(v);
+        }}
+      />
+    </SettingRow>
   );
 }
 

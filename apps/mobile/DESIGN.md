@@ -183,11 +183,59 @@ Layers, back to front: **Pose** (drawing visibility), **Idle** (6.4 s loop: brea
 
 ## State: `src/state/store.ts` (zustand, persisted to AsyncStorage)
 
-Seeded from `DEMO_LEARNER` in `@antelope/core`. Actions for the practice loop:
+Seeded from `DEMO_LEARNER` in `@antelope/core`. The device is the source of truth for practice state; it works fully offline and signed out. Actions for the practice loop:
 
-- `recordPractice({ kind, skill?, refId?, activityId?, minutes })` updates the streak, weekly goal, skill progress and assignment items. When `activityId` is set it also calls `completeActivity`, which advances the path week once every activity in the unit is done.
-- `completeActivity(activityId)`, `submitForReview({ scenarioId, turns, selfReflection?, note? })`.
+- `recordPractice({ kind, skill?, refId?, activityId?, minutes })` updates the streak, weekly goal, skill progress and assignment items. When `activityId` is set it also calls `completeActivity`, which advances the path week once every activity in the unit is done. Every record gets a uuid `id` (its `client_id` on the server) and the signed-in user as `ownerId` (unset in guest mode).
+- `recordSession({ kind, refId, skill, transcript, debrief, selfReflection?, startedAt, endedAt, durationSec })`: every drill rep and finished role-play is kept as a practice session (what trainer review shares).
+- `completeActivity(activityId)`, `claimRecords`, `applySynced` (sync only).
+- `SYNCED_KEYS` / `syncedState()`: the slice mirrored to `learner_state` (progress, streak, goal, path week; not settings or practice history).
 - Selectors: `useCurrentUnit`, `nextActivity`, `useProgressRows` (`state/selectors.ts`).
+
+`src/state/account.ts` (`useAccount`, persisted cache): auth status, profile, cohorts (with trainer names), assignments with progress, submissions, reviews, `onboarded`. The server owns all of it; `sync/cloud.ts` refreshes it. `RATING` maps a review's level to words, `personSeed(name)` gives people a stable avatar (Dr. Rosa Lin keeps the demo face).
+
+## Accounts, sync, cohorts, trainer review
+
+Guest mode is the default and loses nothing: everything above runs on the device. Signing in adds sync, cohorts, assignments and trainer review. Sign-in prompts appear only where signing in unlocks something: joining a cohort (Home's quiet "Have a cohort code? Sign in" under the sample assignment) and sending a role-play for review (the review sheet). Me › Account is the general way in.
+
+### Sync engine: `src/sync/`
+
+- `lib/supabase.ts`: the client (AsyncStorage session, auto refresh started/stopped with AppState), env + LAN-host default, `isTransient()` error triage, and the dev **Simulate offline** switch (every request fails like a dropped connection).
+- `outbox.ts`: persisted, ordered, per-user queue (`completion`, `session`, `submission`, `withdraw`, `seen`). Idempotent writes (client ids + ignore-duplicates), batched, exponential backoff 2s → 5 min with jitter on transient failures; permanent failures are dropped and logged so one bad row can't block the queue.
+- `learnerState.ts`: versioned `learner_state`. Each write sends last-seen version + 1; on PT409 it refetches, merges field by field (`mergeSynced`: union of completed activities, max of week/levels/counts, the later streak) and writes server version + 1. On sign-in, a device with no guest practice adopts the account's state; one with guest practice merges it in.
+- `engine.ts`: auth transitions (guest migration on sign-in, cache cleared on sign-out), store subscriptions (new practice → outbox, synced edits → dirty), flush on enqueue / foreground / reconnect (expo-network) / backoff timer, refresh on sign-in / foreground / pull-to-refresh / Realtime `reviews` and `submissions` events. A submission insert that hits 23505 (a retry, or the session is already shared from another device) counts as submitted; the refresh then swaps the optimistic row for the server's and the review screen follows it. Learner actions: `submitForReview`, `withdrawSubmission`, `markReviewSeen`, `syncNow`.
+- `cloud.ts`: reads (profile, cohorts, assignments + `assignment_progress`, submissions with their review) and the direct actions that need an answer now: `joinCohort` (normalises "mil demo" / "MIL-DEMO" / "DEMO"), `leaveCohort`, `renameSelf`, `reviewAudioUrl` (signed URL).
+- `auth.ts`: email one-time code (`sendCode`, `verifyCode`, `signOut` local only).
+
+### Screens
+
+| Route | What it is |
+|---|---|
+| `welcome` | First launch only (existing guest installs skip it). Mascot on a soft hill, three lines on what the app does, TRY IT FIRST (guest) or Sign in. Behind `Stack.Protected` so it hands over to Home with a fade. |
+| `sign-in?reason=welcome\|cohort\|review\|me` | Sheet. Email → 6-digit code → your name (only while `profiles.display_name_set` is false), with three step bars. The head-pose coach listens while you type, thinks while the code is checked, hops on success. `cohort` continues to Join. |
+| `join` | Sheet. Fixed "MIL –" prefix and four cells; a complete code joins at once. Success: the ochre seal pops with a burst and the success haptic, then the cohort card (trainer, what's waiting). |
+| `review/[id]` | One submission: waiting (withdraw via `ConfirmSheet`), withdrawn (Share it again: a new submission, the withdrawn one stays as history), or the trainer's feedback (rating in words, notes in a coach bubble, voice note, recommended practice as the docked START, Try again). Opening it sets `learner_seen_at`. Pull to refresh. |
+
+Home: the inbox card (`FeedbackCard`) sits under Today's practice when a review is unseen. "From your trainer" shows real assignments (`data/assignments.ts` maps DB items to rows: `any-drill` + skill opens a drill of that skill at your level, `roleplay` opens the scenario; progress is the server's count topped up by unsynced practice on the phone), `JoinCohortCard` when signed in without a cohort, `NothingAssigned`, or the sample assignment + `GuestCohortPrompt` for guests. Me: profile (signed in), "From your trainer" list (`TrainerInbox`), "Your trainer", `AccountSection` (email, rename sheet, cohorts with Leave, join, sync status, sign out).
+
+The review sheet (`roleplay/ReviewSheet.tsx`) gates on the account: guest → sign in, no cohort → join, several cohorts → a trainer picker, else note + SEND. Sign-in and join are full screens, so the sheet steps aside and the debrief reopens it when the flow closes (`lib/flowEvents.ts`) and the step actually happened. Sent shows the real state ("Sent to Dr. Rosa Lin", "Saved. It'll send soon" offline, "Reviewed by …").
+
+### Components
+
+- `account/CodeInput`: segmented code cells over one invisible `TextInput` (iOS `oneTimeCode` autofill, Android `sms-otp`, paste of "123 456" or "MIL-DEMO", a hand-typed "MIL" is swallowed). A typed character pops in (bouncy + tick); the active cell has a blinking cobalt caret; `busy` runs a crest across the cells; `error` is a system notice, so it's the one place that shakes (one decaying shake + warn haptic, warm `notice` cells) and the next keystroke starts a fresh code; `success` fills the cells cobalt left to right and lands on the success haptic. Reduced motion: no pops, crest or shake; colours cross-fade.
+- `KeyboardColumn` (practice-loop): pads by the keyboard's overlap with the column measured in window coordinates, on the keyboard's own curve. Not `KeyboardAvoidingView`, which measures relative to its parent and left the drill composer (below a header) under the iOS 27 suggestion bar.
+- `account/FlowChrome`: `FlowHeader` (close or back, centre slot), `TextField` (2pt edge, raised 3pt, cobalt focus ring cross-fades, `invalid` turns it `notice`), `Notice` (warning icon + copy, opens with `Expand`).
+- `review/VoiceNote`: cobalt play button and a waveform scrubber. The cobalt copy of the bars is clipped to the playhead (one animated width on the UI thread) and glides linearly between the player's 250ms status ticks; drag or tap to scrub (tick on touch, knob swells), seeks on release; plays through the silent switch; adjustable for VoiceOver (±5s).
+- `home/TrainerCards`: `FeedbackCard` (cobalt-edged raised card; the "New" pip pops after the card rises, breathes twice, rests), `JoinCohortCard`, `NothingAssigned`, `GuestCohortPrompt`.
+- Tokens: `color.notice` / `noticeTint` for system notices (a code that didn't work). Warm, never red, never on a learner's practice.
+
+Captures: `docs/screens/accounts-*.jpg`.
+
+### Copy rules
+
+- Ratings are words with a line of meaning ("Developing: It's there in places. The next step is doing it on purpose."). Never a number, a bar or stars.
+- Say what's shared and what isn't, every time. Withdraw is always possible while a session is waiting.
+- Offline is normal: "Saved on this phone. Sends when you're online." Never an error for practice that's safely queued.
+- No pronouns for trainers in system copy (names only).
 
 ## Practice-loop routes: `src/data/routes.ts`
 
@@ -195,7 +243,7 @@ Seeded from `DEMO_LEARNER` in `@antelope/core`. Actions for the practice loop:
 
 ## Practice loop: `src/components/practice-loop` (shared)
 
-- `SessionHeader` (close X + centre + trailing slot, safe top), `Dock` (bottom bar above the home indicator), `KeyboardColumn` (KeyboardAvoidingView `padding` on iOS/Android, plain column on web; Expo Go safe, no keyboard-controller), `sessionStyles`.
+- `SessionHeader` (close X + centre + trailing slot, safe top), `Dock` (bottom bar above the home indicator), `KeyboardColumn` (window-measured keyboard padding on iOS/Android, plain column on web; Expo Go safe, no keyboard-controller), `sessionStyles`.
 - `Speech` (all built on `Bubble` / `Callout`; animations stay on the callers' wrappers): `LearnerBubble` (cobalt, tail bottom right), `EmployeeBubble` (white raised, persona `Avatar`, tail bottom left; children replace text, e.g. `TypingDots`), `LiveEmployeeBubble` (one element from typing dots to finished line; its `layout` springs the frame), `useBubbleEntrance(side, delay, skip)` (rise + scale from the speaker's side), `SpeechCard` (drill line: avatar pops on `bouncy`, bubble rises after it; a `Bubble` with `tail={false}`, depth 5), `InstructionChip` (the task, target glyph, a `Callout`), `CoachSays` (mascot + `Bubble side="coach"`), `PossibleResponse` ("One possible MI-consistent response", never "correct").
 - `Composer`: multiline, grows to 132pt then scrolls, focus ring cross-fades to cobalt, the send button wakes with a spring pop when there's text. Web: Enter sends, Shift+Enter adds a line.
 - `Thinking`: `Shimmer` (a band sweeping a soft track: working, no fake percent), `RotatingLine` (cross-faded coach lines), `CoachThinking` (listening antelope + both).
@@ -224,11 +272,11 @@ Header: "Day N" (streak including today) + "N minutes of MI practice today", and
 - `Debrief`: coach answers your read first (celebrates when the trajectory rose), compact `PracticeTicks`, then:
   - `ReplayChart` (signature): monotone cubic through `trajectory` over plain-language bands, traced left→right with `strokeDashoffset`; employee replies are hollow rings, your moves are filled family markers between them (key moments ringed ochre), each popping on `bouncy` as the trace reaches it. Drag or tap: a guide line, halo and a callout (your line, their reply, observer notes) follow on springs with a light haptic per point. After the trace it settles on the first key moment. "List" toggles an accessible exchange list.
   - `MovesPanel`: rolling counters per move (dashed when zero) and a reflections-vs-questions balance beam that tips on a soft spring. A balance, not a grade.
-  - Strengths, `KeyMoments` (snapping horizontal cards, next one peeks, ochre dot tracks scroll on the UI thread), Try next, What next (try again / practice this skill / harder / easier / new; coach's pick highlighted and docked as the primary), `ReviewSheet` (exactly what's shared and what isn't, optional note, `submitForReview` incl. the debrief, "Sent to Dr. Rosa Lin" with a check pop).
+  - Strengths, `KeyMoments` (snapping horizontal cards, next one peeks, ochre dot tracks scroll on the UI thread), Try next, What next (try again / practice this skill / harder / easier / new; coach's pick highlighted and docked as the primary), `ReviewSheet` (exactly what's shared and what isn't, optional note, account gates and cohort picker, the real submission state; see Accounts below).
 
 ## Home
 
-Today's practice card (chips: skill, then "Drill · ~5 min"), This week, From your trainer (`AssignmentCard`: a `Callout` note, a gold `ProgressBar`, `ListRow`s with a 24pt `StepBadge` check), Your progress (`ProgressList`: a level `StepBadge`, caption "Level 2 · Respond", `LevelPips` and "Next: Elicit"; no percentages), More practice (the focus skill sits in the header's action slot: "Focus this week: Sustain talk").
+Today's practice card (chips: skill, then "Drill · ~5 min"), new trainer feedback (`FeedbackCard`, when unseen), This week, From your trainer (`AssignmentCard` over an `AssignmentView`, demo or real: a `Callout` note, a gold `ProgressBar` whose segments fill by fraction for multi-rep items, `ListRow`s with a 24pt `StepBadge` check), Your progress (`ProgressList`: a level `StepBadge`, caption "Level 2 · Respond", `LevelPips` and "Next: Elicit"; no percentages), More practice (the focus skill sits in the header's action slot: "Focus this week: Sustain talk").
 
 ## Rules for the practice loop
 

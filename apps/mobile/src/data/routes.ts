@@ -10,10 +10,10 @@ import { markReplace } from '@/motion/launch';
  *   /roleplay/[scenarioId]      scenarioId = ScenarioSpec id. ?activityId &minutes &source
  *   /lesson/[id]                id = Lesson id.       ?activityId
  *
- * `source` is where the learner came from: 'today' | 'path' | 'assignment' | 'practice' | 'challenge'.
+ * `source` is where the learner came from: 'today' | 'path' | 'assignment' | 'practice' | 'challenge' | 'review'.
  * `activityId` is set only for course activities; pass it to recordPractice so the path advances.
  */
-export type PracticeSource = 'today' | 'path' | 'assignment' | 'practice' | 'challenge';
+export type PracticeSource = 'today' | 'path' | 'assignment' | 'practice' | 'challenge' | 'review';
 
 /**
  * `replace: true` swaps the current practice screen instead of stacking a new

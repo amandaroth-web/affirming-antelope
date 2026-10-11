@@ -177,14 +177,14 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "can_train": boolean,"created_at": string,"display_name": string,"id": string
+                    "can_train": boolean,"created_at": string,"display_name": string,"display_name_set": boolean,"id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "can_train"?: boolean,"created_at"?: string,"display_name": string,"id": string
+                    "can_train"?: boolean,"created_at"?: string,"display_name": string,"display_name_set"?: boolean,"id": string
                   }
                   Update: {
-                    "can_train"?: boolean,"created_at"?: string,"display_name"?: string,"id"?: string
+                    "can_train"?: boolean,"created_at"?: string,"display_name"?: string,"display_name_set"?: boolean,"id"?: string
                   }
                   Relationships: [
                     

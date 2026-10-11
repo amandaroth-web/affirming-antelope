@@ -356,3 +356,4 @@ values (
   1,
   now() - interval '20 hours'
 );
+update public.profiles set display_name_set = true;

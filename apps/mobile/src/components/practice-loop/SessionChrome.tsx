@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Keyboard, LayoutAnimation, Platform, StyleSheet, View, type KeyboardEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton, XIcon, color, layout, space } from '@/design';
 import { DismissZone } from './SessionSurface';
@@ -51,13 +51,56 @@ export function Dock({ children, style, rule = true }: { children: ReactNode; st
  * Keyboard handling that works in Expo Go and on web: the screen's column
  * (scroll + dock) lifts with the keyboard on iOS and Android (edge-to-edge),
  * and is a plain flex column on web where the browser handles it.
+ *
+ * Not KeyboardAvoidingView: it measures itself relative to its parent, so a
+ * column that sits below a header (the drill) was lifted short by the header's
+ * height and the composer ended up under the keyboard's suggestion bar. This
+ * measures the column in window coordinates when the keyboard moves and pads
+ * by exactly the overlap, animated with the keyboard's own curve.
  */
 export function KeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   if (Platform.OS === 'web') return <View style={[styles.fill, style]}>{children}</View>;
+  return <NativeKeyboardColumn style={style}>{children}</NativeKeyboardColumn>;
+}
+
+function NativeKeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const ref = useRef<View>(null);
+  const [pad, setPad] = useState(0);
+  useEffect(() => {
+    const apply = (e: KeyboardEvent | null) => {
+      const node = ref.current;
+      if (!node) return;
+      const animate = () => {
+        if (Platform.OS === 'ios' && e?.duration) {
+          LayoutAnimation.configureNext({
+            duration: e.duration,
+            update: { duration: e.duration, type: LayoutAnimation.Types[e.easing] ?? LayoutAnimation.Types.keyboard },
+          });
+        }
+      };
+      if (!e) {
+        animate();
+        return setPad(0);
+      }
+      // the column's frame doesn't include the padding change, so its bottom is stable
+      node.measureInWindow((_x, y, _w, h) => {
+        const next = Math.max(0, Math.round(y + h - e.endCoordinates.screenY));
+        setPad((prev) => {
+          if (prev !== next) animate();
+          return next;
+        });
+      });
+    };
+    const subs =
+      Platform.OS === 'ios'
+        ? [Keyboard.addListener('keyboardWillChangeFrame', apply), Keyboard.addListener('keyboardWillHide', (e) => apply({ ...e, endCoordinates: { ...e.endCoordinates, screenY: 1e6 } }))]
+        : [Keyboard.addListener('keyboardDidShow', apply), Keyboard.addListener('keyboardDidHide', () => apply(null))];
+    return () => subs.forEach((s) => s.remove());
+  }, []);
   return (
-    <KeyboardAvoidingView behavior="padding" style={[styles.fill, style]}>
+    <View ref={ref} style={[styles.fill, style, { paddingBottom: pad }]}>
       {children}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

@@ -27,7 +27,7 @@ import { openDrill, openRoleplay, pickDrill, type PracticeSource } from '@/data/
 import { postJson } from '@/lib/api';
 import { FADE_MS, useReduceMotion } from '@/motion';
 import type { Rect } from '@/motion/launch';
-import { useLearner } from '@/state/store';
+import { useLearner, type PracticeSession } from '@/state/store';
 
 type Params = { scenarioId: string; activityId?: string; minutes?: string; source?: string };
 
@@ -64,11 +64,12 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   const [reflection, setReflection] = useState<SelfReflection | null>(null);
   const [debrief, setDebrief] = useState<DebriefData | null>(null);
   const [error, setError] = useState<FriendlyError | null>(null);
-  const [reviewSent, setReviewSent] = useState(false);
+  const [saved, setSaved] = useState<PracticeSession | null>(null);
   const before = usePracticeSnapshot();
   const recordPractice = useLearner((s) => s.recordPractice);
-  const submitForReview = useLearner((s) => s.submitForReview);
-  const trainer = useLearner((s) => s.assignment.assignedBy);
+  const recordSession = useLearner((s) => s.recordSession);
+  // when this conversation started (the brief's START), for the session's duration
+  const startedAt = useRef(new Date().toISOString());
   const inflight = useRef<ReturnType<typeof withTimeout> | null>(null);
   const source = (params.source as PracticeSource) ?? 'practice';
 
@@ -86,8 +87,24 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
       // the coach takes a moment: long enough to read as intentional, never padded past ~2.4s
       await new Promise((res) => setTimeout(res, Math.max(0, 2400 - (Date.now() - started))));
       if (inflight.current !== req) return;
-      setDebrief(normalize(d));
+      const nd = normalize(d);
+      setDebrief(nd);
       setPhase('debrief');
+      const ended = new Date();
+      // the conversation itself, kept so it syncs and can be shared with a trainer
+      setSaved(
+        recordSession({
+          kind: 'roleplay',
+          refId: scenario.id,
+          skill: scenario.primaryChallenge,
+          transcript: t,
+          debrief: nd,
+          selfReflection: r,
+          startedAt: startedAt.current,
+          endedAt: ended.toISOString(),
+          durationSec: Math.max(0, (ended.getTime() - new Date(startedAt.current).getTime()) / 1000),
+        }),
+      );
       recordPractice({
         kind: 'roleplay',
         skill: scenario.primaryChallenge,
@@ -108,7 +125,8 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
     setTurns(opening);
     setReflection(null);
     setDebrief(null);
-    setReviewSent(false);
+    setSaved(null);
+    startedAt.current = new Date().toISOString();
     setSession((n) => n + 1);
     setPhase('chat');
   };
@@ -131,6 +149,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   let body: ReactNode;
   const startChat = (avatar: View | null) => {
     setEntered(true);
+    startedAt.current = new Date().toISOString();
     const node = root.current;
     if (!avatar || !node) return setPhase('chat');
     avatar.measureLayout(
@@ -200,12 +219,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
         reflection={reflection}
         debrief={debrief}
         before={before}
-        trainer={trainer}
-        reviewSent={reviewSent}
-        onReview={(note) => {
-          submitForReview({ scenarioId: scenario.id, turns, selfReflection: reflection, debrief, note: note || undefined });
-          setReviewSent(true);
-        }}
+        session={saved}
         onNext={next}
         onClose={close}
       />

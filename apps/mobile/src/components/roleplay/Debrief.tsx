@@ -32,7 +32,12 @@ import { TypeIn } from './TypeIn';
 import { KeyMoments } from './KeyMoments';
 import { MovesPanel } from './MovesPanel';
 import { ReplayChart, type Exchange } from './ReplayChart';
-import { ReviewSheet } from './ReviewSheet';
+import { ReviewSheet, type ReviewGate } from './ReviewSheet';
+import { DEMO_LEARNER } from '@antelope/core';
+import { router } from 'expo-router';
+import { onFlowClosed } from '@/lib/flowEvents';
+import { firstNameOf, personSeed, useAccount } from '@/state/account';
+import type { PracticeSession } from '@/state/store';
 
 export type NextChoice = NextStep | 'easier';
 
@@ -67,9 +72,7 @@ export function Debrief({
   reflection,
   debrief,
   before,
-  trainer,
-  reviewSent,
-  onReview,
+  session,
   onNext,
   onClose,
 }: {
@@ -78,9 +81,8 @@ export function Debrief({
   reflection: SelfReflection;
   debrief: DebriefData;
   before: PracticeSnapshot;
-  trainer: { name: string; role: string };
-  reviewSent: boolean;
-  onReview: (note: string) => void;
+  /** This conversation as saved on the device (what a trainer review shares). */
+  session: PracticeSession | null;
   onNext: (c: NextChoice) => void;
   onClose: () => void;
 }) {
@@ -88,6 +90,34 @@ export function Debrief({
   const p = scenario.persona;
   const first = p.name.split(' ')[0];
   const [review, setReview] = useState(false);
+  // sign-in / join are full screens: the sheet steps aside and comes back when the learner
+  // does, if the step actually happened (a cancelled sign-in just leaves them on the debrief)
+  const [resume, setResume] = useState<ReviewGate | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(resumeTimer.current), []);
+  useEffect(() => {
+    if (!resume) return;
+    return onFlowClosed(() => {
+      const a = useAccount.getState();
+      const done = resume === 'sign-in' ? a.status === 'signed-in' : a.cohorts.length > 0;
+      // once the flow's sheet is down
+      resumeTimer.current = setTimeout(() => {
+        setResume(null);
+        if (done) setReview(true);
+      }, 450);
+    });
+  }, [resume]);
+  const onGate = (g: ReviewGate) => {
+    setReview(false);
+    setResume(g);
+    setTimeout(() => router.push(g === 'sign-in' ? { pathname: '/sign-in', params: { reason: 'review' } } : '/join'), 280);
+  };
+  const cohorts = useAccount((s) => s.cohorts);
+  const shared = useAccount((s) => (session ? s.submissions.find((x) => x.sessionId === session.id && x.status !== 'withdrawn') : undefined));
+  const reviewedBy = useAccount((s) => (shared ? s.reviews.find((r) => r.submissionId === shared.id)?.trainerName : undefined));
+  const trainerName =
+    (shared && cohorts.find((c) => c.id === shared.cohortId)?.trainerName) ?? cohorts[0]?.trainerName ?? DEMO_LEARNER.trainerAssignment.assignedBy.name;
+  const trainerFirst = firstNameOf(trainerName) ?? 'Your trainer';
   // a few celebratory hops when it's earned, then the antelope settles
   const [cheer, setCheer] = useState(true);
   useEffect(() => {
@@ -284,17 +314,23 @@ export function Debrief({
               tone="surface"
               depth={4}
               radius={radius.surface}
-              accessibilityLabel={reviewSent ? `Sent to ${trainer.name}` : `Submit for trainer review. Share only this session with ${trainer.name}`}
+              accessibilityLabel={shared ? reviewRowTitle(shared.status, trainerName, reviewedBy) : `Submit for trainer review. Share only this session with ${trainerName}`}
               contentStyle={styles.review}
             >
-              <Avatar seed="rosa-lin-trainer" size={44} />
+              <Avatar seed={personSeed(trainerName)} size={44} />
               <View style={styles.flex}>
-                <Text variant="subheading">{reviewSent ? `Sent to ${trainer.name}` : 'Submit for trainer review'}</Text>
+                <Text variant="subheading">{shared ? reviewRowTitle(shared.status, trainerName, reviewedBy) : 'Submit for trainer review'}</Text>
                 <Text variant="caption" color={color.muted}>
-                  {reviewSent ? 'She’ll review this session before group.' : `Share only this session with ${trainer.name}.`}
+                  {shared
+                    ? reviewedBy
+                      ? 'Their feedback is waiting on Home.'
+                      : shared.local
+                        ? 'Saved. It sends as soon as you’re online.'
+                        : `${trainerFirst} will review it before group.`
+                    : `Share only this session with ${trainerName}.`}
                 </Text>
               </View>
-              {reviewSent ? (
+              {shared ? (
                 <View style={styles.sentTick}>
                   <CheckIcon size={14} weight="bold" color={color.navy} />
                 </View>
@@ -316,11 +352,10 @@ export function Debrief({
       <ReviewSheet
         open={review}
         onClose={() => setReview(false)}
-        trainer={trainer}
+        session={session}
+        onGate={onGate}
         turnCount={turns.length}
         feeling={FEELING[reflection.feeling]}
-        sent={reviewSent}
-        onSend={onReview}
       />
     </View>
   );
@@ -424,3 +459,8 @@ const styles = StyleSheet.create({
   sentTick: { width: 26, height: 26, borderRadius: 13, backgroundColor: color.gold, alignItems: 'center', justifyContent: 'center' },
   footnote: { marginTop: space[6], paddingHorizontal: space[4] },
 });
+
+function reviewRowTitle(status: 'submitted' | 'reviewed' | 'withdrawn', trainerName: string, reviewedBy?: string) {
+  if (reviewedBy || status === 'reviewed') return `Reviewed by ${reviewedBy ?? trainerName}`;
+  return `Sent to ${trainerName}`;
+}
