@@ -91,7 +91,7 @@ end $$;
 grant execute on function tests.as_service_role() to service_role, authenticated;
 
 -- merge_anonymous_user: a guest signs in to an existing account and brings their practice.
-select plan(31);
+select plan(21);
 
 select tests.as_postgres();
 insert into tests.ids values
@@ -132,9 +132,9 @@ insert into public.learner_state (user_id, state, version) values (tests.id('ano
 update public.profiles set display_name = 'Lee' where id = tests.id('anon2');
 
 -- ---------------------------------------------------------------- access
-select ok(not has_function_privilege('authenticated', 'public.merge_anonymous_user(uuid, uuid)', 'execute')
-          and not has_function_privilege('anon', 'public.merge_anonymous_user(uuid, uuid)', 'execute')
-          and has_function_privilege('service_role', 'public.merge_anonymous_user(uuid, uuid)', 'execute'),
+select ok(not has_function_privilege('authenticated', 'public.merge_anonymous_user(uuid, uuid, jsonb, integer)', 'execute')
+          and not has_function_privilege('anon', 'public.merge_anonymous_user(uuid, uuid, jsonb, integer)', 'execute')
+          and has_function_privilege('service_role', 'public.merge_anonymous_user(uuid, uuid, jsonb, integer)', 'execute'),
   'merge_anonymous_user is service-role only');
 
 -- ---------------------------------------------------------------- refusals
@@ -149,39 +149,26 @@ select throws_ok($$ select public.merge_anonymous_user(gen_random_uuid(), tests.
   'PT404', null, 'refuses an unknown source');
 
 -- ---------------------------------------------------------------- merge into an account with state
-select is(public.merge_anonymous_user(tests.id('anon1'), tests.uid('amanda')),
+-- The route merges the two documents in TypeScript (packages/core mergeGuestIntoAccount)
+-- and passes the result plus the account version it read.
+select tests.as_postgres();
+select set_config('tests.amanda_version', (select version::text from public.learner_state where user_id = tests.uid('amanda')), true);
+select tests.as_service_role();
+select throws_ok($$ select public.merge_anonymous_user(tests.id('anon1'), tests.uid('amanda')) $$,
+  'PT409', null, 'both have learner_state: a merged document is required');
+select throws_ok($$ select public.merge_anonymous_user(tests.id('anon1'), tests.uid('amanda'), '{"firstName":"Amanda"}', 999) $$,
+  'PT409', 'The account''s learner_state changed; merge again', 'a stale account version is refused');
+select is(public.merge_anonymous_user(tests.id('anon1'), tests.uid('amanda'),
+            '{"firstName": "Amanda", "shape": 3, "merged": true}', current_setting('tests.amanda_version')::int),
   '{"learner_state": "merged", "completions_moved": 1, "sessions_moved": 1}'::jsonb,
   'merges anon1 into Amanda');
 
 select tests.as_postgres();
-select is((select version from public.learner_state where user_id = tests.uid('amanda')), 2, 'account version bumps');
+select is((select version from public.learner_state where user_id = tests.uid('amanda')),
+  current_setting('tests.amanda_version')::int + 1, 'account version bumps');
+select is((select state from public.learner_state where user_id = tests.uid('amanda')),
+  '{"firstName": "Amanda", "shape": 3, "merged": true}'::jsonb, 'the merged document is stored');
 select is((select count(*)::int from public.learner_state where user_id = tests.id('anon1')), 0, 'guest learner_state is gone');
-select is((select state->>'firstName' from public.learner_state where user_id = tests.uid('amanda')), 'Amanda',
-  'identity: the account''s name wins');
-select is((select state->>'role' from public.learner_state where user_id = tests.uid('amanda')), 'Director of outpatient nursing',
-  'identity: the account''s role wins over an empty one');
-select is((select (state->>'currentWeek')::int from public.learner_state where user_id = tests.uid('amanda')), 6,
-  'currentWeek: max');
-select is((select state->'completedActivityIds' from public.learner_state where user_id = tests.uid('amanda')),
-  '["u04-a1", "u04-a2", "u04-a3", "u05-a1"]'::jsonb, 'completedActivityIds: union, account first');
-select is((select state->'skills'->'oars' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"level": 2, "percent": 100, "status": "complete"}'::jsonb, 'skills: the account''s higher rank stays');
-select is((select state->'skills'->'evoking' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"level": 2, "percent": 5, "status": "in-progress"}'::jsonb, 'skills: the guest''s higher level wins');
-select is((select state->'skills'->'discord' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"level": 1, "percent": 20, "status": "in-progress"}'::jsonb, 'skills: unlocked beats locked');
-select is((select state->'skills'->'engaging' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"level": 3, "percent": 40, "status": "in-progress"}'::jsonb, 'skills: account-only skills are kept');
-select is((select state->'weekDays' from public.learner_state where user_id = tests.uid('amanda')),
-  '[true, true, true, true, false, false, true]'::jsonb, 'weekDays: OR');
-select is((select state->'streak' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"days": 2, "lastPracticeDay": "2026-10-10"}'::jsonb, 'streak: the later practice day wins');
-select is((select state->'weeklyGoal' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"target": 5, "done": 4, "hitCount": 2}'::jsonb, 'weeklyGoal: account target, max counts');
-select is((select (state->>'scenariosCompleted')::int from public.learner_state where user_id = tests.uid('amanda')), 4,
-  'scenariosCompleted: max');
-select is((select state->'settings' from public.learner_state where user_id = tests.uid('amanda')),
-  '{"motion": "system", "haptics": true}'::jsonb, 'unknown keys survive');
 
 select is((select count(*)::int from public.activity_completions where user_id = tests.uid('amanda') and client_id = tests.id('new_client')), 1,
   'completion moved to the account');

@@ -1,3 +1,4 @@
+import { mergeGuestIntoAccount, type Json } from "@antelope/core";
 import { bearer } from "@/lib/ai/auth";
 import { ApiError, errorResponse, jsonResponse, optionsResponse, readJson } from "@/lib/ai/http";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -58,11 +59,43 @@ export async function POST(req: Request) {
     if (!anonUser.is_anonymous) throw fail(409, "not_anonymous", "That guest session already belongs to an account.");
     if (anonUser.id === permUser.id) throw fail(400, "same_user", "The two tokens are the same user.");
 
-    const { data, error } = await admin.rpc("merge_anonymous_user", {
-      anonymous_id: anonUser.id,
-      permanent_id: permUser.id,
-    });
-    if (error) {
+    // learner_state: merge the two documents with the app's own rules, then store the
+    // result only if the account's version hasn't moved (else re-read and go again).
+    let data: unknown = null;
+    for (let attempt = 0; ; attempt++) {
+      const { data: rows, error: readError } = await admin
+        .from("learner_state")
+        .select("user_id, state, version")
+        .in("user_id", [anonUser.id, permUser.id]);
+      if (readError) {
+        console.error(`[account] reading learner_state failed: ${readError.code ?? "?"}`);
+        throw fail(500, "merge_failed", "Couldn't bring the guest progress over. Please try again.");
+      }
+      const guest = rows?.find((r) => r.user_id === anonUser.id);
+      const account = rows?.find((r) => r.user_id === permUser.id);
+      let merged: Record<string, unknown> | null = null;
+      if (guest && account) {
+        // A guest who never practiced keeps the account as it was (as when a fresh
+        // install signs in): a fresh document would only unlock starter skills.
+        const { count } = await admin
+          .from("activity_completions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", anonUser.id);
+        merged = (count ?? 0) > 0 ? mergeGuestIntoAccount(account.state, guest.state) : (account.state as Record<string, unknown>);
+      }
+
+      const res = await admin.rpc("merge_anonymous_user", {
+        anonymous_id: anonUser.id,
+        permanent_id: permUser.id,
+        merged_state: merged as Json | undefined,
+        account_version: account?.version,
+      });
+      if (!res.error) {
+        data = res.data;
+        break;
+      }
+      const error = res.error;
+      if (error.code === "PT409" && error.hint === "state_changed" && attempt < 3) continue;
       if (error.code === "PT404") throw fail(404, "not_found", "That guest no longer exists.");
       if (error.code === "PT409") {
         const code = error.hint === "not_permanent" ? "account_required" : "not_anonymous";

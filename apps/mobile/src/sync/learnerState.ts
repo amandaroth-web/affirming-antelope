@@ -1,7 +1,7 @@
-import type { Json, PathwayId, SkillId } from '@antelope/core';
+import { laterChoice, mergeSynced as coreMerge, normalizeSynced as coreNormalize, type Json } from '@antelope/core';
 import { errorCode, supabase } from '@/lib/supabase';
 import { useAccount } from '@/state/account';
-import { fillSkills, mergeProgress, skillRank, toRemoteDoc, upgradeDoc } from '@/state/learnerDoc';
+import { toRemoteDoc } from '@/state/learnerDoc';
 import { SYNCED_KEYS, syncedState, useLearner, type SyncedState } from '@/state/store';
 
 /**
@@ -33,75 +33,16 @@ export async function fetchState(userId: string): Promise<Row | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Merge. Every rule is monotonic (progress only moves forward), so merging is
-// order-independent: merge(a, b) == merge(b, a) for the fields that matter.
-// Documents are upgraded on read (`upgradeDoc`): v2 (one pathway at the top level)
-// becomes v3 (progress per pathway), and an untouched v2 demo seed becomes fresh.
+// Merge: the rules live in @antelope/core (learnerDoc.ts) so the server's guest merge
+// (merge-anonymous) applies exactly the same ones.
 // ---------------------------------------------------------------------------
 
-function mergeSkills(a: SyncedState['skills'], b: Partial<SyncedState['skills']> | undefined): SyncedState['skills'] {
-  if (!b) return a;
-  const out = { ...a };
-  for (const k of Object.keys(b) as SkillId[]) {
-    const theirs = b[k];
-    if (!theirs) continue;
-    const mine = out[k];
-    out[k] = !mine || skillRank(theirs) > skillRank(mine) ? theirs : mine;
-  }
-  return out;
-}
-
-function mergeStreak(a: SyncedState['streak'], b: SyncedState['streak'] | undefined): SyncedState['streak'] {
-  if (!b) return a;
-  const da = a.lastPracticeDay ?? '';
-  const db = b.lastPracticeDay ?? '';
-  if (da === db) return a.days >= b.days ? a : b;
-  return da > db ? a : b;
-}
-
-function mergeAllProgress(a: SyncedState['progress'], b: SyncedState['progress']): SyncedState['progress'] {
-  const out: SyncedState['progress'] = {};
-  for (const id of new Set([...Object.keys(a), ...Object.keys(b)]) as Set<PathwayId>) out[id] = mergeProgress(a[id], b[id]);
-  return out;
-}
-
-/** The track picked most recently wins (a pick beats no pick); ties go to the account's copy. */
-function laterChoice(local: SyncedState, remote: SyncedState): Pick<SyncedState, 'activePathwayId' | 'pathwayChosenAt'> {
-  const l = local.pathwayChosenAt ?? '';
-  const r = remote.pathwayChosenAt ?? '';
-  const pick = l > r ? local : remote;
-  return { activePathwayId: pick.activePathwayId, pathwayChosenAt: pick.pathwayChosenAt };
-}
-
-/** Fill gaps in a server document (older app versions, the seed) from local defaults. */
 export function normalizeSynced(remote: unknown, fallback: SyncedState): SyncedState {
-  const r = upgradeDoc(remote);
-  const out = { ...fallback } as Record<string, unknown>;
-  for (const k of SYNCED_KEYS) if (r[k] !== undefined) out[k] = r[k];
-  const s = out as SyncedState;
-  s.skills = fillSkills(fallback.skills, r.skills);
-  return s;
+  return coreNormalize(remote, fallback);
 }
 
 export function mergeSynced(local: SyncedState, remoteRaw: unknown): SyncedState {
-  const remote = normalizeSynced(remoteRaw, local);
-  const weekDays = Array.from({ length: 7 }, (_, i) => !!local.weekDays[i] || !!remote.weekDays[i]);
-  return {
-    // identity: the account's copy wins (it's what the learner set up)
-    firstName: remote.firstName || local.firstName,
-    role: remote.role || local.role,
-    ...laterChoice(local, remote),
-    progress: mergeAllProgress(local.progress, remote.progress),
-    skills: mergeSkills(local.skills, remote.skills),
-    streak: mergeStreak(local.streak, remote.streak),
-    weekDays,
-    weeklyGoal: {
-      target: remote.weeklyGoal.target || local.weeklyGoal.target,
-      done: Math.max(local.weeklyGoal.done, remote.weeklyGoal.done),
-      hitCount: Math.max(local.weeklyGoal.hitCount, remote.weeklyGoal.hitCount),
-    },
-    scenariosCompleted: Math.max(local.scenariosCompleted, remote.scenariosCompleted),
-  };
+  return coreMerge(local, remoteRaw);
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

@@ -307,7 +307,7 @@ isOneToOne: false
         isSetofReturn: false
       } },
 "merge_anonymous_user":
-{ Args: { "anonymous_id": string,"permanent_id": string }; Returns: Json
+{ Args: { "account_version"?: number,"anonymous_id": string,"merged_state"?: Json,"permanent_id": string }; Returns: Json
                            },
 "rotate_join_code":
 { Args: { "cohort_id": string }; Returns: string

@@ -4,9 +4,12 @@
 -- verified both access tokens; the route then deletes the anonymous auth user, which
 -- cascades away anything left behind (duplicates, counters, the profile).
 --
---   learner_state         merged with the client's PT409 rules (mergeSynced in
---                         apps/mobile/src/sync/learnerState.ts): the account is
---                         "remote", the guest is "local"
+--   learner_state         when both users have one, the route merges the two documents
+--                         with the app's own rules (mergeGuestIntoAccount in
+--                         packages/core/src/learnerDoc.ts) and passes the result with the
+--                         account version it read. A different version now means another
+--                         device wrote in between: PT409, and the route re-reads and retries.
+--                         When only the guest has one, it moves to the account.
 --   activity_completions  moved, except client_ids the account already has
 --   practice_sessions     moved, except client_ids the account already has
 --   profiles.display_name copied when the guest chose a name and the account never did
@@ -14,170 +17,16 @@
 --                         doesn't reset today's quota
 
 -- ---------------------------------------------------------------------------
--- learner_state merge
+-- merge_anonymous_user(anonymous_id, permanent_id, merged_state, account_version)
+--   -> jsonb summary. Service role only.
 -- ---------------------------------------------------------------------------
 
-create function app_private.jnum(j jsonb)
-returns numeric
-language sql immutable set search_path = ''
-as $$ select case when jsonb_typeof(j) = 'number' then (j #>> '{}')::numeric end $$;
-
--- JS truthiness for the values these documents hold.
-create function app_private.jtruthy(j jsonb)
-returns boolean
-language sql immutable set search_path = ''
-as $$
-  select case jsonb_typeof(j)
-    when 'boolean' then j = 'true'::jsonb
-    when 'number' then (j #>> '{}')::numeric <> 0
-    when 'string' then (j #>> '{}') <> ''
-    when 'array' then true
-    when 'object' then true
-    else false
-  end
-$$;
-
--- DemoSkillProgress rank: locked = -1, else level * 1000 + percent.
-create function app_private.skill_rank(p jsonb)
-returns numeric
-language sql immutable set search_path = ''
-as $$
-  select case when p ->> 'status' = 'locked' then -1
-              else coalesce(app_private.jnum(p -> 'level'), 0) * 1000 + coalesce(app_private.jnum(p -> 'percent'), 0)
-         end
-$$;
-
--- mergeSynced(local = guest, remote = account). Keys neither side has stay absent;
--- keys this function doesn't know are kept (the account's copy wins).
-create function app_private.merge_learner_state(account jsonb, guest jsonb)
-returns jsonb
-language plpgsql immutable set search_path = ''
-as $$
-declare
-  g jsonb := case when jsonb_typeof(guest) = 'object' then guest else '{}'::jsonb end;
-  r jsonb;     -- normalizeSynced(account, guest): the account's non-null values over the guest's
-  out_doc jsonb;
-  k text;
-  v jsonb;
-  skills jsonb;
-  theirs jsonb;
-  gs jsonb;
-  rs jsonb;
-  gday text;
-  rday text;
-  gw jsonb;
-  rw jsonb;
-begin
-  select g || coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) into r
-    from jsonb_each(case when jsonb_typeof(account) = 'object' then account else '{}'::jsonb end) e
-   where e.value <> 'null'::jsonb;
-  out_doc := r;
-
-  -- identity: the account's copy wins (remote || local)
-  foreach k in array array['firstName', 'role', 'pathwayId'] loop
-    v := case when app_private.jtruthy(r -> k) then r -> k else g -> k end;
-    out_doc := case when v is null then out_doc - k else out_doc || jsonb_build_object(k, v) end;
-  end loop;
-
-  -- counters: max
-  foreach k in array array['currentWeek', 'scenariosCompleted', 'pathSeenWeek'] loop
-    v := to_jsonb(greatest(app_private.jnum(g -> k), app_private.jnum(r -> k)));
-    if v is not null and v <> 'null'::jsonb then
-      out_doc := out_doc || jsonb_build_object(k, v);
-    end if;
-  end loop;
-
-  -- completedActivityIds: union, account's order first
-  if jsonb_typeof(r -> 'completedActivityIds') = 'array' or jsonb_typeof(g -> 'completedActivityIds') = 'array' then
-    select coalesce(jsonb_agg(x.val order by x.first_pos), '[]'::jsonb) into v
-      from (
-        select a.val, min(a.pos) as first_pos
-          from (
-            select e.value as val, e.ordinality as pos
-              from jsonb_array_elements(case when jsonb_typeof(r -> 'completedActivityIds') = 'array'
-                                             then r -> 'completedActivityIds' else '[]'::jsonb end)
-                   with ordinality e
-            union all
-            select e.value, 1000000 + e.ordinality
-              from jsonb_array_elements(case when jsonb_typeof(g -> 'completedActivityIds') = 'array'
-                                             then g -> 'completedActivityIds' else '[]'::jsonb end)
-                   with ordinality e
-          ) a
-         group by a.val
-      ) x;
-    out_doc := out_doc || jsonb_build_object('completedActivityIds', v);
-  end if;
-
-  -- skills: per skill, the higher rank; ties keep the guest's (mergeSkills(local, remote))
-  if jsonb_typeof(g -> 'skills') = 'object' or jsonb_typeof(r -> 'skills') = 'object' then
-    skills := case when jsonb_typeof(g -> 'skills') = 'object' then g -> 'skills' else '{}'::jsonb end;
-    -- remote.skills after normalizeSynced: {...local.skills, ...remote.skills}
-    rs := skills || case when jsonb_typeof(account -> 'skills') = 'object' then account -> 'skills' else '{}'::jsonb end;
-    for k, theirs in select e.key, e.value from jsonb_each(rs) e loop
-      if theirs is null or theirs = 'null'::jsonb then
-        continue;
-      end if;
-      if skills -> k is null or skills -> k = 'null'::jsonb
-         or app_private.skill_rank(theirs) > app_private.skill_rank(skills -> k) then
-        skills := skills || jsonb_build_object(k, theirs);
-      end if;
-    end loop;
-    out_doc := out_doc || jsonb_build_object('skills', skills);
-  end if;
-
-  -- streak: the later lastPracticeDay; same day -> more days (ties keep the guest's)
-  gs := g -> 'streak';
-  rs := r -> 'streak';
-  if jsonb_typeof(gs) = 'object' and jsonb_typeof(rs) = 'object' then
-    gday := coalesce(gs ->> 'lastPracticeDay', '');
-    rday := coalesce(rs ->> 'lastPracticeDay', '');
-    if gday = rday then
-      v := case when coalesce(app_private.jnum(gs -> 'days'), 0) >= coalesce(app_private.jnum(rs -> 'days'), 0)
-                then gs else rs end;
-    else
-      v := case when gday collate "C" > rday collate "C" then gs else rs end;
-    end if;
-    out_doc := out_doc || jsonb_build_object('streak', v);
-  end if;
-
-  -- weekDays: day-by-day OR over 7 days
-  if jsonb_typeof(r -> 'weekDays') = 'array' or jsonb_typeof(g -> 'weekDays') = 'array' then
-    select jsonb_agg(app_private.jtruthy(g -> 'weekDays' -> i) or app_private.jtruthy(r -> 'weekDays' -> i) order by i)
-      into v
-      from generate_series(0, 6) i;
-    out_doc := out_doc || jsonb_build_object('weekDays', v);
-  end if;
-
-  -- weeklyGoal: target account || guest, done and hitCount max
-  gw := g -> 'weeklyGoal';
-  rw := r -> 'weeklyGoal';
-  if jsonb_typeof(gw) = 'object' or jsonb_typeof(rw) = 'object' then
-    gw := case when jsonb_typeof(gw) = 'object' then gw else '{}'::jsonb end;
-    rw := case when jsonb_typeof(rw) = 'object' then rw else '{}'::jsonb end;
-    v := jsonb_strip_nulls(jsonb_build_object(
-      'target', case when app_private.jtruthy(rw -> 'target') then rw -> 'target' else gw -> 'target' end,
-      'done', greatest(app_private.jnum(gw -> 'done'), app_private.jnum(rw -> 'done')),
-      'hitCount', greatest(app_private.jnum(gw -> 'hitCount'), app_private.jnum(rw -> 'hitCount'))
-    ));
-    out_doc := out_doc || jsonb_build_object('weeklyGoal', v);
-  end if;
-
-  return out_doc;
-end;
-$$;
-
-revoke execute on function
-  app_private.jnum(jsonb),
-  app_private.jtruthy(jsonb),
-  app_private.skill_rank(jsonb),
-  app_private.merge_learner_state(jsonb, jsonb)
-from public, anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- merge_anonymous_user(anonymous_id, permanent_id) -> jsonb summary. Service role only.
--- ---------------------------------------------------------------------------
-
-create function public.merge_anonymous_user(anonymous_id uuid, permanent_id uuid)
+create function public.merge_anonymous_user(
+  anonymous_id uuid,
+  permanent_id uuid,
+  merged_state jsonb default null,
+  account_version integer default null
+)
 returns jsonb
 language plpgsql volatile security definer set search_path = ''
 as $$
@@ -225,8 +74,13 @@ begin
   if found then
     select s.* into perm_state from public.learner_state s where s.user_id = merge_anonymous_user.permanent_id for update;
     if found then
+      if merge_anonymous_user.merged_state is null
+         or jsonb_typeof(merge_anonymous_user.merged_state) <> 'object'
+         or merge_anonymous_user.account_version is distinct from perm_state.version then
+        raise exception 'The account''s learner_state changed; merge again' using errcode = 'PT409', hint = 'state_changed';
+      end if;
       update public.learner_state s
-         set state = app_private.merge_learner_state(perm_state.state, anon_state.state),
+         set state = merge_anonymous_user.merged_state,
              version = perm_state.version + 1
        where s.user_id = merge_anonymous_user.permanent_id;
       delete from public.learner_state s where s.user_id = merge_anonymous_user.anonymous_id;
@@ -285,5 +139,5 @@ begin
 end;
 $$;
 
-revoke execute on function public.merge_anonymous_user(uuid, uuid) from public, anon, authenticated;
-grant execute on function public.merge_anonymous_user(uuid, uuid) to service_role;
+revoke execute on function public.merge_anonymous_user(uuid, uuid, jsonb, integer) from public, anon, authenticated;
+grant execute on function public.merge_anonymous_user(uuid, uuid, jsonb, integer) to service_role;
