@@ -1,4 +1,4 @@
-import { DEMO_LEARNER } from '@antelope/core';
+import { getDrill, getScenario, type Setting } from '@antelope/core';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
@@ -54,8 +54,10 @@ export function ReviewSheet({
   }, [cohorts, cohortId]);
 
   const target = cohorts.find((c) => c.id === cohortId) ?? cohorts[0];
-  const trainerName = target?.trainerName ?? DEMO_LEARNER.trainerAssignment.assignedBy.name;
-  const first = firstNameOf(trainerName) ?? 'your trainer';
+  // the cohort's trainer, else a neutral phrase (a guest or an unjoined learner has no trainer to name)
+  const trainerName = target?.trainerName ?? 'your trainer';
+  const first = firstNameOf(target?.trainerName) ?? 'your trainer';
+  const setting: Setting = (session?.kind === 'drill' ? getDrill(session.refId)?.setting : session ? getScenario(session.refId)?.setting : undefined) ?? 'workplace';
 
   const send = () => {
     if (!session || !target) return;
@@ -69,7 +71,7 @@ export function ReviewSheet({
     body = (
       <Sent
         sub={sub}
-        trainerName={cohorts.find((c) => c.id === sub.cohortId)?.trainerName ?? trainerName}
+        trainerName={cohorts.find((c) => c.id === sub.cohortId)?.trainerName}
         reviewedBy={review?.trainerName}
         pop={justSent}
         onDone={onClose}
@@ -93,7 +95,6 @@ export function ReviewSheet({
         onClose={onClose}
         turnCount={turnCount}
         feeling={feeling}
-        trainerName={trainerName}
       />
     );
   } else if (!cohorts.length) {
@@ -136,7 +137,7 @@ export function ReviewSheet({
         <TextInput
           value={note}
           onChangeText={setNote}
-          placeholder={`e.g. “I got stuck after he mentioned the template.”`}
+          placeholder={setting === 'clinical' ? 'e.g. “I got stuck after she mentioned the cost.”' : 'e.g. “I got stuck after he mentioned the template.”'}
           placeholderTextColor={color.faint}
           multiline
           maxLength={2000}
@@ -281,7 +282,7 @@ function Sent({
   onWithdraw,
 }: {
   sub: Submission;
-  trainerName: string;
+  trainerName?: string;
   reviewedBy?: string;
   pop: boolean;
   onDone: () => void;
@@ -300,7 +301,7 @@ function Sent({
   const first = firstNameOf(trainerName) ?? 'Your trainer';
   const queued = sub.local && (useAccount.getState().offline || isSimulatedOffline());
 
-  const title = reviewedBy ? `Reviewed by ${reviewedBy}` : queued ? 'Saved. It’ll send soon' : `Sent to ${trainerName}`;
+  const title = reviewedBy ? `Reviewed by ${reviewedBy}` : queued ? 'Saved. It’ll send soon' : `Sent to ${trainerName ?? 'your trainer'}`;
   const detail = reviewedBy
     ? 'Find the feedback on Home and in Me, under From your trainer.'
     : queued

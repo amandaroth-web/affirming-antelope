@@ -60,9 +60,22 @@ export interface PathUnit {
   activities: PathActivity[];
 }
 
+/**
+ * Where a conversation happens. Drives the counterpart's label ("Employee" vs
+ * "Patient"), the learner's role, and which pathway content belongs to.
+ */
+export type Setting = "workplace" | "clinical";
+
+export type PathwayId = "mi-for-leaders" | "mi-for-clinicians";
+
 export interface Pathway {
-  id: string;
+  id: PathwayId;
   title: string;
+  setting: Setting;
+  /** One line for pickers, e.g. "Performance, change, and burnout conversations with your team." */
+  tagline: string;
+  /** Who it's for, e.g. "Managers and team leads in healthcare". */
+  audience: string;
   units: PathUnit[];
 }
 
@@ -96,8 +109,14 @@ export interface Persona {
 export interface ScenarioSpec {
   id: string; // e.g. "PM-017"
   title: string;
-  context: string; // e.g. "Performance management"
-  leadershipIssue: string; // e.g. "Missed deadlines"
+  setting: Setting;
+  context: string; // e.g. "Performance management", "Primary care follow-up"
+  issue: string; // workplace: "Missed deadlines"; clinical: "Blood pressure medication adherence"
+  /**
+   * Optional. The behavior change talk is judged against, when it's more
+   * specific than `issue` (e.g. "Cutting back on drinking"). Defaults to issue.
+   */
+  targetBehavior?: string;
   persona: Persona;
   /** What the learner sees before starting. Coach voice, second person. */
   learnerBrief: string;
@@ -129,6 +148,11 @@ export interface ScenarioSpec {
 
 export interface Turn {
   id: string;
+  /**
+   * "employee" is the stored id for the role-played counterpart in every setting
+   * (an employee at work, a patient in clinic). Never show it to people: label
+   * it with counterpartLabel(setting).
+   */
   speaker: "learner" | "employee";
   text: string;
 }
@@ -213,11 +237,12 @@ export interface Debrief {
 
 export interface Drill {
   id: string;
+  setting: Setting;
   skill: SkillId;
   level: SkillLevelNumber;
   /** Setting line, e.g. "A team lead, after a missed deadline". */
   context: string;
-  speaker: string; // "Employee", "Direct report", ...
+  speaker: string; // "Employee", "Direct report", "Patient", ...
   prompt: string; // what they say
   /** What to try, e.g. "Respond with a complex reflection." */
   instruction: string;
@@ -257,4 +282,19 @@ export interface RoleplayDebriefRequest {
 export interface DrillFeedbackRequest {
   drillId: string;
   response: string;
+}
+
+// ---------------------------------------------------------------------------
+// Setting labels (UI copy and prompts read these; never hard-code "employee")
+// ---------------------------------------------------------------------------
+
+export const SETTING_LABELS: Record<Setting, { counterpart: string; counterparts: string; learnerRole: string; conversation: string }> = {
+  workplace: { counterpart: "employee", counterparts: "employees", learnerRole: "manager", conversation: "one-on-one" },
+  clinical: { counterpart: "patient", counterparts: "patients", learnerRole: "clinician", conversation: "visit" },
+};
+
+/** "Employee" / "Patient", sentence case for UI labels. */
+export function counterpartLabel(setting: Setting): string {
+  const w = SETTING_LABELS[setting].counterpart;
+  return w.charAt(0).toUpperCase() + w.slice(1);
 }

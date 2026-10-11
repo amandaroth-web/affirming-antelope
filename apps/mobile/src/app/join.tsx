@@ -1,3 +1,4 @@
+import type { PathwayId } from '@antelope/core';
 import { Redirect, router, useIsFocused } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -11,7 +12,10 @@ import { track } from '@/lib/analytics';
 import { emitFlowClosed } from '@/lib/flowEvents';
 import { joinCohort } from '@/sync/cloud';
 import { refresh } from '@/sync/engine';
+import { TrackCard } from '@/components/track/TrackCard';
+import { getPathway, trackName } from '@/data/pathways';
 import { personSeed, useAccount } from '@/state/account';
+import { useLearner } from '@/state/store';
 
 /**
  * Join a cohort with the trainer's code. Codes are always "MIL-" + 4 characters,
@@ -24,7 +28,7 @@ export default function Join() {
   const [code, setCode] = useState('');
   const [state, setState] = useState<CodeState>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [joined, setJoined] = useState<{ id: string; name: string } | null>(null);
+  const [joined, setJoined] = useState<{ id: string; name: string; pathwayId: PathwayId } | null>(null);
   const coach = useRef<MascotHandle>(null);
   useEffect(() => () => emitFlowClosed('join'), []);
 
@@ -116,7 +120,10 @@ export default function Join() {
  * You're in: the ochre seal drops and pops with a burst and the success haptic on
  * the same frame, then the cohort card rises with the trainer and what's waiting.
  */
-function Joined({ cohort, onDone }: { cohort: { id: string; name: string }; onDone: () => void }) {
+function Joined({ cohort, onDone }: { cohort: { id: string; name: string; pathwayId: PathwayId }; onDone: () => void }) {
+  // the cohort runs another track than the one you're on: offer to switch (decided once, on arrival)
+  const [offer] = useState(() => useLearner.getState().activePathwayId !== cohort.pathwayId);
+  const active = useLearner((s) => s.activePathwayId);
   const reduce = useReduceMotion();
   const burst = useRef<BurstHandle>(null);
   const seal = useSharedValue(0);
@@ -175,9 +182,31 @@ function Joined({ cohort, onDone }: { cohort: { id: string; name: string }; onDo
           </View>
         </Raised>
       </Enter>
-      <Enter index={4} delay={120} style={styles.actions}>
-        <Button label="Done" fullWidth onPress={onDone} />
-      </Enter>
+      {offer ? (
+        <Enter index={4} delay={120} style={styles.offer}>
+          <Text variant="subheading">This cohort practices {getPathway(cohort.pathwayId).title}</Text>
+          <Text variant="caption" color={color.muted} style={styles.offerLede}>
+            Switch so Home and your path follow your cohort. {getPathway(active).title} keeps its progress, and you can switch back in Me.
+          </Text>
+          <TrackCard id={cohort.pathwayId} compact selected onSelect={() => {}} style={styles.offerCard} />
+          <View style={styles.offerActions}>
+            <Button
+              label={`Switch to ${trackName(cohort.pathwayId)}`}
+              fullWidth
+              onPress={() => {
+                haptic.success();
+                useLearner.getState().choosePathway(cohort.pathwayId, 'cohort');
+                onDone();
+              }}
+            />
+            <Button variant="secondary" label={`Keep ${trackName(active)}`} fullWidth onPress={onDone} />
+          </View>
+        </Enter>
+      ) : (
+        <Enter index={4} delay={120} style={styles.actions}>
+          <Button label="Done" fullWidth onPress={onDone} />
+        </Enter>
+      )}
     </View>
   );
 }
@@ -211,6 +240,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardWrap: { marginTop: space[6] },
+  offer: { marginTop: space[7] },
+  offerLede: { marginTop: space[1] },
+  offerCard: { marginTop: space[4] },
+  offerActions: { marginTop: space[5], gap: space[3] },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -11,8 +11,8 @@ import { ArrowRightIcon, Button, CaretLeftIcon, Text, color, layout, space } fro
 import { findActivity, openActivity } from '@/data/routes';
 import { practiceSource, track } from '@/lib/analytics';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
-import { nextActivity } from '@/state/selectors';
-import { useLearner } from '@/state/store';
+import { nextActivity, useCompletedActivityIds } from '@/state/selectors';
+import { activePathwayId, useLearner } from '@/state/store';
 
 export default function LessonScreen() {
   return (
@@ -31,12 +31,12 @@ function LessonSession() {
   const [done, setDone] = useState(false);
   const before = usePracticeSnapshot();
   const recordPractice = useLearner((s) => s.recordPractice);
-  const completed = useLearner((s) => s.completedActivityIds);
+  const completed = useCompletedActivityIds();
   const unit = lesson ? getUnit(lesson.unitId) : undefined;
 
   useEffect(() => {
     if (!lesson) return;
-    track('practice_started', { kind: 'lesson', ref_id: lesson.id, ...(unit?.skills[0] ? { skill: unit.skills[0] } : {}), source: practiceSource(source) });
+    track('practice_started', { kind: 'lesson', ref_id: lesson.id, ...(unit?.skills[0] ? { skill: unit.skills[0] } : {}), source: practiceSource(source), pathway_id: activePathwayId() });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

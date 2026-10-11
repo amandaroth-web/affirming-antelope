@@ -267,7 +267,7 @@ isOneToOne: false
             }[]
                            },
 "create_cohort":
-{ Args: { "name": string,"starts_on"?: string }; Returns: {
+{ Args: { "name": string,"pathway_id"?: string,"starts_on"?: string }; Returns: {
               "archived_at": string | null,
 "created_at": string,
 "id": string,

@@ -2,11 +2,17 @@
 // Learn activities point at Lesson ids; drill activities at Drill ids;
 // roleplay activities at a single ScenarioSpec id.
 
-import type { PathUnit, Pathway } from "./types";
+import type { PathUnit, Pathway, PathwayId } from "./types";
+import { MI_FOR_CLINICIANS } from "./pathway-clinicians";
+
+export { MI_FOR_CLINICIANS };
 
 export const MI_FOR_LEADERS: Pathway = {
   id: "mi-for-leaders",
   title: "MI for Leaders",
+  setting: "workplace",
+  tagline: "Performance, change, and burnout conversations with your team.",
+  audience: "Managers and team leads in healthcare",
   units: [
     {
       week: 1,
@@ -167,10 +173,34 @@ export const MI_FOR_LEADERS: Pathway = {
   ],
 };
 
-export function getUnit(id: string): PathUnit | undefined {
-  return MI_FOR_LEADERS.units.find((u) => u.id === id);
+/**
+ * Every pathway by id. Unit, activity, and lesson ids are unique across pathways,
+ * so getUnit works without knowing which pathway a unit belongs to.
+ */
+export const PATHWAYS: Partial<Record<PathwayId, Pathway>> = {
+  "mi-for-leaders": MI_FOR_LEADERS,
+  "mi-for-clinicians": MI_FOR_CLINICIANS,
+};
+
+export const DEFAULT_PATHWAY_ID: PathwayId = "mi-for-leaders";
+
+export function getPathway(id: PathwayId | string | null | undefined): Pathway {
+  return (id && PATHWAYS[id as PathwayId]) || MI_FOR_LEADERS;
 }
 
-export function getUnitByWeek(week: number): PathUnit | undefined {
-  return MI_FOR_LEADERS.units.find((u) => u.week === week);
+export function listPathways(): Pathway[] {
+  return Object.values(PATHWAYS).filter((p): p is Pathway => Boolean(p));
+}
+
+export function getUnit(id: string): PathUnit | undefined {
+  for (const p of listPathways()) {
+    const u = p.units.find((x) => x.id === id);
+    if (u) return u;
+  }
+  return undefined;
+}
+
+/** Defaults to MI for Leaders for older callers that only know a week number. */
+export function getUnitByWeek(week: number, pathwayId: PathwayId = DEFAULT_PATHWAY_ID): PathUnit | undefined {
+  return getPathway(pathwayId).units.find((u) => u.week === week);
 }

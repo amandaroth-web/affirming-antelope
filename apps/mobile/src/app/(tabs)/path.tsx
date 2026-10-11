@@ -1,4 +1,4 @@
-import { MI_FOR_LEADERS, type PathUnit } from '@antelope/core';
+import type { Pathway, PathUnit } from '@antelope/core';
 import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
@@ -21,18 +21,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { Mascot, type MascotHandle } from '@/components/mascot';
 import { layoutBands, layoutTrail, NODE, type TrailLayout } from '@/components/path/geometry';
-import { Landscape } from '@/components/path/Landscape';
+import { Landscape, motifFor, PALETTES } from '@/components/path/Landscape';
 import { Trail } from '@/components/path/Trail';
 import { UnitSheet } from '@/components/path/UnitSheet';
 import { WeekNode, type WeekNodeHandle } from '@/components/path/WeekNode';
 import { Button, Card, CaretDownIcon, CaretUpIcon, FlagPennantIcon, PressableSurface, Text, color, haptic, layout, space } from '@/design';
 import { openActivity } from '@/data/routes';
 import { Burst, Enter, FADE_MS, spring, useReduceMotion, type BurstHandle } from '@/motion';
-import { TOTAL_WEEKS } from '@/state/selectors';
+import { totalWeeks, useActivePathway, useProgress } from '@/state/selectors';
 import { useLearner, weekStatus, type WeekStatus } from '@/state/store';
 
 const HEADER = 76;
-const BAND_COLORS = ['#F4F6FF', color.soft, '#FCF3E3', color.softDeep, '#F7F1E6', '#E9EDFD'];
 const MASCOT_H = 104;
 const MASCOT_W = MASCOT_H * (674 / 978);
 const FLAG = 60;
@@ -82,7 +81,7 @@ interface Spot {
 
 /** Where the coach stands for a week: beside its node on the side with room, or by the finish flag. */
 function mascotSpot(trail: TrailLayout, width: number, week: number): Spot {
-  if (week > TOTAL_WEEKS) {
+  if (week > trail.nodes.length) {
     const f = trail.finish;
     return {
       left: f.x - FLAG / 2 - MASCOT_W - 2,
@@ -103,23 +102,37 @@ function mascotSpot(trail: TrailLayout, width: number, week: number): Spot {
   };
 }
 
+/**
+ * The active track's path. Keyed by pathway, so switching tracks while Path is
+ * mounted re-lays the trail from scratch (node count, landscape, scroll, clock)
+ * and never carries one track's unlock into the other.
+ */
 export default function PathScreen() {
+  const pathway = useActivePathway();
+  return <PathTrack key={pathway.id} pathway={pathway} />;
+}
+
+function PathTrack({ pathway }: { pathway: Pathway }) {
+  const total = totalWeeks(pathway);
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const width = Math.min(winW, layout.maxWidth);
   const focused = useIsFocused();
   const reduce = useReduceMotion();
-  const currentWeek = useLearner((s) => s.currentWeek);
-  const pathSeenWeek = useLearner((s) => s.pathSeenWeek);
-  const markPathSeen = useLearner((s) => s.markPathSeen);
-  const completed = useLearner((s) => s.completedActivityIds);
-  const complete = currentWeek > TOTAL_WEEKS;
+  const { currentWeek, pathSeenWeek, completedActivityIds: completed } = useProgress();
+  const markSeen = useLearner((s) => s.markPathSeen);
+  // markPathSeen acts on the active track: only ever mark this one
+  const markPathSeen = useCallback(() => {
+    if (useLearner.getState().activePathwayId === pathway.id) markSeen();
+  }, [markSeen, pathway.id]);
+  const complete = currentWeek > total;
 
   const headerH = insets.top + HEADER;
   const visBottom = winH - insets.bottom - layout.tabBarHeight;
   const intro = complete ? 300 : 0;
-  const trail = useMemo(() => layoutTrail(width, TOTAL_WEEKS, headerH + 150 + intro), [width, headerH, intro]);
-  const bands = useMemo(() => layoutBands(width, trail.height, BAND_COLORS), [width, trail.height]);
+  const trail = useMemo(() => layoutTrail(width, total, headerH + 150 + intro), [width, total, headerH, intro]);
+  const motif = motifFor(pathway.setting);
+  const bands = useMemo(() => layoutBands(width, trail.finish.y, PALETTES[motif], motif), [width, trail.finish.y, motif]);
   const maxScroll = Math.max(0, trail.height + insets.bottom + layout.tabBarHeight - winH);
   const clampY = useCallback((y: number) => Math.min(maxScroll, Math.max(0, y)), [maxScroll]);
 
@@ -136,9 +149,9 @@ export default function PathScreen() {
   const shownComplete = complete && stage >= 3;
   const shownWeek = stage >= 3 ? currentWeek : from;
   const mascotWeek = stage >= 4 ? currentWeek : from;
-  const shownIdx = Math.min(shownWeek, TOTAL_WEEKS) - 1;
+  const shownIdx = Math.min(shownWeek, total) - 1;
 
-  const yOf = (week: number) => (week > TOTAL_WEEKS ? trail.finish.y : trail.nodes[week - 1].y);
+  const yOf = (week: number) => (week > total ? trail.finish.y : trail.nodes[week - 1].y);
   const segTarget = clampY((yOf(Math.max(1, from)) + yOf(currentWeek)) / 2 - (headerH + visBottom) / 2);
   const nodeTarget = (week: number) => clampY(yOf(week) - (headerH + visBottom) / 2 + 20);
 
@@ -285,7 +298,7 @@ export default function PathScreen() {
 
   const startUnlock = useCallback(() => {
     if (run.current || !pending) return;
-    const finish = currentWeek > TOTAL_WEEKS;
+    const finish = currentWeek > total;
     const s = scrollY.value;
     const segTop = yOf(from) - NODE / 2;
     const segBottom = yOf(currentWeek) + NODE / 2 + 6;
@@ -323,7 +336,7 @@ export default function PathScreen() {
     clock.value = 0;
     clock.value = withDelay(delay, withTiming(B_DONE, { duration: B_DONE, easing: Easing.linear }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, currentWeek, from, reduce, headerH, visBottom, segTarget, trail]);
+  }, [pending, currentWeek, total, from, reduce, headerH, visBottom, segTarget, trail, markPathSeen]);
 
   // pending → hold the pre-unlock picture (before paint), then play when focused
   useLayoutEffect(() => {
@@ -350,7 +363,7 @@ export default function PathScreen() {
   // the UI thread; React only hears about it when it changes.
   const [jumpDir, setJumpDir] = useState(0);
   const [pillDir, setPillDir] = useState(1);
-  const curY = complete ? -1 : trail.nodes[Math.min(currentWeek, TOTAL_WEEKS) - 1].y;
+  const curY = complete ? -1 : trail.nodes[Math.min(currentWeek, total) - 1].y;
   useAnimatedReaction(
     () => {
       if (curY < 0) return 0;
@@ -458,9 +471,9 @@ export default function PathScreen() {
 
   const title = (
     <Text variant="subheading" accessibilityRole="header">
-      {MI_FOR_LEADERS.title}
+      {pathway.title}
       <Text variant="subheading" color={color.muted}>
-        {shownComplete ? ' · Complete' : ` · Week ${shownWeek} of ${TOTAL_WEEKS}`}
+        {shownComplete ? ' · Complete' : ` · Week ${shownWeek} of ${total}`}
       </Text>
     </Text>
   );
@@ -487,7 +500,7 @@ export default function PathScreen() {
                 <Mascot pose="celebrate" mood="cheer" size={150} paused={!focused} accessibilityLabel="The antelope coach, celebrating" />
                 <View style={styles.doneCopy}>
                   <Text variant="heading" align="center">
-                    You’ve completed the MI for Leaders pathway.
+                    You’ve completed the {pathway.title} pathway.
                   </Text>
                   <Text variant="body" color={color.muted} align="center">
                     Keep practicing — everything is open.
@@ -506,12 +519,12 @@ export default function PathScreen() {
               flip={spotNow.flip}
               paused={!focused}
               accessibilityLabel={
-                mascotWeek > TOTAL_WEEKS ? 'The antelope coach, at the finish line' : 'The antelope coach, waiting at this week'
+                mascotWeek > total ? 'The antelope coach, at the finish line' : 'The antelope coach, waiting at this week'
               }
             />
           </Animated.View>
 
-          {MI_FOR_LEADERS.units.map((u, i) => {
+          {pathway.units.map((u, i) => {
             const p = trail.nodes[i];
             const status = statusOf(u.week);
             const labelLeft = p.x > width / 2;
@@ -533,6 +546,7 @@ export default function PathScreen() {
                       nodeRefs.current[i] = r;
                     }}
                     week={u.week}
+                    total={total}
                     title={u.title}
                     status={status}
                     paused={!focused}
@@ -639,7 +653,7 @@ export default function PathScreen() {
             <CaretDownIcon size={16} weight="bold" color={color.white} />
           )}
           <Text variant="label" color={color.white}>
-            Week {Math.min(currentWeek, TOTAL_WEEKS)}
+            Week {Math.min(currentWeek, total)}
           </Text>
         </PressableSurface>
       </Animated.View>
@@ -650,9 +664,9 @@ export default function PathScreen() {
           <View
             style={styles.bar}
             accessible
-            accessibilityLabel={`${Math.min(shownWeek - 1, TOTAL_WEEKS)} of ${TOTAL_WEEKS} weeks complete`}
+            accessibilityLabel={`${pathway.title}: ${Math.min(shownWeek - 1, total)} of ${total} weeks complete`}
           >
-            {MI_FOR_LEADERS.units.map((u) => {
+            {pathway.units.map((u) => {
               const s = statusOf(u.week);
               return <View key={u.id} style={[styles.seg, s === 'complete' && styles.segDone, s === 'current' && styles.segNow]} />;
             })}
@@ -666,6 +680,7 @@ export default function PathScreen() {
         open={!!sheet?.open}
         origin={sheet?.origin}
         status={sheet?.status ?? 'current'}
+        weeks={total}
         completed={completed}
         onClose={closeSheet}
         onStart={(activityId) => {

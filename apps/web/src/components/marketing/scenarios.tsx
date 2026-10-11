@@ -38,7 +38,7 @@ export function Scenarios({ heading, body }: { heading: string; body: string }) 
                 </div>
                 <h3 className="mt-4 font-display text-lg font-bold text-ink">{s.title}</h3>
                 <p className="mt-1 text-sm font-bold text-muted">
-                  {s.leadershipIssue} · {difficultyLabel[s.difficulty]}
+                  {s.issue} · {difficultyLabel[s.difficulty]}
                 </p>
                 <p className="mt-4 rounded-2xl rounded-tl-md border-2 border-line bg-soft px-4 py-3 font-bold leading-snug text-ink">
                   “{s.openingLine}”

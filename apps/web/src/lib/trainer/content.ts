@@ -161,7 +161,7 @@ export const SCENARIO_OPTIONS = SCENARIOS.map((s) => ({
   id: s.id,
   title: s.title,
   context: s.context,
-  issue: s.leadershipIssue,
+  issue: s.issue,
   persona: `${s.persona.name}, ${s.persona.role}`,
   personaName: s.persona.name,
   brief: s.learnerBrief,

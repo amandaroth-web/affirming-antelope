@@ -11,6 +11,8 @@ import { screenView, startAnalytics } from '@/lib/analytics';
 import { color } from '@/design/tokens';
 import { spring } from '@/motion/springs';
 import { useReduceMotion } from '@/motion/useMotionPrefs';
+// reads the launch URL's `src` (track preselect) before the router normalises it
+import '@/lib/launchHint';
 import { useAccount } from '@/state/account';
 import { useLearner } from '@/state/store';
 import { startSync } from '@/sync/engine';
@@ -48,7 +50,10 @@ export default function RootLayout() {
   const pathname = usePathname();
   useEffect(() => screenView(pathname), [pathname]);
   const ready = (fontsLoaded || !!fontError) && hydrated;
-  const onboarded = useAccount((s) => s.onboarded) === true;
+  // in once the welcome is done and a track is picked (an old demo seed reset to fresh still needs one)
+  const welcomed = useAccount((s) => s.onboarded) === true;
+  const tracked = useLearner((s) => s.pathwayChosenAt !== null);
+  const onboarded = welcomed && tracked;
   const reduce = useReduceMotion();
   const [splashGone, setSplashGone] = useState(false);
   const rise = useSharedValue(0);

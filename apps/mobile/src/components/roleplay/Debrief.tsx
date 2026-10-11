@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { Mascot } from '@/components/mascot';
+import { callName } from '@/components/practice-loop/names';
 import { PracticeTicks, type PracticeSnapshot } from '@/components/practice-loop/Completion';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import {
@@ -25,6 +26,7 @@ import {
   color,
   radius,
   space,
+  personaAvatar,
 } from '@/design';
 import { Enter, useReduceMotion } from '@/motion';
 import { Cascade } from './Cascade';
@@ -33,7 +35,6 @@ import { KeyMoments } from './KeyMoments';
 import { MovesPanel } from './MovesPanel';
 import { ReplayChart, type Exchange } from './ReplayChart';
 import { ReviewSheet, type ReviewGate } from './ReviewSheet';
-import { DEMO_LEARNER } from '@antelope/core';
 import { router } from 'expo-router';
 import { onFlowClosed } from '@/lib/flowEvents';
 import { firstNameOf, personSeed, useAccount } from '@/state/account';
@@ -88,7 +89,7 @@ export function Debrief({
 }) {
   const focused = useIsFocused();
   const p = scenario.persona;
-  const first = p.name.split(' ')[0];
+  const first = callName(p.name);
   const [review, setReview] = useState(false);
   // sign-in / join are full screens: the sheet steps aside and comes back when the learner
   // does, if the step actually happened (a cancelled sign-in just leaves them on the debrief)
@@ -115,9 +116,10 @@ export function Debrief({
   const cohorts = useAccount((s) => s.cohorts);
   const shared = useAccount((s) => (session ? s.submissions.find((x) => x.sessionId === session.id && x.status !== 'withdrawn') : undefined));
   const reviewedBy = useAccount((s) => (shared ? s.reviews.find((r) => r.submissionId === shared.id)?.trainerName : undefined));
-  const trainerName =
-    (shared && cohorts.find((c) => c.id === shared.cohortId)?.trainerName) ?? cohorts[0]?.trainerName ?? DEMO_LEARNER.trainerAssignment.assignedBy.name;
-  const trainerFirst = firstNameOf(trainerName) ?? 'Your trainer';
+  // the cohort's trainer, else a neutral phrase (guests have no trainer to name yet)
+  const cohortTrainer = (shared && cohorts.find((c) => c.id === shared.cohortId)?.trainerName) ?? cohorts[0]?.trainerName;
+  const trainerName = cohortTrainer ?? 'your trainer';
+  const trainerFirst = firstNameOf(cohortTrainer) ?? 'Your trainer';
   // a few celebratory hops when it's earned, then the antelope settles
   const [cheer, setCheer] = useState(true);
   useEffect(() => {
@@ -235,7 +237,7 @@ export function Debrief({
           </Enter>
 
           <Section index={2} title="How the conversation moved" onLayout={track('chart')}>
-            <ReplayChart exchanges={exchanges} name={p.name} seed={p.avatarSeed} play={plays('chart')} settled={settled} />
+            <ReplayChart exchanges={exchanges} name={p.name} avatar={personaAvatar(p, scenario.setting)} play={plays('chart')} settled={settled} />
           </Section>
 
           <Section index={3} title="Your moves" onLayout={track('moves')}>
@@ -317,7 +319,7 @@ export function Debrief({
               accessibilityLabel={shared ? reviewRowTitle(shared.status, trainerName, reviewedBy) : `Submit for trainer review. Share only this session with ${trainerName}`}
               contentStyle={styles.review}
             >
-              <Avatar seed={personSeed(trainerName)} size={44} />
+              <Avatar seed={personSeed(cohortTrainer ?? 'trainer')} size={44} />
               <View style={styles.flex}>
                 <Text variant="subheading">{shared ? reviewRowTitle(shared.status, trainerName, reviewedBy) : 'Submit for trainer review'}</Text>
                 <Text variant="caption" color={color.muted}>

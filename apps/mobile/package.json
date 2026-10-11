@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -55,7 +56,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web --port 8081",
-    "build:web": "expo export --platform web --output-dir dist-web && python3 scripts/finish-web.py",
+    "build:web": "expo export --platform web --output-dir dist-web && node scripts/finish-web.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint"
   },

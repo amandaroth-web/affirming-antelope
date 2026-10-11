@@ -1,4 +1,6 @@
 import { SKILLS } from '@antelope/core';
+import { TrackSwitchSheet } from '@/components/track/TrackSwitchSheet';
+import { trackName } from '@/data/pathways';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -16,15 +18,20 @@ import {
   Chip,
   FlagPennantIcon,
   Hoofprint,
+  PressableSurface,
   Raised,
   Screen,
+  StethoscopeIcon,
+  UsersThreeIcon,
+  UserIcon,
   Switch,
   Text,
   color,
+  radius,
   space,
 } from '@/design';
 import { Enter, RollingNumber, usePressScale } from '@/motion';
-import { TOTAL_WEEKS } from '@/state/selectors';
+import { pathwaySkills, useActivePathway, useCurrentWeek, weekLabel as weekOf } from '@/state/selectors';
 import { useLearner } from '@/state/store';
 
 export default function Me() {
@@ -32,7 +39,13 @@ export default function Me() {
   const signedIn = useAccount((a) => a.status === 'signed-in');
   const cohorts = useAccount((a) => a.cohorts);
   const pending = useAccount((a) => a.submissions.filter((x) => x.status === 'submitted').length);
-  const weekLabel = s.currentWeek > TOTAL_WEEKS ? 'MI for Leaders · Complete' : `MI for Leaders · Week ${s.currentWeek} of ${TOTAL_WEEKS}`;
+  const pathway = useActivePathway();
+  const currentWeek = useCurrentWeek();
+  const weekLabel = `${pathway.title} · ${weekOf(pathway, currentWeek)}`;
+  const [switchOpen, setSwitchOpen] = useState(false);
+  // the active track's skills first, in the order its course reaches them
+  const taught = pathwaySkills(pathway);
+  const ladder = SKILLS.filter((sk) => taught.includes(sk.id)).sort((a, b) => taught.indexOf(a.id) - taught.indexOf(b.id));
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -40,14 +53,15 @@ export default function Me() {
     setRefreshing(false);
   }, []);
   const trainer = signedIn ? cohorts[0] : null;
-  const showTrainer = !signedIn || !!trainer;
+  // guests have no trainer; the demo learner shows the sample one
+  const showTrainer = signedIn ? !!trainer : s.demo && !!s.assignment;
 
   return (
     <Screen refreshControl={signedIn ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.primary} /> : undefined}>
       <Enter>
         {signedIn ? (
           <ProfileHead courseChip={<Chip label={weekLabel} tone="soft" style={styles.course} />} />
-        ) : (
+        ) : s.demo ? (
           <View style={styles.profile}>
             <Avatar seed="amanda-demo-learner" size={72} accessibilityLabel={s.firstName} />
             <View style={styles.profileCopy}>
@@ -56,6 +70,21 @@ export default function Me() {
               </Text>
               <Text variant="caption" color={color.muted}>
                 {s.role}
+              </Text>
+              <Chip label={weekLabel} tone="soft" style={styles.course} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.profile}>
+            <View style={styles.guestAvatar}>
+              <UserIcon size={34} weight="bold" color={color.primary} />
+            </View>
+            <View style={styles.profileCopy}>
+              <Text variant="title" accessibilityRole="header">
+                Your practice
+              </Text>
+              <Text variant="caption" color={color.muted}>
+                Saved on this phone
               </Text>
               <Chip label={weekLabel} tone="soft" style={styles.course} />
             </View>
@@ -70,13 +99,42 @@ export default function Me() {
       </Enter>
 
       <Enter index={2}>
+        <SectionHeader title="Your track" />
+        <PressableSurface
+          onPress={() => setSwitchOpen(true)}
+          haptic="tick"
+          pressScale={0.985}
+          contentStyle={styles.trackRow}
+          accessibilityLabel={`${pathway.title}, ${weekOf(pathway, currentWeek)}. Switch track`}
+        >
+          <View style={styles.trackIcon}>
+            {pathway.setting === 'clinical' ? (
+              <StethoscopeIcon size={24} weight="fill" color={color.primary} />
+            ) : (
+              <UsersThreeIcon size={24} weight="fill" color={color.primary} />
+            )}
+          </View>
+          <View style={styles.flex}>
+            <Text variant="bodyStrong">{trackName(pathway.id)}</Text>
+            <Text variant="caption" color={color.muted} numberOfLines={1}>
+              {pathway.title} · {weekOf(pathway, currentWeek)}
+            </Text>
+          </View>
+          <Text variant="label" color={color.primary}>
+            Switch
+          </Text>
+          <CaretRightIcon size={18} weight="bold" color={color.primary} />
+        </PressableSurface>
+      </Enter>
+
+      <Enter index={2}>
         <SectionHeader title="Skill levels" />
         <Text variant="body" color={color.muted} style={styles.explain}>
           Each skill climbs six levels, from Recognize to Advanced. No scores, just what you can do.
         </Text>
         <Raised contentStyle={styles.list}>
-          {SKILLS.map((sk, i) => (
-            <SkillLadder key={sk.id} skill={sk} progress={s.skills[sk.id]} last={i === SKILLS.length - 1} />
+          {ladder.map((sk, i) => (
+            <SkillLadder key={sk.id} skill={sk} progress={s.skills[sk.id]} last={i === ladder.length - 1} />
           ))}
         </Raised>
       </Enter>
@@ -95,12 +153,12 @@ export default function Me() {
             <Avatar
               seed={trainer ? personSeed(trainer.trainerName) : 'rosa-lin-trainer'}
               size={52}
-              accessibilityLabel={trainer?.trainerName ?? s.assignment.assignedBy.name}
+              accessibilityLabel={trainer?.trainerName ?? s.assignment?.assignedBy.name}
             />
             <View style={styles.flex}>
-              <Text variant="bodyStrong">{trainer?.trainerName ?? s.assignment.assignedBy.name}</Text>
+              <Text variant="bodyStrong">{trainer?.trainerName ?? s.assignment?.assignedBy.name}</Text>
               <Text variant="caption" color={color.muted} numberOfLines={2}>
-                {trainer ? `${trainer.name} · reviews what you share` : `${s.assignment.assignedBy.role} · reviews your role-plays`}
+                {trainer ? `${trainer.name} · reviews what you share` : `${s.assignment?.assignedBy.role} · reviews your role-plays`}
               </Text>
             </View>
             {signedIn ? (
@@ -141,6 +199,11 @@ export default function Me() {
               Demo
             </Text>
             <Raised contentStyle={styles.settings}>
+              {__DEV__ ? (
+                <SettingRow title="Demo learner" detail="Amanda’s seeded week 4, for demos. Off starts fresh.">
+                  <Switch accessibilityLabel="Demo learner" value={s.demo} onChange={(v) => s.setDemo(v)} />
+                </SettingRow>
+              ) : null}
               {__DEV__ && supabaseConfigured ? <OfflineToggle /> : null}
               <LinkRow
                 title="Preview the completed pathway"
@@ -159,11 +222,17 @@ export default function Me() {
                 />
               ) : null}
               {/* a local reset would just sync back from the account */}
-              {signedIn ? null : <LinkRow title="Reset demo data" onPress={() => s.resetDemo()} last />}
+              {signedIn ? null : <LinkRow title={s.demo ? 'Reset demo data' : 'Start this track over'} onPress={() => s.resetProgress()} last />}
             </Raised>
           </>
         )}
       </Enter>
+      <TrackSwitchSheet
+        open={switchOpen}
+        onClose={() => setSwitchOpen(false)}
+        source="me"
+        onSwitched={() => setTimeout(() => router.navigate('/path'), 320)}
+      />
     </Screen>
   );
 }
@@ -233,6 +302,9 @@ function LinkRow({ title, onPress, last }: { title: string; onPress: () => void;
 const styles = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   profileCopy: { flex: 1 },
+  guestAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: color.soft, alignItems: 'center', justifyContent: 'center' },
+  trackRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], padding: space[4], minHeight: 72 },
+  trackIcon: { width: 44, height: 44, borderRadius: radius.badge, backgroundColor: color.soft, alignItems: 'center', justifyContent: 'center' },
   course: { marginTop: space[2] },
   stats: { flexDirection: 'row', gap: space[3], marginTop: space[6] },
   stat: { flex: 1 },

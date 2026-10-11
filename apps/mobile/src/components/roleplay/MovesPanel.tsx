@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedReaction, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
+import { callName } from '@/components/practice-loop/names';
 import { MoveMarker } from '@/components/practice-loop/MoveMarker';
 import { TALLY_ROWS } from '@/components/practice-loop/moves';
 import { Text, border, color, haptic, moveColor, radius, space } from '@/design';
@@ -17,7 +18,7 @@ export function MovesPanel({ tallies, name, play = true, settled }: { tallies: M
   const live = play || !!settled;
   const reflections = tallies.simpleReflections + tallies.complexReflections + tallies.summaries;
   const questions = tallies.openQuestions + tallies.closedQuestions;
-  const first = name.split(' ')[0];
+  const first = callName(name);
   return (
     <View style={styles.wrap}>
       <View style={styles.grid}>

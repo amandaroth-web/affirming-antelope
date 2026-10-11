@@ -1,7 +1,10 @@
 // DRAFT — pending trainer review
 // All people, workplaces, and situations are fictional.
 
-import type { Drill } from "./types";
+import type { Drill, PathwayId, Setting } from "./types";
+import { CLINICIAN_DAILY_DRILL_ORDER, CLINICIAN_DRILLS } from "./drills-clinicians";
+
+export { CLINICIAN_DAILY_DRILL_ORDER, CLINICIAN_DRILLS };
 
 export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
@@ -9,6 +12,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-oars-01",
+    setting: "workplace",
     skill: "oars",
     level: 1,
     context: "A clinic supervisor, checking in with a medical assistant after a busy week",
@@ -41,6 +45,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-02",
+    setting: "workplace",
     skill: "oars",
     level: 1,
     context: "A nurse manager, one-on-one with a charge nurse",
@@ -68,6 +73,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-03",
+    setting: "workplace",
     skill: "oars",
     level: 1,
     context: "A practice manager, after a front desk lead handled an upset patient",
@@ -100,6 +106,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-04",
+    setting: "workplace",
     skill: "oars",
     level: 2,
     context: "A lab supervisor, after a tech has been arriving late",
@@ -113,6 +120,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-05",
+    setting: "workplace",
     skill: "oars",
     level: 2,
     context: "A clinic director, talking with a provider about patient complaints",
@@ -126,6 +134,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-06",
+    setting: "workplace",
     skill: "oars",
     level: 2,
     context: "A nurse manager, with a new graduate nurse after a hard shift",
@@ -139,6 +148,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-oars-07",
+    setting: "workplace",
     skill: "oars",
     level: 3,
     context: "A department lead, end of a one-on-one with a billing specialist",
@@ -156,6 +166,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-engaging-01",
+    setting: "workplace",
     skill: "engaging",
     level: 1,
     context: "A clinic supervisor, first check-in with a medical assistant who seems withdrawn",
@@ -183,6 +194,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-engaging-02",
+    setting: "workplace",
     skill: "engaging",
     level: 2,
     context: "A pharmacy manager, after a tech vents in a one-on-one",
@@ -196,6 +208,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-engaging-03",
+    setting: "workplace",
     skill: "engaging",
     level: 3,
     context: "A new nurse manager, meeting a veteran nurse for the first time",
@@ -213,6 +226,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-focusing-01",
+    setting: "workplace",
     skill: "focusing",
     level: 1,
     context: "A team lead, opening a one-on-one with a scheduler",
@@ -242,6 +256,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-focusing-02",
+    setting: "workplace",
     skill: "focusing",
     level: 2,
     context: "A clinic manager, during a check-in that's drifted to small talk",
@@ -255,6 +270,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-focusing-03",
+    setting: "workplace",
     skill: "focusing",
     level: 3,
     context: "A department director, with a supervisor who lists several concerns at once",
@@ -268,6 +284,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-focusing-04",
+    setting: "workplace",
     skill: "focusing",
     level: 2,
     context: "A nurse manager, with a nurse who asked about the new float policy",
@@ -285,6 +302,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-evoking-01",
+    setting: "workplace",
     skill: "evoking",
     level: 1,
     context: "A clinic manager, talking with a provider who often runs late",
@@ -321,6 +339,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-evoking-02",
+    setting: "workplace",
     skill: "evoking",
     level: 1,
     context: "A team lead, with an analyst who has been missing deadlines",
@@ -348,6 +367,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-evoking-03",
+    setting: "workplace",
     skill: "evoking",
     level: 2,
     context: "A revenue cycle manager, mid-conversation about missed deadlines",
@@ -361,6 +381,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-evoking-04",
+    setting: "workplace",
     skill: "evoking",
     level: 3,
     context: "A clinic director, with a provider who has mixed feelings about charting after hours",
@@ -374,6 +395,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-evoking-05",
+    setting: "workplace",
     skill: "evoking",
     level: 4,
     context: "A team lead, after raising a repeated documentation issue",
@@ -387,6 +409,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-evoking-06",
+    setting: "workplace",
     skill: "evoking",
     level: 3,
     context: "A nurse manager, with a nurse who keeps skipping breaks",
@@ -404,6 +427,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-change-talk-01",
+    setting: "workplace",
     skill: "change-talk",
     level: 1,
     context: "A practice manager, near the end of a check-in with a front desk lead",
@@ -437,6 +461,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-change-talk-02",
+    setting: "workplace",
     skill: "change-talk",
     level: 2,
     context: "A department lead, talking with a coordinator about missed follow-ups",
@@ -450,6 +475,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-change-talk-03",
+    setting: "workplace",
     skill: "change-talk",
     level: 3,
     context: "A clinic supervisor, after an MA mentions wanting to feel more on top of things",
@@ -467,6 +493,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-sustain-talk-01",
+    setting: "workplace",
     skill: "sustain-talk",
     level: 1,
     context: "A team lead, discussing late reports with an analyst",
@@ -503,6 +530,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-sustain-talk-02",
+    setting: "workplace",
     skill: "sustain-talk",
     level: 2,
     context: "A clinic manager, with an MA who skips the pre-visit checklist",
@@ -516,6 +544,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-sustain-talk-03",
+    setting: "workplace",
     skill: "sustain-talk",
     level: 3,
     context: "A nurse manager, with a nurse resisting bedside shift report",
@@ -529,6 +558,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-sustain-talk-04",
+    setting: "workplace",
     skill: "sustain-talk",
     level: 4,
     context: "A revenue cycle manager, third conversation about missed deadlines",
@@ -546,6 +576,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-discord-01",
+    setting: "workplace",
     skill: "discord",
     level: 1,
     context: "A director, talking with a charge nurse about a new staffing model",
@@ -574,6 +605,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-discord-02",
+    setting: "workplace",
     skill: "discord",
     level: 2,
     context: "A clinic manager, after raising a pattern of late arrivals",
@@ -587,6 +619,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-discord-03",
+    setting: "workplace",
     skill: "discord",
     level: 3,
     context: "A team lead, after jumping in with solutions too quickly",
@@ -600,6 +633,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-discord-04",
+    setting: "workplace",
     skill: "discord",
     level: 4,
     context: "A department director, with a veteran nurse angry about a policy change",
@@ -617,6 +651,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-planning-01",
+    setting: "workplace",
     skill: "planning",
     level: 1,
     context: "A clinic supervisor, late in a conversation about room turnover",
@@ -645,6 +680,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-planning-02",
+    setting: "workplace",
     skill: "planning",
     level: 2,
     context: "A team lead, after an analyst says they want to stop missing deadlines",
@@ -658,6 +694,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-planning-03",
+    setting: "workplace",
     skill: "planning",
     level: 3,
     context: "A nurse manager, planning with a nurse who wants to delegate more",
@@ -675,6 +712,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-leadership-01",
+    setting: "workplace",
     skill: "leadership",
     level: 1,
     context: "A clinic director, addressing a non-negotiable infection control requirement",
@@ -704,6 +742,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-leadership-02",
+    setting: "workplace",
     skill: "leadership",
     level: 3,
     context: "A revenue cycle manager, sharing a firm deadline",
@@ -717,6 +756,7 @@ export const DRILLS: Drill[] = [
   },
   {
     id: "drill-leadership-03",
+    setting: "workplace",
     skill: "leadership",
     level: 4,
     context: "A department lead, when an employee wants to be told what to do",
@@ -734,6 +774,7 @@ export const DRILLS: Drill[] = [
   // -------------------------------------------------------------------------
   {
     id: "drill-full-conversation-01",
+    setting: "workplace",
     skill: "full-conversation",
     level: 4,
     context: "A practice manager, near the end of a long conversation with a front desk lead",
@@ -745,9 +786,14 @@ export const DRILLS: Drill[] = [
       "You're worried the new process will be hard for older patients, and you also see the paper forms aren't working. You get why it matters. Where would you like to go from here?",
     ],
   },
+  // MI for Clinicians drills live in drills-clinicians.ts.
+  ...CLINICIAN_DRILLS,
 ];
 
-/** A sensible daily sequence: recognize before respond, OARS before evoking. */
+/**
+ * A sensible daily sequence: recognize before respond, OARS before evoking.
+ * This is the MI for Leaders order; use dailyDrillOrder(pathwayId) for others.
+ */
 export const DAILY_DRILL_ORDER: string[] = [
   "drill-oars-01",
   "drill-oars-02",
@@ -791,4 +837,20 @@ export const DAILY_DRILL_ORDER: string[] = [
 
 export function getDrill(id: string): Drill | undefined {
   return DRILLS.find((d) => d.id === id);
+}
+
+/** Daily drill sequence per pathway. */
+export const DAILY_DRILL_ORDER_BY_PATHWAY: Record<PathwayId, string[]> = {
+  "mi-for-leaders": DAILY_DRILL_ORDER,
+  "mi-for-clinicians": CLINICIAN_DAILY_DRILL_ORDER,
+};
+
+/** The daily drill sequence for a pathway; unknown ids fall back to MI for Leaders. */
+export function dailyDrillOrder(pathwayId: PathwayId | string | null | undefined): string[] {
+  return (pathwayId && DAILY_DRILL_ORDER_BY_PATHWAY[pathwayId as PathwayId]) || DAILY_DRILL_ORDER;
+}
+
+/** Every drill written for a setting (workplace or clinical). */
+export function drillsForSetting(setting: Setting): Drill[] {
+  return DRILLS.filter((d) => d.setting === setting);
 }

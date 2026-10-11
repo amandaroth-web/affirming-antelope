@@ -1,9 +1,10 @@
 import { getSkill, type ScenarioSpec } from '@antelope/core';
 import { useRef, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { callName } from '@/components/practice-loop/names';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { HeroTarget, useSession } from '@/components/practice-loop/SessionSurface';
-import { ArrowRightIcon, Avatar, Button, ChatCircleDotsIcon, Chip, FlagPennantIcon, Raised, TargetIcon, Text, UserIcon, color, space } from '@/design';
+import { ArrowRightIcon, Avatar, Button, ChatCircleDotsIcon, Chip, FlagPennantIcon, Raised, TargetIcon, Text, UserIcon, color, personaAvatar, space } from '@/design';
 import { Enter } from '@/motion';
 
 export const DIFFICULTY: Record<ScenarioSpec['difficulty'], string> = { intro: 'Intro', intermediate: 'Intermediate', advanced: 'Advanced' };
@@ -13,7 +14,7 @@ export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; 
   const p = scenario.persona;
   const avatar = useRef<View>(null);
   const heroTitle = useSession()?.title;
-  const first = p.name.split(' ')[0];
+  const first = callName(p.name);
   return (
     <View style={sessionStyles.root}>
       <SessionHeader
@@ -41,7 +42,7 @@ export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; 
         <View style={sessionStyles.column}>
           <Enter from="scale" style={styles.person}>
             <View ref={avatar} collapsable={false}>
-              <Avatar seed={p.avatarSeed} size={96} ring={color.white} accessibilityLabel={p.name} />
+              <Avatar {...personaAvatar(p, scenario.setting)} size={96} ring={color.white} accessibilityLabel={p.name} />
             </View>
             <View style={styles.personCopy}>
               <Text variant="title" accessibilityRole="header">

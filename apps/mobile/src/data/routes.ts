@@ -1,6 +1,8 @@
-import { DAILY_DRILL_ORDER, DRILLS, MI_FOR_LEADERS, SCENARIOS, type PathActivity, type ScenarioSpec, type SkillId, type SkillLevelNumber } from '@antelope/core';
+import { DRILLS, SCENARIOS, getDrill, type PathActivity, type ScenarioSpec, type Setting, type SkillId, type SkillLevelNumber } from '@antelope/core';
 import { router } from 'expo-router';
 import { markReplace } from '@/motion/launch';
+import { useLearner } from '@/state/store';
+import { dailyDrillOrder, drillsForSetting, findActivityIn, getPathway, pathwayForSetting, scenariosForSetting } from './pathways';
 
 /**
  * Route contract for the practice loop. Screens that launch practice call
@@ -67,25 +69,27 @@ export function openActivity(a: PathActivity, source: PracticeSource = 'path', n
   else openLesson(ref, { activityId: a.id, minutes: a.minutes, source, ...nav });
 }
 
-/** The path activity a practice screen was opened for, if any. */
+/** The path activity a practice screen was opened for, if any (any pathway). */
 export function findActivity(activityId?: string): PathActivity | undefined {
-  if (!activityId) return undefined;
-  for (const u of MI_FOR_LEADERS.units) {
-    const a = u.activities.find((x) => x.id === activityId);
-    if (a) return a;
-  }
-  return undefined;
+  return findActivityIn(activityId)?.activity;
+}
+
+/** The setting of the learner's active track. */
+export function activeSetting(): Setting {
+  return getPathway(useLearner.getState().activePathwayId).setting;
 }
 
 /**
  * Next drill for "One more?": the rest of the course activity's drills first,
- * then onward through DAILY_DRILL_ORDER, skipping anything done this session.
+ * then onward through the daily order of the drill's own setting (a clinical
+ * rep is followed by another clinical rep), skipping anything done this session.
  */
 export function nextDrillId(current: string, done: string[], activityId?: string): string {
   const seen = new Set([...done, current]);
   const fromActivity = findActivity(activityId)?.refIds?.find((id) => !seen.has(id) && DRILLS.some((d) => d.id === id));
   if (fromActivity) return fromActivity;
-  const order = DAILY_DRILL_ORDER;
+  const setting = getDrill(current)?.setting ?? activeSetting();
+  const order = dailyDrillOrder(pathwayForSetting(setting));
   const i = order.indexOf(current);
   for (let k = 1; k <= order.length; k++) {
     const id = order[(i + k + order.length) % order.length];
@@ -94,19 +98,32 @@ export function nextDrillId(current: string, done: string[], activityId?: string
   return order[0];
 }
 
-/** Best drill for a skill at (or just below) the learner's level. */
-export function pickDrill(skill: SkillId, level: SkillLevelNumber): string {
-  const forSkill = DRILLS.filter((d) => d.skill === skill);
-  const pool = forSkill.length ? forSkill : DRILLS;
+/**
+ * Best drill for a skill at (or just below) the learner's level, in a setting
+ * (the active track's by default). A skill with no drills in that setting yet
+ * borrows from the other setting before giving up on the skill.
+ */
+export function pickDrill(skill: SkillId, level: SkillLevelNumber, setting: Setting = activeSetting()): string {
+  const inSetting = drillsForSetting(setting);
+  const forSkill = inSetting.filter((d) => d.skill === skill);
+  const anywhere = DRILLS.filter((d) => d.skill === skill);
+  const pool = forSkill.length ? forSkill : anywhere.length ? anywhere : inSetting.length ? inSetting : DRILLS;
   const atLevel = pool.filter((d) => d.level === level);
   const below = pool.filter((d) => d.level <= level).sort((a, b) => b.level - a.level);
   const list = atLevel.length ? atLevel : below.length ? below : pool;
   return list[Math.floor(Math.random() * list.length)].id;
 }
 
-/** A scenario that exercises the skill, falling back to any scenario. */
-export function pickScenario(skill: SkillId): ScenarioSpec {
-  const fits = SCENARIOS.filter((s) => s.primaryChallenge === skill || s.targetSkills.includes(skill));
-  const pool = fits.length ? fits : SCENARIOS;
+/** Whether a setting has its own drills for a skill. */
+export function hasDrills(skill: SkillId, setting: Setting): boolean {
+  return drillsForSetting(setting).some((d) => d.skill === skill);
+}
+
+/** A scenario in the setting that exercises the skill, falling back to any scenario in the setting. */
+export function pickScenario(skill: SkillId, setting: Setting = activeSetting()): ScenarioSpec {
+  const inSetting = scenariosForSetting(setting);
+  const base = inSetting.length ? inSetting : SCENARIOS;
+  const fits = base.filter((s) => s.primaryChallenge === skill || s.targetSkills.includes(skill));
+  const pool = fits.length ? fits : base;
   return pool[Math.floor(Math.random() * pool.length)];
 }

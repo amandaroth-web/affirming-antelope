@@ -183,19 +183,25 @@ Layers, back to front: **Pose** (drawing visibility), **Idle** (6.4 s loop: brea
 
 ## State: `src/state/store.ts` (zustand, persisted to AsyncStorage)
 
-Seeded from `DEMO_LEARNER` in `@antelope/core`. The device is the source of truth for practice state; it works fully offline and signed out. Actions for the practice loop:
+A new install starts as a **fresh learner** (`freshLearnerState` in `@antelope/core`, via `state/learnerDoc.ts › freshSeed`): week 1, no streak, no name, no trainer assignment. Amanda (`DEMO_LEARNER`) is reachable only from Me › Demo › **Demo learner** in dev builds (`setDemo`; the `demo` flag is device-only and never synced). The device is the source of truth for practice state; it works fully offline and signed out.
+
+**Multi-pathway shape (store v3).** `activePathwayId` + `pathwayChosenAt` (null until the welcome's track step) and `progress[pathwayId] = { currentWeek, completedActivityIds, pathSeenWeek }`. Streak, weekly goal, skill levels and counts stay global. `completeActivity` finds the pathway that owns the activity (ids are unique across pathways), so a lesson from the other track advances that track. `choosePathway(id, source)` switches without touching the other track's progress and sends `pathway_chosen`. Read progress through the selectors (`useActivePathway`, `useSetting`, `useProgress`, `useCurrentWeek`, `useCompletedActivityIds`, `weekLabel`, `pathwaySkills`), never `MI_FOR_LEADERS`; content goes through `data/pathways.ts` (`getPathway`, `drillsForSetting`, `scenariosForSetting`, `dailyDrillOrder`, `pathwayForSetting`, `trackName`).
+
+**Migration (persist v2 → v3, `learnerDoc.ts › upgradeDoc`, also applied to every `learner_state` read).** An untouched v2 demo seed (Amanda's name, 17-day streak with no practice day, week 4) becomes a fresh learner with no track chosen, so the welcome opens at the track step. Any other v2 state keeps its progress under its `pathwayId` (track counts as chosen) but drops the demo identity (name, sample assignment). Pushes add the v2 fields mirrored from MI for Leaders (`toRemoteDoc`) so older app versions still read their course; the merge unions per-pathway progress (max week, union of activities) and keeps the most recent track pick.
+
+Actions for the practice loop:
 
 - `recordPractice({ kind, skill?, refId?, activityId?, minutes })` updates the streak, weekly goal, skill progress and assignment items. When `activityId` is set it also calls `completeActivity`, which advances the path week once every activity in the unit is done. Every record gets a uuid `id` (its `client_id` on the server) and the signed-in user as `ownerId` (unset in guest mode).
 - `recordSession({ kind, refId, skill, transcript, debrief, selfReflection?, startedAt, endedAt, durationSec })`: every drill rep and finished role-play is kept as a practice session (what trainer review shares).
 - `completeActivity(activityId)`, `claimRecords`, `applySynced` (sync only).
-- `SYNCED_KEYS` / `syncedState()`: the slice mirrored to `learner_state` (progress, streak, goal, path week; not settings or practice history).
-- Selectors: `useCurrentUnit`, `nextActivity`, `useProgressRows` (`state/selectors.ts`).
+- `SYNCED_KEYS` / `syncedState()`: the slice mirrored to `learner_state` (track, per-pathway progress, streak, goal; not settings, the demo flag or practice history).
+- Selectors: `useCurrentUnit`, `nextActivity`, `useProgressRows` (`state/selectors.ts`). Process rows and "Opens in week N" come from the active pathway's units.
 
 `src/state/account.ts` (`useAccount`, persisted cache): auth status, profile, cohorts (with trainer names), assignments with progress, submissions, reviews, `onboarded`. The server owns all of it; `sync/cloud.ts` refreshes it. `RATING` maps a review's level to words, `personSeed(name)` gives people a stable avatar (Dr. Rosa Lin keeps the demo face).
 
 ## Accounts, sync, cohorts, trainer review
 
-Guest mode is the default and loses nothing: everything above runs on the device. Signing in adds sync, cohorts, assignments and trainer review. Sign-in prompts appear only where signing in unlocks something: joining a cohort (Home's quiet "Have a cohort code? Sign in" under the sample assignment) and sending a role-play for review (the review sheet). Me › Account is the general way in.
+Guest mode is the default and loses nothing: everything above runs on the device. Signing in adds sync, cohorts, assignments and trainer review. Sign-in prompts appear only where signing in unlocks something: joining a cohort (Home's "Practicing with a trainer?" card for guests) and sending a role-play for review (the review sheet). Me › Account is the general way in.
 
 ### Sync engine: `src/sync/`
 
@@ -210,12 +216,12 @@ Guest mode is the default and loses nothing: everything above runs on the device
 
 | Route | What it is |
 |---|---|
-| `welcome` | First launch only (existing guest installs skip it). Mascot on a soft hill, three lines on what the app does, TRY IT FIRST (guest) or Sign in. Behind `Stack.Protected` so it hands over to Home with a fade. |
+| `welcome` | First launch, two steps. **Intro:** mascot on a soft hill, three lines on what the app does, TRY IT FIRST (guest) or Sign in (sign-in returns here via `flowEvents`). **Track:** "What conversations do you want to practice?", two `TrackCard`s (Patients / MI for Clinicians, Your team / MI for Leaders; tagline and audience from core), CONTINUE disabled until one is picked. Never skipped: `lib/launchHint.ts` preselects from the launch URL (`src=audience_clinicians` / `for_clinicians` / leaders likewise, or a guide's deep-linked drill's setting); a signed-in account's track is preselected too. Installs that still need a track (an old demo seed reset to fresh) open at this step. Root guard: `onboarded && pathwayChosenAt`. Behind `Stack.Protected` so it hands over to Home with a fade. |
 | `sign-in?reason=welcome\|cohort\|review\|me` | Sheet. Email → 6-digit code → your name (only while `profiles.display_name_set` is false), with three step bars. The head-pose coach listens while you type, thinks while the code is checked, hops on success. `cohort` continues to Join. |
 | `join` | Sheet. Fixed "MIL –" prefix and four cells; a complete code joins at once. Success: the ochre seal pops with a burst and the success haptic, then the cohort card (trainer, what's waiting). |
 | `review/[id]` | One submission: waiting (withdraw via `ConfirmSheet`), withdrawn (Share it again: a new submission, the withdrawn one stays as history), or the trainer's feedback (rating in words, notes in a coach bubble, voice note, recommended practice as the docked START, Try again). Opening it sets `learner_seen_at`. Pull to refresh. |
 
-Home: the inbox card (`FeedbackCard`) sits under Today's practice when a review is unseen. "From your trainer" shows real assignments (`data/assignments.ts` maps DB items to rows: `any-drill` + skill opens a drill of that skill at your level, `roleplay` opens the scenario; progress is the server's count topped up by unsynced practice on the phone), `JoinCohortCard` when signed in without a cohort, `NothingAssigned`, or the sample assignment + `GuestCohortPrompt` for guests. Me: profile (signed in), "From your trainer" list (`TrainerInbox`), "Your trainer", `AccountSection` (email, rename sheet, cohorts with Leave, join, sync status, sign out).
+Home: the inbox card (`FeedbackCard`) sits under Today's practice when a review is unseen. "From your trainer" shows real assignments (`data/assignments.ts` maps DB items to rows: `any-drill` + skill opens a drill of that skill at your level, `roleplay` opens the scenario; progress is the server's count topped up by unsynced practice on the phone), `JoinCohortCard` when signed in without a cohort, `GuestJoinCard` for guests (no sample assignment; the demo learner alone keeps Dr. Rosa Lin's), `NothingAssigned`, or the sample assignment + `GuestCohortPrompt` for guests. Me: profile (signed in), "From your trainer" list (`TrainerInbox`), "Your trainer", `AccountSection` (email, rename sheet, cohorts with Leave, join, sync status, sign out).
 
 The review sheet (`roleplay/ReviewSheet.tsx`) gates on the account: guest → sign in, no cohort → join, several cohorts → a trainer picker, else note + SEND. Sign-in and join are full screens, so the sheet steps aside and the debrief reopens it when the flow closes (`lib/flowEvents.ts`) and the step actually happened. Sent shows the real state ("Sent to Dr. Rosa Lin", "Saved. It'll send soon" offline, "Reviewed by …").
 
@@ -274,9 +280,23 @@ Header: "Day N" (streak including today) + "N minutes of MI practice today", and
   - `MovesPanel`: rolling counters per move (dashed when zero) and a reflections-vs-questions balance beam that tips on a soft spring. A balance, not a grade.
   - Strengths, `KeyMoments` (snapping horizontal cards, next one peeks, ochre dot tracks scroll on the UI thread), Try next, What next (try again / practice this skill / harder / easier / new; coach's pick highlighted and docked as the primary), `ReviewSheet` (exactly what's shared and what isn't, optional note, account gates and cohort picker, the real submission state; see Accounts below).
 
+## Tracks: `src/components/track`
+
+- `TrackCard`: a big radio card (`accessibilityRole="radio"`). Selecting it: the face presses onto its shadow (tick), edge and face cross-fade to cobalt on periwinkle, the icon tile turns cobalt and hops (anticipation dip, bouncy rise), the radio's check pops in. Reduced motion: colours cross-fade only. `compact` drops the audience line; `current` marks the track you're on.
+- Welcome track step: the head-pose coach listens, hops at the first pick, nods at a change of mind; CONTINUE fires `haptic.success`.
+- `TrackSwitchSheet` (Me › Your track › Switch): both cards, the other track preselected, the note under them ticks over ("MI for Clinicians stays at week 3 of 8. MI for Leaders starts at week 1."), primary "Switch to Your team", secondary "Keep Patients". After a switch Me navigates to Path, which re-lays out for the new track (`PathTrack key={pathway.id}`).
+- Join (`join.tsx`): when the cohort's `cohorts.pathway_id` differs from the active track, the success card offers the switch (source `cohort`) instead of a bare DONE.
+- Path: 8- and 12-unit trails share one geometry (`components/path/geometry.ts`: step, amplitude and swing scale with unit count; the last week always sits at full swing into the finish). Landscape per setting: savanna (acacias, sand) for workplace, wetland (sage bands, reeds, pools) for clinical.
+- Setting-aware copy: role-play and review screens label the counterpart from the scenario's own setting (`SETTING_LABELS`, `practice-loop/names.ts › conversationLabel` "One-on-one with Darnell" / "Visit with Len", `callName` keeps "Ms. Alvarez"). Never show "employee" for clinical content; `Turn.speaker` stays `'employee'` internally.
+- Practice tab: follows the active setting, with a quiet TextLink to "Try leadership/patient practice instead"; tiles note "Role-play only" / "Coming soon for patients" when a setting has no drills for a skill, and Start borrows from the other setting with a caption.
+- `Avatar` ages: `personaAvatar(persona, setting)` / `drillSpeakerAvatar(drill)` (`design/personaAge.ts`) infer age and presentation from the persona's role ("Patient, 61, …") or the drill context; older adults get grey or white hair, receding or bald styles, lines, reading glasses and knitwear; patients never get scrubs or a lanyard. Workplace seeds draw exactly as before. Dev grid: `antelope://dev/avatars`.
+- Dev: `antelope://dev/track?id=mi-for-clinicians&to=/path&week=3` jumps onto a track.
+
+Captures: `docs/screens/clinician-*.jpg`.
+
 ## Home
 
-Today's practice card (chips: skill, then "Drill · ~5 min"), new trainer feedback (`FeedbackCard`, when unseen), This week, From your trainer (`AssignmentCard` over an `AssignmentView`, demo or real: a `Callout` note, a gold `ProgressBar` whose segments fill by fraction for multi-rep items, `ListRow`s with a 24pt `StepBadge` check), Your progress (`ProgressList`: a level `StepBadge`, caption "Level 2 · Respond", `LevelPips` and "Next: Elicit"; no percentages), More practice (the focus skill sits in the header's action slot: "Focus this week: Sustain talk").
+Greeting: the account's name when signed in, else just "Good morning" (the demo learner keeps "Amanda"). Today's practice card (`data/today.ts`: the next drill in `dailyDrillOrder(active)` not done yet; chips: skill, then "Drill · ~5 min"), new trainer feedback (`FeedbackCard`, when unseen), This week, From your trainer (`AssignmentCard` over an `AssignmentView`, demo or real: a `Callout` note, a gold `ProgressBar` whose segments fill by fraction for multi-rep items, `ListRow`s with a 24pt `StepBadge` check), Your progress (`ProgressList`: a level `StepBadge`, caption "Level 2 · Respond", `LevelPips` and "Next: Elicit"; no percentages), More practice (the focus skill sits in the header's action slot: "Focus this week: Sustain talk").
 
 ## Rules for the practice loop
 

@@ -36,8 +36,8 @@ const UNLOCK_BURST = [color.primary, color.primary, color.primaryTint, color.gol
  */
 export const WeekNode = forwardRef<
   WeekNodeHandle,
-  { week: number; title: string; status: WeekStatus; onPress: () => void; paused?: boolean; anchored?: boolean }
->(function WeekNode({ week, title, status, onPress, paused, anchored }, ref) {
+  { week: number; /** Weeks in the course, for the spoken label ("Week 3 of 8"). */ total?: number; title: string; status: WeekStatus; onPress: () => void; paused?: boolean; anchored?: boolean }
+>(function WeekNode({ week, total, title, status, onPress, paused, anchored }, ref) {
   const reduce = useReduceMotion();
   const shakeX = useSharedValue(0);
   const pulse = useSharedValue(0);
@@ -162,12 +162,8 @@ export const WeekNode = forwardRef<
   }));
 
   const tone = status === 'complete' ? 'gold' : status === 'current' ? 'primary' : 'locked';
-  const label =
-    status === 'complete'
-      ? `Week ${week}, ${title}, complete`
-      : status === 'current'
-        ? `Week ${week}, ${title}, in progress`
-        : `Week ${week}, ${title}, locked`;
+  const of = total ? ` of ${total}` : '';
+  const label = `Week ${week}${of}, ${title}, ${status === 'complete' ? 'complete' : status === 'current' ? 'in progress' : 'locked'}`;
 
   return (
     <Animated.View style={wrapStyle}>

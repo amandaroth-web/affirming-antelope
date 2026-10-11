@@ -105,7 +105,7 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
                 <h1 className="mt-1 font-display text-[32px] font-bold leading-[1.08] tracking-tight text-ink">{title}</h1>
                 {scenario ? (
                   <p className="mt-1.5 text-[16px] font-bold text-ink/75">
-                    {scenario.persona.name}, {scenario.persona.role} · {scenario.context}: {scenario.leadershipIssue}
+                    {scenario.persona.name}, {scenario.persona.role} · {scenario.context}: {scenario.issue}
                   </p>
                 ) : drill ? (
                   <p className="mt-1.5 text-[16px] font-bold text-ink/75">{drill.context}</p>
