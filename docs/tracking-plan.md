@@ -11,6 +11,11 @@ uses the same vocabulary. Snake_case, `object_verb` past tense.
   trainers, trainer feedback, audio, or free-text inputs. Ids and enums only.
 - **No PII.** Never send email or display names. Identify signed-in people by their
   Supabase user uuid only.
+- **Anonymous users are not identified.** Every app user now has a Supabase uid from
+  first launch (guests are anonymous users), but `identify` runs only for permanent
+  users: on conversion (same uid, `verifyOtp` `email_change`) and on sign-in to an
+  existing account. Guests stay on PostHog's device id; identifying on conversion links
+  their earlier events. See [anonymous-auth.md](anonymous-auth.md#analytics-identity).
 - **Website is cookieless:** `persistence: 'memory'`, no cookies or local storage, so no
   consent banner. A visitor's anonymous id travels to the app only through the CTA link
   (`?ph_did=<id>&ph_sid=<session>`), and the app bootstraps PostHog with it.
@@ -30,7 +35,7 @@ uses the same vocabulary. Snake_case, `object_verb` past tense.
 ## Super properties (on every event)
 
 `surface`: `'website' | 'app' | 'trainer'`, `platform`: `'web' | 'ios' | 'android'`,
-`app_version`, `signed_in`: boolean.
+`app_version`, `signed_in`: boolean (true only for permanent users; an anonymous session is `false`).
 
 ## Person properties (signed-in only)
 
@@ -52,8 +57,8 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 |---|---|
 | `app_opened` | `entry` (`direct`, `website_cta`, `guide`, `deep_link`), `src?` (CTA location) |
 | `onboarding_chosen` | `choice` (`guest`, `sign_in`) |
-| `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`) |
-| `sign_in_completed` | `is_new_user`, `migrated_guest_data` |
+| `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`, `quota`: a guest at today's free AI limit) |
+| `sign_in_completed` | `is_new_user`, `migrated_guest_data` (conversion: always the same uid; existing account: merge-anonymous moved rows) |
 | `signed_out` | — |
 | `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`), `pathway_id` |
 | `drill_answered` | `drill_id`, `skill`, `level`, `format` (`choice`, `text`), `hit_target` |

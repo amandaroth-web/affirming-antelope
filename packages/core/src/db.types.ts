@@ -266,6 +266,12 @@ isOneToOne: false
               "assigned": number,"completed": number,"display_name": string,"last_active_at": string,"needs_review": number,"user_id": string
             }[]
                            },
+"consume_ai_quota":
+{ Args: { "bucket": string }; Returns: Json
+                           },
+"consume_legacy_ai_quota":
+{ Args: { "bucket": string,"ip_hash": string }; Returns: Json
+                           },
 "create_cohort":
 { Args: { "name": string,"pathway_id"?: string,"starts_on"?: string }; Returns: {
               "archived_at": string | null,
@@ -300,6 +306,9 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"merge_anonymous_user":
+{ Args: { "account_version"?: number,"anonymous_id": string,"merged_state"?: Json,"permanent_id": string }; Returns: Json
+                           },
 "rotate_join_code":
 { Args: { "cohort_id": string }; Returns: string
                            }

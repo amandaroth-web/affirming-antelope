@@ -6,6 +6,8 @@ import {
   type Debrief,
   type DrillFeedback,
   type PathwayId,
+  type PathwayProgress,
+  SYNCED_KEYS as CORE_SYNCED_KEYS,
   type SelfReflection,
   type SkillId,
   type SkillLevelNumber,
@@ -80,17 +82,8 @@ export interface Settings {
   haptics: boolean;
 }
 
-/** One pathway's place in its course. Kept per pathway, so switching tracks loses nothing. */
-export interface PathwayProgress {
-  /** 1..units, or units + 1 once the pathway is complete. */
-  currentWeek: number;
-  completedActivityIds: string[];
-  /**
-   * The week the Path screen last showed as current. When `currentWeek` moves
-   * past it, Path plays the unlock choreography once and then marks it seen.
-   */
-  pathSeenWeek: number;
-}
+/** One pathway's place in its course (shared with the server merge in @antelope/core). */
+export type { PathwayProgress };
 
 export type PathwayChoiceSource = 'onboarding' | 'me' | 'cohort';
 
@@ -132,6 +125,8 @@ export interface LearnerActions {
   recordSession: (p: Omit<PracticeSession, 'id' | 'ownerId'>) => PracticeSession;
   /** After a guest migration: guest-made records now belong to this account. */
   claimRecords: (userId: string, completionIds: string[], sessionIds: string[]) => void;
+  /** After merge-anonymous: the guest's records now belong to the account they were merged into. */
+  reownRecords: (fromUserId: string, toUserId: string) => void;
   /** Replace the synced part of the state (sign-in adoption, merges from the server). */
   applySynced: (synced: SyncedState) => void;
   /** Pick (or switch) the active track. Progress on the other track stays where it was. */
@@ -153,18 +148,7 @@ export interface LearnerActions {
  * The part of the store mirrored to `learner_state` so progress follows the account.
  * Practice history goes to its own tables; settings, greetings and the demo flag stay on the device.
  */
-export const SYNCED_KEYS = [
-  'firstName',
-  'role',
-  'activePathwayId',
-  'pathwayChosenAt',
-  'progress',
-  'skills',
-  'streak',
-  'weekDays',
-  'weeklyGoal',
-  'scenariosCompleted',
-] as const satisfies readonly (keyof LearnerState)[];
+export const SYNCED_KEYS = CORE_SYNCED_KEYS satisfies readonly (keyof LearnerState)[];
 export type SyncedState = Pick<LearnerState, (typeof SYNCED_KEYS)[number]>;
 
 export function syncedState(s: LearnerState): SyncedState {
@@ -298,6 +282,12 @@ export const useLearner = create<LearnerState & LearnerActions>()(
             sessions: s.sessions.map((r) => (ss.has(r.id) && !r.ownerId ? { ...r, ownerId: userId } : r)),
           };
         }),
+
+      reownRecords: (fromUserId, toUserId) =>
+        set((s) => ({
+          practiceLog: s.practiceLog.map((r) => (r.ownerId === fromUserId ? { ...r, ownerId: toUserId } : r)),
+          sessions: s.sessions.map((r) => (r.ownerId === fromUserId ? { ...r, ownerId: toUserId } : r)),
+        })),
 
       applySynced: (synced) => set(synced),
 

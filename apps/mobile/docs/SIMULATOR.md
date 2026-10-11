@@ -113,11 +113,10 @@ For app testing without model calls, run a second, mocked server on its own port
 ```sh
 cd apps/web && AI_MOCK=1 npx next dev -p 3007        # deterministic canned replies
 cd apps/mobile && EXPO_PUBLIC_API_URL=http://localhost:3007 \
-  EXPO_PUBLIC_APP_TOKEN=$(grep ^APP_CLIENT_TOKEN= ../web/.env.local | cut -d= -f2-) \
   npx expo start --dev-client --port 8081 --clear
 ```
 
-`apps/web/.env.local` sets `APP_CLIENT_TOKEN`, so the guest token is required even locally. Signed in, the app also sends `Authorization: Bearer <access token>` on every AI call.
+Every AI call sends `Authorization: Bearer <access token>`: guests are anonymous Supabase users, created on first launch (see below), so the API needs a reachable Supabase stack. Quotas apply in mock mode too.
 
 ## Rive
 
@@ -137,12 +136,10 @@ const { riveFile } = useRiveFile(require('../../assets/rive/mascot-wave.riv'));
 - The default (new) iOS backend does **not** support state-machine inputs (`setNumberInputValue`/`triggerInput` throw "SMI inputs are not supported by the new runtime"). Drive state machines through view-model data binding (`useViewModelInstance(file, { async: true })` + `dataBind={instance}`).
 - Mascot playground (dev only): `antelope://dev/mascot?pose=wave&mood=idle&size=300&fire=wave&at=600&chrome=0` (`fire`: wave, hop, turn, cheer, nod, blink; change `n` to re-fire).
 
-## API auth (`APP_CLIENT_TOKEN` / `EXPO_PUBLIC_APP_TOKEN`, Supabase bearer)
+## API auth (Supabase bearer; guests are anonymous users)
 
-Signed in, `src/lib/api.ts` sends `Authorization: Bearer <Supabase access token>` (kept fresh by supabase-js while the app is in the foreground). It always sends the guest `x-antelope-key` too when it's set, which is what guests rely on.
+Design: `docs/anonymous-auth.md`. On first launch the app calls `signInAnonymously()` quietly (`src/sync/anonymous.ts`; retried with backoff, on foreground and before an AI request while offline). `src/lib/api.ts` always sends `Authorization: Bearer <access token>`, refreshing once on a 401. There is no app token any more: `EXPO_PUBLIC_APP_TOKEN` / `x-antelope-key` are gone from the app (the API still accepts the old header until 2026-10-25 for older builds).
 
-The API in `apps/web` requires the header `x-antelope-key` when the server env var `APP_CLIENT_TOKEN` is set (it is set in production on Vercel). When unset, as in plain local dev, the check is skipped.
-
-- Server: `APP_CLIENT_TOKEN` in `apps/web/.env.local` (see `apps/web/.env.example`).
-- App: set `EXPO_PUBLIC_APP_TOKEN` to the same value in the environment of the `expo start` process (restart Metro with `--clear` after changing it). For EAS builds, put it in EAS environment variables, never in `eas.json`.
-- Caveat: `EXPO_PUBLIC_*` values are bundled into the app binary, so the token only deters casual abuse. Real per-user auth arrives with accounts.
+- Sign in from a guest: a new email converts the same user (`updateUser({ email })` + `verifyOtp` `email_change`); an email that already has an account signs in to it and the engine calls `/api/account/merge-anonymous` with the guest token kept before switching.
+- Practice limits: `429 quota_exceeded` / `503 ai_resting` show coach-voice copy (`components/practice-loop/errors.ts`); a guest at the daily limit gets "Save my progress with email".
+- Test the limits locally by editing `app_private.ai_usage` (e.g. `update app_private.ai_usage set count = 40 where bucket = 'drill'`), and an offline first launch by stopping the stack's API gateway (`docker stop supabase_kong_<project_id>`).

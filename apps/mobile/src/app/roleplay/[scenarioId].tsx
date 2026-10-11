@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { usePracticeSnapshot } from '@/components/practice-loop/Completion';
+import { ErrorIcon, SaveProgressLink } from '@/components/practice-loop/ErrorBits';
 import { friendlyError, withTimeout, type FriendlyError } from '@/components/practice-loop/errors';
 import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { SessionSurface, useSessionClose } from '@/components/practice-loop/SessionSurface';
@@ -22,7 +23,7 @@ import { Brief } from '@/components/roleplay/Brief';
 import { Conversation } from '@/components/roleplay/Conversation';
 import { Debrief, type NextChoice } from '@/components/roleplay/Debrief';
 import { Reflection } from '@/components/roleplay/Reflection';
-import { Avatar, Button, Raised, Text, WifiSlashIcon, color, haptic, layout, personaAvatar, space, type AvatarIdentity } from '@/design';
+import { Avatar, Button, Raised, Text, color, haptic, layout, personaAvatar, space, type AvatarIdentity } from '@/design';
 import { scenariosForSetting } from '@/data/pathways';
 import { openDrill, openRoleplay, pickDrill } from '@/data/routes';
 import { postJson } from '@/lib/api';
@@ -343,13 +344,14 @@ function Thinking({ error, onRetry, onBack, onClose }: { error: FriendlyError | 
       <View style={styles.center}>
         {error ? (
           <Raised tone="surface" depth={5} contentStyle={styles.errorFace}>
-            <WifiSlashIcon size={28} weight="bold" color={color.primary} />
+            <ErrorIcon error={error} size={28} />
             <Text variant="heading" align="center">
               {error.title}
             </Text>
             <Text variant="body" color={color.muted} align="center">
               {error.detail} Your conversation and reflection are saved.
             </Text>
+            <SaveProgressLink error={error} />
           </Raised>
         ) : (
           <CoachThinking title="Reading the conversation" lines={THINKING_LINES} paused={!focused} />

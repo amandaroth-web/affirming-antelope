@@ -39,6 +39,11 @@ export default function Join() {
     setState('busy');
     setError(null);
     const res = await joinCohort(c);
+    if (!res.ok && res.reason === 'account-required') {
+      // a guest session got here (the account status hadn't caught up): sign in first
+      router.replace({ pathname: '/sign-in', params: { reason: 'cohort' } });
+      return;
+    }
     if (!res.ok) {
       setState('error');
       setError(

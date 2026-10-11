@@ -8,12 +8,13 @@ import { FeedbackPanel } from '@/components/drill/FeedbackPanel';
 import { Mascot, type MascotHandle } from '@/components/mascot';
 import { CompletionMoment, usePracticeSnapshot } from '@/components/practice-loop/Completion';
 import { Composer } from '@/components/practice-loop/Composer';
+import { ErrorIcon, SaveProgressLink } from '@/components/practice-loop/ErrorBits';
 import { friendlyError, withTimeout, type FriendlyError } from '@/components/practice-loop/errors';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { HeroTarget, SessionSurface, useSession, useSessionClose } from '@/components/practice-loop/SessionSurface';
 import { CoachSays, InstructionChip, LearnerBubble, SpeechCard, useComposerLaunch } from '@/components/practice-loop/Speech';
 import { Shimmer } from '@/components/practice-loop/Thinking';
-import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, WifiSlashIcon, color, drillSpeakerAvatar, haptic, layout, radius, space } from '@/design';
+import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, color, drillSpeakerAvatar, haptic, layout, radius, space } from '@/design';
 import { nextDrillId } from '@/data/routes';
 import { postJson } from '@/lib/api';
 import { practiceSource, track } from '@/lib/analytics';
@@ -368,13 +369,14 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
               <View style={styles.block}>
               <Raised tone="surface" depth={4} contentStyle={styles.errorFace}>
                 <View style={styles.errorIcon}>
-                  <WifiSlashIcon size={22} weight="bold" color={color.primary} />
+                  <ErrorIcon error={error} size={22} />
                 </View>
                 <View style={styles.flex}>
                   <Text variant="subheading">{error.title}</Text>
                   <Text variant="body" color={color.muted}>
                     {error.detail} Your response is saved.
                   </Text>
+                  <SaveProgressLink error={error} style={styles.errorLink} />
                 </View>
               </Raised>
               </View>
@@ -493,6 +495,7 @@ const styles = StyleSheet.create({
   listening: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   listeningCopy: { gap: space[2] },
   errorFace: { flexDirection: 'row', gap: space[3], padding: space[4], alignItems: 'flex-start' },
+  errorLink: { marginTop: space[2], alignSelf: 'flex-start' },
   errorIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: color.soft, alignItems: 'center', justifyContent: 'center' },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[3] },
   linkDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: color.line },

@@ -36,7 +36,7 @@ export type PracticeSource =
   | "review_recommendation"
   | "next_step";
 
-export type SignInReason = "welcome" | "cohort" | "review" | "me";
+export type SignInReason = "welcome" | "cohort" | "review" | "me" | "quota";
 export type AppEntry = "direct" | "website_cta" | "guide" | "deep_link";
 export type NextStepFrom = "drill" | "debrief" | "lesson";
 export type NextStepChoice = "try_again" | "same_skill" | "harder" | "new_scenario" | "one_more" | "done";

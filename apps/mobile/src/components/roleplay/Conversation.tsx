@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type N
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Composer } from '@/components/practice-loop/Composer';
 import { ConfirmSheet } from '@/components/practice-loop/ConfirmSheet';
+import { SaveProgressLink } from '@/components/practice-loop/ErrorBits';
 import { callName, conversationLabel } from '@/components/practice-loop/names';
 import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components/practice-loop/SessionChrome';
 import { EmployeeBubble, LearnerBubble, LiveEmployeeBubble, useBubbleEntrance, useComposerLaunch } from '@/components/practice-loop/Speech';
@@ -183,8 +184,9 @@ export function Conversation({
               {error ? (
                 <Animated.View entering={fades.entering} exiting={fades.exiting} layout={layout} style={styles.retry}>
                   <Text variant="caption" color={color.muted} align="center">
-                    {error.title}. {first} didn’t get that.
+                    {error.kind === 'wait' ? `${error.title}. ${error.detail}` : `${error.title}. ${first} didn’t get that.`}
                   </Text>
+                  <SaveProgressLink error={error} style={styles.center} />
                   <Button
                     variant="secondary"
                     size="sm"

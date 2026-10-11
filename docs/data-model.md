@@ -24,8 +24,21 @@ Test data only for now (no PHI, no BAA). Keep personal data to name + email anyw
 - Supabase Auth, **email one-time code** (6 digits) for learners and trainers.
   Email templates must include `{{ .Token }}`. Local dev mail: Mailpit (`supabase status`).
 - `profiles` row is created by a trigger on `auth.users` insert.
-- **Guest mode:** the app works signed out with local demo state. On first sign-in the
-  app uploads local `learner_state`, completions, and sessions (deduped by `client_id`).
+- **Guests are anonymous users.** On first launch the app calls `signInAnonymously()`,
+  so every app user has a uid and syncs from the start. An anonymous user has the
+  `authenticated` role and `is_anonymous: true` in the JWT. They can use their own
+  `learner_state`, `activity_completions`, `practice_sessions` and profile. They can't
+  join cohorts, submit for review, claim trainer, create cohorts, or see other people
+  (restrictive policies + RPC checks, error `42501` hint `account_required`). The check
+  fails closed: a JWT without the claim counts as anonymous. Full design and client
+  flows: [anonymous-auth.md](anonymous-auth.md).
+- **Upgrading** keeps the uid: `updateUser({ email })` then `verifyOtp({ type: 'email_change' })`.
+  Requires "Confirm email" on, else Supabase attaches the email without a code.
+- **Signing in to an existing account** instead: the app captures the anonymous access
+  token, signs in, and calls `POST /api/account/merge-anonymous`, which moves the
+  guest's rows into the account (`merge_anonymous_user`) and deletes the guest.
+- Installs from before anonymous auth still do the one-time upload of local
+  `learner_state`, completions, and sessions (deduped by `client_id`).
 - **Trainers:** `profiles.can_train` gates cohort creation. Set it via
   `claim_trainer(code)` (security definer) which checks a code in a private table
   `app_private.trainer_codes`, or manually by an admin.
@@ -53,9 +66,25 @@ Test data only for now (no PHI, no BAA). Keep personal data to name + email anyw
 - `rotate_join_code(cohort_id uuid) → text` — cohort trainer only.
 - `assignment_progress(assignment_id uuid) → table(user_id, display_name, item_id, done int, quantity int)` — counts completions since the assignment's `created_at` matching each item. Trainer of the cohort sees all members; a learner sees only their own rows.
 - `cohort_member_stats(cohort_id uuid) → table(user_id, display_name, assigned int, completed int, needs_review int, last_active_at)` — trainer only. Drives the dashboard table (PRD §6).
+- `consume_ai_quota(bucket text) → jsonb {allowed, reason, limit, remaining, retry_after}` — the caller's own AI quota (`turn`, `debrief`, `drill`), atomically checked and incremented. Tier from the JWT (`anonymous` / `permanent`). `reason`: `daily`, `burst` (per-minute) or `global` (circuit breaker). Denied calls aren't counted. Refuses deleted/banned users.
+- `consume_legacy_ai_quota(ip_hash text, bucket text) → jsonb` — service role only; per-IP quota for the legacy `x-antelope-key` path. Remove after 2026-10-25.
+- `merge_anonymous_user(anonymous_id uuid, permanent_id uuid, merged_state jsonb, account_version int) → jsonb {learner_state, completions_moved, sessions_moved}` — service role only. When both users have `learner_state`, stores `merged_state` (merged by the API with the app's own rules, `packages/core/src/learnerDoc.ts`) if the account is still at `account_version`, else `PT409` hint `state_changed`; when only the guest has one, moves it. Moves completions/sessions not already in the account (by `client_id`), carries a chosen display name and AI usage. The caller then deletes the anonymous auth user.
+
+`join_cohort`, `claim_trainer` and `create_cohort` refuse anonymous callers.
 
 All security-definer functions: `set search_path = ''`, explicit schema-qualified names,
 check `auth.uid()` membership/ownership before returning anything.
+
+## Private tables (schema `app_private`, never exposed)
+
+| table | notes |
+|---|---|
+| `trainer_codes`, `trainer_code_claims` | trainer access codes |
+| `ai_quota_limits` | `(tier, bucket) → per_day, per_minute`. Tiers `anonymous` (turn 60/12, debrief 6/2, drill 40/8), `permanent` (300/20, 30/3, 200/12), `legacy_ip` (30/10, 3/1, 15/5). Edit with SQL, no deploy. |
+| `ai_global_limits` | `bucket → per_day` ceiling across everyone (turn 20000, debrief 1000, drill 10000; null = none). Over it the AI routes answer 503 "Practice AI is resting". |
+| `ai_usage` | `(user_id, day, bucket) → count`, plus a one-minute window. Cascades with the auth user. Pruned after 35 days. |
+| `ai_usage_legacy_ip` | same, keyed on an HMAC of the client IP. Drop after 2026-10-25. |
+| `ai_usage_global` | `(day, bucket) → count` for the circuit breaker. |
 
 ## Storage
 
@@ -64,9 +93,17 @@ check `auth.uid()` membership/ownership before returning anything.
 
 ## API auth (apps/web AI routes)
 
-- Accept **either** `Authorization: Bearer <supabase access token>` (verified server-side;
-  per-user rate limit) **or** the guest `x-antelope-key` app token (per-IP limit).
+- **Required:** `Authorization: Bearer <supabase access token>`, anonymous or permanent,
+  verified with `getClaims`. Then `consume_ai_quota(bucket)` runs **with the caller's JWT**
+  (so the uid can't be spoofed) right before the AI call: 429 `quota_exceeded` (daily or
+  burst, with `retry_after`), 503 `ai_resting` (global ceiling). Fails closed (503) if the
+  quota can't be checked.
+- **Legacy:** the shared `x-antelope-key` is accepted until 2026-10-25 behind
+  `ALLOW_LEGACY_APP_TOKEN` (default on until then), with a durable per-IP quota.
+- `POST /api/account/merge-anonymous` (bearer = permanent user, body
+  `{ anonymousAccessToken }`) uses the server-only secret key.
 - AI routes stay stateless; the app persists sessions itself through Supabase.
+- Error codes: [anonymous-auth.md](anonymous-auth.md#error-codes-the-client-must-handle).
 
 ## Environments
 
@@ -75,5 +112,7 @@ check `auth.uid()` membership/ownership before returning anything.
   a demo learner "Amanda", one assignment, one submitted session).
 - Hosted: one Supabase project; `supabase link` + `supabase db push`. Env:
   `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (mobile),
-  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (web, server only — avoid unless needed).
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
+  (or legacy `SUPABASE_SERVICE_ROLE_KEY`; web, server only — used only by merge-anonymous
+  and the legacy quota), `ALLOW_LEGACY_APP_TOKEN` (until 2026-10-25).
 - Generated types: `supabase gen types typescript --local > packages/core/src/db.types.ts`.

@@ -42,7 +42,7 @@ end $$;
 -- Become a signed-in user / anon for the rest of the transaction (until `reset role`).
 create or replace function tests.as_user(uid uuid) returns void language plpgsql as $$
 begin
-  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated', 'is_anonymous', false)::text, true);
   perform set_config('role', 'authenticated', true);
 end $$;
 create or replace function tests.as_anon() returns void language plpgsql as $$

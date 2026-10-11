@@ -197,7 +197,14 @@ export async function refreshCloud(userId: string, email: string): Promise<boole
 // Direct actions (need an immediate answer, so they don't queue)
 // ---------------------------------------------------------------------------
 
-export type JoinResult = { ok: true; cohort: { id: string; name: string; pathwayId: PathwayId } } | { ok: false; reason: 'not-found' | 'offline' | 'error' };
+export type JoinResult =
+  | { ok: true; cohort: { id: string; name: string; pathwayId: PathwayId } }
+  | { ok: false; reason: 'not-found' | 'offline' | 'error' | 'account-required' };
+
+/** Postgres refused a guest (anonymous user): 42501 with hint `account_required` (docs/anonymous-auth.md). */
+export function needsAccount(e: unknown): boolean {
+  return errorCode(e) === '42501' && (e as { hint?: string } | null)?.hint === 'account_required';
+}
 
 /** "mil demo", "MIL-DEMO", "demo" → "MIL-DEMO". */
 export function normalizeJoinCode(raw: string): string {
@@ -212,6 +219,7 @@ export async function joinCohort(code: string): Promise<JoinResult> {
   });
   if (error) {
     if (errorCode(error) === 'PT404') return { ok: false, reason: 'not-found' };
+    if (needsAccount(error)) return { ok: false, reason: 'account-required' };
     return { ok: false, reason: isTransient(error) ? 'offline' : 'error' };
   }
   return { ok: true, cohort: { id: data.id, name: data.name, pathwayId: isPathwayId(data.pathway_id) ? data.pathway_id : 'mi-for-leaders' } };
