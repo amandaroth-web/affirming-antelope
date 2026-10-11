@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  web-build:
+    name: Site build (apps/web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Dummy values: the build inlines NEXT_PUBLIC_*, it never talks to a backend.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_dummy_key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Cache Next.js build
+        uses: actions/cache@v6
+        with:
+          path: apps/web/.next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('apps/web/src/**', 'apps/web/content/**', 'packages/core/src/**') }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+      - run: npm run build -w web
+
+  app-export:
+    name: App web export (apps/mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_PUBLIC_API_URL: https://example.invalid
+      EXPO_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_dummy_key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:web -w mobile
+
+  db:
+    name: DB tests (pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/supabase-local
+      - name: Reset to a fresh seed
+        run: supabase db reset
+      - name: Run pgTAP suite
+        run: supabase test db
+
+  db-lint:
+    name: DB lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/supabase-local
+      - name: plpgsql_check lint (fail on errors only)
+        run: supabase db lint --local --fail-on error
+
+  db-types:
+    name: DB types drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/supabase-local
+      - name: Regenerate packages/core/src/db.types.ts
+        run: supabase gen types typescript --local > packages/core/src/db.types.ts
+      - name: Fail if types are stale
+        run: |
+          if ! git diff --exit-code -- packages/core/src/db.types.ts; then
+            echo "::error file=packages/core/src/db.types.ts::db.types.ts is out of date. Run 'npm run db:reset && npm run db:types' and commit the result."
+            exit 1
+          fi

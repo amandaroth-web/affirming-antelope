@@ -8,15 +8,7 @@ import type { ReviewRating } from "@antelope/core";
 import { saveReview } from "@/app/trainer/actions";
 import { track } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
-import {
-  DIFFICULTY,
-  DRILL_OPTIONS,
-  DRILL_SKILLS,
-  LESSON_OPTIONS,
-  RATINGS,
-  SCENARIO_OPTIONS,
-  skillName,
-} from "@/lib/trainer/content";
+import { DIFFICULTY, RATINGS, catalogFor, skillName } from "@/lib/trainer/content";
 import { AudioRecorder, Player, type Clip } from "./audio-recorder";
 import { Badge, buttonClass, focusRing } from "../ui";
 
@@ -53,6 +45,7 @@ export function FeedbackPanel({
   status: initialStatus,
   sessionSkill,
   scenarioId,
+  pathwayId,
   existing,
 }: {
   submissionId: string;
@@ -61,8 +54,11 @@ export function FeedbackPanel({
   status: "submitted" | "reviewed";
   sessionSkill: string;
   scenarioId: string | null;
+  /** The cohort's pathway: recommendations come from its setting and lessons. */
+  pathwayId: string;
   existing: ExistingReview | null;
 }) {
+  const catalog = useMemo(() => catalogFor(pathwayId), [pathwayId]);
   const router = useRouter();
   const reduce = useReducedMotion();
   const uid = useId();
@@ -112,24 +108,24 @@ export function FeedbackPanel({
 
   const recOptions = useMemo(() => {
     const skill = sessionSkill;
-    const drillsForSkill = DRILL_OPTIONS.filter((d) => d.skill === skill);
+    const drillsForSkill = catalog.drills.filter((d) => d.skill === skill);
     return { drillsForSkill, skill };
-  }, [sessionSkill]);
+  }, [sessionSkill, catalog]);
 
   const recDetail = useMemo(() => {
     const { kind, ref } = decodeRec(rec);
     if (!kind || !ref) return null;
     if (kind === "drill") {
-      const d = DRILL_OPTIONS.find((x) => x.id === ref);
+      const d = catalog.drills.find((x) => x.id === ref);
       return d ? { label: "Short practice", title: d.instruction, sub: `${skillName(d.skill)} · Level ${d.level} · “${d.prompt}”` } : null;
     }
     if (kind === "roleplay") {
-      const s = SCENARIO_OPTIONS.find((x) => x.id === ref);
+      const s = catalog.scenarios.find((x) => x.id === ref);
       return s ? { label: "AI role-play", title: s.title, sub: `${s.persona} · ${DIFFICULTY[s.difficulty]} · ${skillName(s.skill)}` } : null;
     }
-    const l = LESSON_OPTIONS.find((x) => x.id === ref);
+    const l = catalog.lessons.find((x) => x.id === ref);
     return l ? { label: "Lesson", title: l.title, sub: `Week ${l.week} · ${l.unitTitle}` } : null;
-  }, [rec]);
+  }, [rec, catalog]);
 
   const busy = phase !== "idle";
   const hasAudio = !!clip || (!!storedUrl && !removeStored);
@@ -365,16 +361,16 @@ export function FeedbackPanel({
                     </optgroup>
                   ) : null}
                   <optgroup label="AI role-plays">
-                    {SCENARIO_OPTIONS.map((s) => (
+                    {catalog.scenarios.map((s) => (
                       <option key={s.id} value={`roleplay:${s.id}`}>
                         {s.id === scenarioId ? "This scenario again: " : ""}
                         {s.title} ({DIFFICULTY[s.difficulty]})
                       </option>
                     ))}
                   </optgroup>
-                  {DRILL_SKILLS.filter((s) => s !== recOptions.skill).map((s) => (
+                  {catalog.drillSkills.filter((s) => s !== recOptions.skill).map((s) => (
                     <optgroup key={s} label={`${skillName(s)} drills`}>
-                      {DRILL_OPTIONS.filter((d) => d.skill === s).map((d) => (
+                      {catalog.drills.filter((d) => d.skill === s).map((d) => (
                         <option key={d.id} value={`drill:${d.id}`}>
                           L{d.level} · {d.instruction}
                         </option>
@@ -382,7 +378,7 @@ export function FeedbackPanel({
                     </optgroup>
                   ))}
                   <optgroup label="Lessons">
-                    {LESSON_OPTIONS.map((l) => (
+                    {catalog.lessons.map((l) => (
                       <option key={l.id} value={`learn:${l.id}`}>
                         Week {l.week} · {l.title}
                       </option>

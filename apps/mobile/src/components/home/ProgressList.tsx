@@ -40,7 +40,7 @@ function Row({ row: r, progress: p, index: i, last }: { row: ProgressRow; progre
   });
   const badgeStyle = useAnimatedStyle(() => (reduce ? { opacity: pop.value } : { transform: [{ scale: pop.value }] }));
 
-  const caption = locked ? 'Opens in week 7' : `Level ${p.level} · ${level.name}`;
+  const caption = locked ? (r.opensWeek ? `Opens in week ${r.opensWeek}` : 'Not on this track') : `Level ${p.level} · ${level.name}`;
   // what the pips are heading for; the last level has no next
   const next = !locked && !complete && p.level < 6 ? `Next: ${getSkillLevel((p.level + 1) as SkillLevelNumber).name}` : null;
 

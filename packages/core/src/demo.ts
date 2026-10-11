@@ -1,7 +1,11 @@
 // DRAFT — pending trainer review
-// Mock learner state for the demo user. All people are fictional.
+// Mock learner state for the demo user, plus a fresh state for real new
+// learners. All people are fictional.
 
-import type { ActivityKind, SkillId, SkillLevelNumber } from "./types";
+import { dailyDrillOrder, getDrill } from "./drills";
+import { getPathway } from "./pathway";
+import { SKILLS } from "./skills";
+import type { ActivityKind, PathwayId, SkillId, SkillLevelNumber } from "./types";
 
 export type UnitStatus = "complete" | "in-progress" | "locked";
 
@@ -53,11 +57,13 @@ export interface DemoLearnerState {
   skills: Record<SkillId, DemoSkillProgress>;
   streakDays: number;
   weeklyGoal: { target: number; done: number };
-  trainerAssignment: DemoTrainerAssignment;
+  /** null for a learner with no trainer assignment yet (see freshLearnerState). */
+  trainerAssignment: DemoTrainerAssignment | null;
   todaysPractice: DemoTodaysPractice;
 }
 
-export const DEMO_LEARNER: DemoLearnerState = {
+/** Amanda always has an assignment, so callers can read it without a null check. */
+export const DEMO_LEARNER: DemoLearnerState & { trainerAssignment: DemoTrainerAssignment } = {
   user: {
     id: "demo-amanda",
     firstName: "Amanda",
@@ -107,3 +113,48 @@ export const DEMO_LEARNER: DemoLearnerState = {
     why: "One short drill on meeting pushback without arguing. It sets you up for this week's role-play.",
   },
 };
+
+/**
+ * A brand-new learner on a pathway: week 1, no streak, no progress, a weekly
+ * goal of 0/3, no trainer assignment, and the pathway's first daily drill as
+ * today's practice. Skills in the first unit start in progress; the rest are
+ * locked. Pass `user` to fill in who they are.
+ */
+export function freshLearnerState(
+  pathwayId: PathwayId,
+  user: Partial<DemoLearnerState["user"]> = {},
+): DemoLearnerState {
+  const pathway = getPathway(pathwayId);
+  const firstUnit = pathway.units[0];
+  const skills = Object.fromEntries(
+    SKILLS.map((s) => [
+      s.id,
+      { level: 1, percent: 0, status: firstUnit.skills.includes(s.id) ? "in-progress" : "locked" } satisfies DemoSkillProgress,
+    ]),
+  ) as Record<SkillId, DemoSkillProgress>;
+
+  const firstDrillId = dailyDrillOrder(pathway.id)[0];
+  const firstDrill = getDrill(firstDrillId);
+  const activity = firstUnit.activities.find((a) => a.kind === "drill" && a.refIds?.includes(firstDrillId));
+
+  return {
+    user: { id: "", firstName: "", role: "", organization: "", ...user },
+    pathwayId: pathway.id,
+    currentWeek: firstUnit.week,
+    currentUnitId: firstUnit.id,
+    completedUnitIds: [],
+    currentUnitCompletedActivityIds: [],
+    skills,
+    streakDays: 0,
+    weeklyGoal: { target: 3, done: 0 },
+    trainerAssignment: null,
+    todaysPractice: {
+      kind: "drill",
+      refId: firstDrillId,
+      title: activity?.title ?? "Your first drill",
+      skill: firstDrill?.skill ?? "oars",
+      minutes: 2,
+      why: "One short drill to start. Spotting the core skills comes before using them.",
+    },
+  };
+}

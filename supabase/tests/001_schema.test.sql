@@ -105,14 +105,14 @@ select is(
 
 select is(
   (select count(*)::int from unnest(array[
-      'public.join_cohort(text)', 'public.claim_trainer(text)', 'public.create_cohort(text, date)',
+      'public.join_cohort(text)', 'public.claim_trainer(text)', 'public.create_cohort(text, date, text)',
       'public.rotate_join_code(uuid)', 'public.assignment_progress(uuid)', 'public.cohort_member_stats(uuid)'
     ]) f where has_function_privilege('anon', f, 'execute')),
   0, 'anon cannot execute any RPC');
 
 select is(
   (select count(*)::int from unnest(array[
-      'public.join_cohort(text)', 'public.claim_trainer(text)', 'public.create_cohort(text, date)',
+      'public.join_cohort(text)', 'public.claim_trainer(text)', 'public.create_cohort(text, date, text)',
       'public.rotate_join_code(uuid)', 'public.assignment_progress(uuid)', 'public.cohort_member_stats(uuid)'
     ]) f where has_function_privilege('authenticated', f, 'execute')),
   6, 'authenticated can execute every RPC');

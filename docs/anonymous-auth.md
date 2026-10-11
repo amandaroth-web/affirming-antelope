@@ -1,8 +1,8 @@
 # Anonymous auth and AI quotas
 
 Design note for phase 2 (mobile client). Phase 1, the database and API, has shipped on
-branch `anon-auth`: migrations `20261011130000_anonymous_users.sql`,
-`20261011130100_ai_quotas.sql` and `20261011130200_merge_anonymous_user.sql`, plus the
+branch `anon-auth`: migrations `20261012130000_anonymous_users.sql`,
+`20261012130100_ai_quotas.sql` and `20261012130200_merge_anonymous_user.sql`, plus the
 API changes in `apps/web/src/lib/ai/auth.ts` and `apps/web/src/app/api/account/merge-anonymous`.
 
 ## Why

@@ -10,12 +10,15 @@ export function AiFeedback({
   turns,
   exchanges,
   personaName,
+  counterpart,
   learnerFirst,
 }: {
   debrief: Debrief;
   turns: Turn[];
   exchanges: Exchange[];
   personaName: string;
+  /** "Patient" or "Employee". */
+  counterpart: string;
   learnerFirst: string;
 }) {
   const max = Math.max(1, ...TALLY_ROWS.map((r) => debrief.tallies[r.key] ?? 0));
@@ -40,7 +43,7 @@ export function AiFeedback({
       <Card className="p-6" aria-label="Conversation trajectory">
         <h3 className="font-display text-[17px] font-bold text-ink">How the conversation moved</h3>
         <div className="mt-2">
-          <TrajectoryChart exchanges={exchanges} personaName={personaName} />
+          <TrajectoryChart exchanges={exchanges} personaName={personaName} counterpart={counterpart} />
         </div>
       </Card>
 

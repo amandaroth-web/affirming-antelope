@@ -40,7 +40,8 @@ uses the same vocabulary. Snake_case, `object_verb` past tense.
 ## Person properties (signed-in only)
 
 `role`: `'learner' | 'trainer'`, `is_trainer`: boolean, `cohort_count`: number,
-`signed_up_at`: ISO date. Set on sign-in / when they change.
+`signed_up_at`: ISO date, `pathway_id`: `'mi-for-leaders' | 'mi-for-clinicians'` (the active
+track). Set on sign-in / when they change (`pathway_id` also when a track is picked).
 
 ## Website events
 
@@ -59,18 +60,19 @@ uses the same vocabulary. Snake_case, `object_verb` past tense.
 | `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`) |
 | `sign_in_completed` | `is_new_user`, `migrated_guest_data` (conversion: always the same uid; existing account: merge-anonymous moved rows) |
 | `signed_out` | — |
-| `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`) |
+| `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`), `pathway_id` |
 | `drill_answered` | `drill_id`, `skill`, `level`, `format` (`choice`, `text`), `hit_target` |
 | `drill_feedback_received` | `drill_id`, `latency_ms`, `move`, `hit_target` |
 | `roleplay_turn_sent` | `scenario_id`, `turn_index` |
 | `roleplay_ended` | `scenario_id`, `learner_turns`, `ended_early` |
 | `reflection_submitted` | `scenario_id`, `feeling` |
-| `debrief_viewed` | `scenario_id`, `latency_ms`, `suggested_next_step` |
+| `debrief_viewed` | `scenario_id`, `latency_ms`, `suggested_next_step`, `pathway_id` |
 | `next_step_chosen` | `from` (`drill`, `debrief`, `lesson`), `choice` (`try_again`, `same_skill`, `harder`, `new_scenario`, `one_more`, `done`) |
-| `practice_completed` | `kind`, `ref_id`, `skill?`, `minutes`, `activity_id?`, `in_course` |
+| `practice_completed` | `kind`, `ref_id`, `skill?`, `minutes`, `activity_id?`, `in_course`, `pathway_id` |
 | `streak_extended` | `streak_days` |
 | `weekly_goal_hit` | `target` |
 | `cohort_joined` | `cohort_id` |
+| `pathway_chosen` | `pathway_id` (`mi-for-leaders`, `mi-for-clinicians`), `source` (`onboarding`, `me`, `cohort`) |
 | `submission_created` | `kind`, `ref_id` |
 | `submission_withdrawn` | — |
 | `review_viewed` | `rating?`, `has_audio`, `try_again` |

@@ -92,9 +92,8 @@ export default function SignIn() {
       router.replace('/join');
       return;
     }
+    // first launch: the welcome moves on to the track step once the sheet is down (flowEvents)
     close();
-    // first launch: once the sheet is down, the welcome hands over to Home
-    if (reason === 'welcome') setTimeout(() => useAccount.getState().set({ onboarded: true }), 360);
   };
 
   const submitEmail = async () => {

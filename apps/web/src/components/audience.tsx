@@ -1,18 +1,19 @@
 import { ArrowRight, ChalkboardTeacher, Stethoscope, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
+import { MI_FOR_CLINICIANS, MI_FOR_LEADERS } from "@antelope/core";
 import { Reveal } from "./reveal";
 
 const people = [
   {
     href: "/for/clinicians",
     who: "Clinicians",
-    line: "Physicians, nurses, therapists, and coaches. Keep the MI you trained in from fading between workshops.",
+    line: `MI for Clinicians: patient drills and role-plays for physicians, nurses, therapists, and coaches. An ${MI_FOR_CLINICIANS.units.length}-week track that fits a clinic day.`,
     icon: Stethoscope,
   },
   {
     href: "/for/leaders",
     who: "Healthcare leaders",
-    line: "Managers and supervisors. Rehearse the performance conversation before you have it for real.",
+    line: `MI for Leaders: managers and supervisors rehearse the performance conversation before they have it for real. A ${MI_FOR_LEADERS.units.length}-week track.`,
     icon: UsersThree,
   },
   {

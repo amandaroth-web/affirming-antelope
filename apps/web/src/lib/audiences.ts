@@ -1,4 +1,13 @@
-import { DRILLS, MI_FOR_LEADERS, SCENARIOS } from "@antelope/core";
+import {
+  DRILLS,
+  MI_FOR_CLINICIANS,
+  MI_FOR_LEADERS,
+  SCENARIOS,
+  drillsForSetting,
+  scenariosForSetting,
+  type Pathway,
+  type Setting,
+} from "@antelope/core";
 import type { Audience } from "@/lib/site";
 
 export type AudienceIcon =
@@ -25,6 +34,12 @@ export type AudiencePage = {
   lede: string;
   /** Hero showcase card. */
   showcase: "drill" | "pathway" | "cohort";
+  /** Which role-plays to list; omitted shows every setting. */
+  setting?: Setting;
+  /** A pathway to feature in its own section below the features (clinicians). */
+  pathway?: Pathway;
+  /** Copy for the pathway section. */
+  pathwaySection?: { heading: string; body: string };
   pains: { title: string; body: string }[];
   painsHeading: string;
   steps: { title: string; body: string }[];
@@ -40,31 +55,43 @@ export type AudiencePage = {
 
 const drillCount = DRILLS.length;
 const scenarioCount = SCENARIOS.length;
-const weeks = MI_FOR_LEADERS.units.length;
-const weekMinutes = MI_FOR_LEADERS.units.map((u) =>
-  u.activities.reduce((sum, a) => sum + a.minutes, 0),
-);
-const minWeek = Math.min(...weekMinutes);
-const maxWeek = Math.max(...weekMinutes);
+const clinicalDrills = drillsForSetting("clinical").length;
+const clinicalScenarios = scenariosForSetting("clinical").length;
+const workplaceDrills = drillsForSetting("workplace").length;
+const workplaceScenarios = scenariosForSetting("workplace").length;
+
+/** Weeks and the shortest and longest week in minutes, for one pathway. */
+function pathwayStats(pathway: Pathway) {
+  const minutes = pathway.units.map((u) => u.activities.reduce((sum, a) => sum + a.minutes, 0));
+  return { weeks: pathway.units.length, min: Math.min(...minutes), max: Math.max(...minutes) };
+}
+const leaders = pathwayStats(MI_FOR_LEADERS);
+const clinicians = pathwayStats(MI_FOR_CLINICIANS);
 
 export const AUDIENCES: Record<Audience, AudiencePage> = {
   clinicians: {
     slug: "clinicians",
     name: "Clinicians",
     metaTitle: "Motivational interviewing practice for clinicians",
-    metaDescription:
-      "Free MI practice for physicians, nurses, therapists, and coaches. Five-minute OARS drills and AI role-plays that keep your reflections sharp between trainings.",
+    metaDescription: `Free MI practice for physicians, nurses, therapists, and health coaches. Five-minute drills and AI role-plays with realistic patients, plus the ${clinicians.weeks}-week MI for Clinicians pathway.`,
     keywords: [
       "motivational interviewing practice for clinicians",
       "motivational interviewing for nurses",
       "motivational interviewing for physicians",
+      "motivational interviewing patient role play",
       "OARS practice",
       "reflective listening practice",
     ],
     eyebrow: "For physicians, nurses, therapists, and coaches",
     h1: "Keep your MI sharp between trainings.",
-    lede: "You learned OARS in a workshop. Then the clinic got busy and the closed questions crept back. Five minutes of practice a day keeps the skill where you can reach it.",
+    lede: "You learned OARS in a workshop. Then the clinic got busy and the closed questions crept back. Practice with patients who have their own reasons, five minutes at a time.",
     showcase: "drill",
+    setting: "clinical",
+    pathway: MI_FOR_CLINICIANS,
+    pathwaySection: {
+      heading: `${clinicians.weeks} weeks that fit a clinic day`,
+      body: `${MI_FOR_CLINICIANS.tagline} Lessons, drills, and a role-play most weeks, in order. A week takes ${clinicians.min} to ${clinicians.max} minutes in total.`,
+    },
     painsHeading: "The workshop was good. Then Monday happened.",
     pains: [
       {
@@ -73,39 +100,39 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       },
       {
         title: "Nobody hears you do it",
-        body: "Getting a real session coded takes a recording and a trained coder. Most people never get feedback at all.",
+        body: "Getting a real visit coded takes a recording and a trained coder. Most people never get feedback at all.",
       },
       {
-        title: "Advice comes out first",
-        body: "You know the righting reflex. Under time pressure it still wins, because it's the habit you've rehearsed most.",
+        title: "The fix comes out first",
+        body: "You know the righting reflex. With fifteen minutes and a full list, it still wins, because it's the habit you've rehearsed most.",
       },
     ],
     stepsHeading: "Practice, notice, use it.",
     steps: [
       {
         title: "One short drill",
-        body: "Read what they said, then answer with the move the drill asks for: an open question, a complex reflection, an affirmation.",
+        body: "Read what the patient said, then answer with the move the drill asks for: an open question, a complex reflection, an affirmation.",
       },
       {
         title: "See what you did",
         body: "Feedback names the move you actually made and whether it hit the target, with an example of one that does.",
       },
       {
-        title: "Have the whole conversation",
-        body: "When you're ready, run a role-play with someone who has their own reasons for staying stuck, then read the debrief.",
+        title: "Have the whole visit",
+        body: "When you're ready, run a role-play with a patient who has their own reasons for staying stuck, then read the debrief.",
       },
     ],
     featuresHeading: "What you'll practice",
     features: [
       {
         icon: "target",
-        title: `${drillCount} drills across the MI skills`,
-        body: "OARS, engaging, focusing, evoking, change talk, sustain talk, discord, and planning. Each one takes a few minutes.",
+        title: `${clinicalDrills} patient drills`,
+        body: "Medication, smoking, drinking, diabetes, and sleep, across OARS, engaging, focusing, evoking, change talk, sustain talk, discord, and planning.",
       },
       {
         icon: "chat",
-        title: `${scenarioCount} live role-plays`,
-        body: "Each person has a backstory you don't see. Reflect well and they open up. Argue, and they dig in, like people do.",
+        title: `${clinicalScenarios} patient role-plays`,
+        body: "Each patient has a backstory you don't see. Reflect well and they open up. Correct them, and they dig in, like people do.",
       },
       {
         icon: "chart",
@@ -121,11 +148,15 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     faq: [
       {
         q: "Are the role-plays patient conversations?",
-        a: "Not yet. Today's role-plays are workplace conversations in healthcare settings, with people like a medical assistant, a charge nurse, and a practice manager. OARS, reflections, and responding to sustain talk work the same way in a patient visit, and the drills practice exactly those moves.",
+        a: `Yes. The MI for Clinicians track has ${clinicalScenarios} role-plays set in visits: a new patient with a list of concerns, a man who stopped his blood pressure medication, a lawyer whose screening form flagged her drinking, a rising A1c, and a smoker who has heard it all. You play the clinician.`,
+      },
+      {
+        q: "Does it give medical advice?",
+        a: "No. It coaches the conversation, not the medicine. Feedback is about how you asked, reflected, and shared information, not whether a dose or guideline was right.",
       },
       {
         q: "Is it really free?",
-        a: "Yes. The drills, the role-plays, and the 12-week pathway are free, and you don't need a card. You can start as a guest without an account.",
+        a: `Yes. The drills, the role-plays, and the ${clinicians.weeks}-week MI for Clinicians pathway are free, and you don't need a card. You can start as a guest without an account.`,
       },
       {
         q: "Does it count toward CE or CME credit?",
@@ -133,7 +164,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       },
       {
         q: "Should I type in real patient details?",
-        a: "No. Every scenario is fictional, and your replies are processed by an AI model to play the other person and write feedback. Keep real patient and colleague information out of it.",
+        a: "No. Every scenario is fictional, and your replies are processed by an AI model to play the patient and write feedback. Keep real patient and colleague information out of it.",
       },
       {
         q: "Is there a phone app?",
@@ -150,7 +181,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     name: "Healthcare leaders",
     metaTitle: "Motivational interviewing for healthcare leaders",
     metaDescription:
-      "Practice MI for performance conversations with AI role-plays of realistic employees. A free 12-week MI for Leaders pathway for healthcare managers and supervisors.",
+      `Practice MI for performance conversations with AI role-plays of realistic employees. A free ${leaders.weeks}-week MI for Leaders pathway for healthcare managers and supervisors.`,
     keywords: [
       "motivational interviewing for leaders",
       "motivational interviewing for managers",
@@ -161,6 +192,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     h1: "Rehearse the hard conversation before you have it.",
     lede: "Late reports, a quiet team member, a change nobody asked for. Practice with an AI employee who has their own reasons, so the real conversation isn't your first try.",
     showcase: "pathway",
+    setting: "workplace",
     painsHeading: "You can't practice on your team.",
     pains: [
       {
@@ -196,12 +228,12 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       {
         icon: "chat",
         title: "Realistic employees",
-        body: `${scenarioCount} role-plays drawn from healthcare work: missed deadlines, a reliable MA gone quiet, a new process nobody wanted, a charge nurse who found out by memo.`,
+        body: `${workplaceScenarios} role-plays drawn from healthcare work: missed deadlines, a reliable MA gone quiet, a new process nobody wanted, a charge nurse who found out by memo.`,
       },
       {
         icon: "path",
-        title: `The ${weeks}-week MI for Leaders pathway`,
-        body: `Short lessons, drills, and role-plays in order, from foundations to advanced practice. Most weeks take ${minWeek} to ${maxWeek} minutes in total.`,
+        title: `The ${leaders.weeks}-week MI for Leaders pathway`,
+        body: `Short lessons, drills, and role-plays in order, from foundations to advanced practice. Most weeks take ${leaders.min} to ${leaders.max} minutes in total.`,
       },
       {
         icon: "users",
@@ -217,15 +249,15 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     faq: [
       {
         q: "Isn't motivational interviewing for patients?",
-        a: "It started in addiction treatment and is used widely in healthcare. The same skills help any time you need someone to change and can't make them: open questions, reflections, and drawing out their own reasons.",
+        a: "It started in addiction treatment and is used widely in healthcare. The same skills help any time you need someone to change and can't make them: open questions, reflections, and drawing out their own reasons. If you want to practice patient visits, the MI for Clinicians track has its own drills and role-plays.",
       },
       {
-        q: "What's in the 12-week pathway?",
+        q: `What's in the ${leaders.weeks}-week pathway?`,
         a: "Foundations, the spirit of MI, engaging, focusing, evoking, planning, integration, self-coding, leadership and MI, and two weeks of advanced practice. Each week mixes short lessons and drills, with a role-play every week from week three on.",
       },
       {
         q: "How much time does it take?",
-        a: `Each activity takes three to ten minutes. A pathway week is ${minWeek} to ${maxWeek} minutes in total, and you can split it across days.`,
+        a: `Each activity takes three to ten minutes. A pathway week is ${leaders.min} to ${leaders.max} minutes in total, and you can split it across days.`,
       },
       {
         q: "Can my managers practice together?",
@@ -276,7 +308,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     steps: [
       {
         title: "Create a cohort",
-        body: "Get a join code. Learners enter it in the app and show up on your participants list.",
+        body: "Choose MI for Clinicians or MI for Leaders and get a join code. Learners enter it in the app and show up on your participants list.",
       },
       {
         title: "Assign practice",
@@ -297,7 +329,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       {
         icon: "assign",
         title: "Assignments from the library",
-        body: `${drillCount} drills, ${scenarioCount} role-plays, and the ${weeks}-week pathway's lessons. Learners see your instructions and due date in the app.`,
+        body: `${drillCount} drills, ${scenarioCount} role-plays, and the lessons from both pathways. A cohort draws on its own pathway's content: patient conversations for clinicians, workplace ones for leaders. Learners see your instructions and due date in the app.`,
       },
       {
         icon: "review",
@@ -325,7 +357,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       },
       {
         q: "Can I write my own scenarios?",
-        a: "Not yet. Assignments come from the built-in library of drills, role-plays, and pathway lessons. Every scenario is fictional.",
+        a: "Not yet. Assignments come from the built-in library of drills, role-plays, and pathway lessons, filtered to your cohort's pathway. Every scenario is fictional.",
       },
       {
         q: "What does it cost?",

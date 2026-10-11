@@ -13,12 +13,12 @@ import { Dock, KeyboardColumn, SessionHeader, sessionStyles } from '@/components
 import { HeroTarget, SessionSurface, useSession, useSessionClose } from '@/components/practice-loop/SessionSurface';
 import { CoachSays, InstructionChip, LearnerBubble, SpeechCard, useComposerLaunch } from '@/components/practice-loop/Speech';
 import { Shimmer } from '@/components/practice-loop/Thinking';
-import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, WifiSlashIcon, color, haptic, layout, radius, space } from '@/design';
+import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, WifiSlashIcon, color, drillSpeakerAvatar, haptic, layout, radius, space } from '@/design';
 import { nextDrillId } from '@/data/routes';
 import { postJson } from '@/lib/api';
 import { practiceSource, track } from '@/lib/analytics';
 import { Enter, Expand, FADE_MS, RollingNumber, spring, useFades, useForwardSwap, useReduceMotion } from '@/motion';
-import { today, useLearner } from '@/state/store';
+import { activePathwayId, today, useLearner } from '@/state/store';
 
 /**
  * The daily habit loop. One drill at a time; "One more?" chains through the
@@ -57,7 +57,7 @@ function DrillSession() {
 
   useEffect(() => {
     const d = getDrill(id);
-    track('practice_started', { kind: 'drill', ref_id: id, ...(d ? { skill: d.skill, level: d.level } : {}), source: practiceSource(source) });
+    track('practice_started', { kind: 'drill', ref_id: id, ...(d ? { skill: d.skill, level: d.level } : {}), source: practiceSource(source), pathway_id: activePathwayId() });
     // once per screen: "One more" reports its own start below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -88,7 +88,7 @@ function DrillSession() {
     const next = nextDrillId(drillId, done, activityId);
     track('next_step_chosen', { from: 'drill', choice: 'one_more' });
     const d = getDrill(next);
-    track('practice_started', { kind: 'drill', ref_id: next, ...(d ? { skill: d.skill, level: d.level } : {}), source: 'next_step' });
+    track('practice_started', { kind: 'drill', ref_id: next, ...(d ? { skill: d.skill, level: d.level } : {}), source: 'next_step', pathway_id: activePathwayId() });
     setReps((n) => n + 1);
     setComplete(false);
     setDrillId(next);
@@ -303,7 +303,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
           </Enter>
 
           <View style={styles.block}>
-            <SpeechCard context={drill.context} speaker={drill.speaker} seed={`${drill.id}:${drill.speaker}`} line={drill.prompt} />
+            <SpeechCard context={drill.context} speaker={drill.speaker} avatar={drillSpeakerAvatar(drill)} line={drill.prompt} />
           </View>
 
           <Enter delay={560} style={styles.block}>

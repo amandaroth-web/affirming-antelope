@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const turns = parseTurns(obj.turns, { lastMustBeLearner: true });
     const quota = await chargeQuota(caller, "turn");
 
-    if (mode === "mock") return streamResponse(req, mockStream(mockEmployeeReply(turns), req.signal), quota);
+    if (mode === "mock") return streamResponse(req, mockStream(mockEmployeeReply(turns, spec.setting), req.signal), quota);
     return streamResponse(req, await streamEmployeeReply(spec, turns, req.signal), quota);
   } catch (err) {
     return errorResponse(req, err);

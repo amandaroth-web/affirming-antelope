@@ -1,3 +1,4 @@
+import { getScenario } from '@antelope/core';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -24,6 +25,7 @@ import {
   haptic,
   space,
 } from '@/design';
+import { callName } from '@/components/practice-loop/names';
 import { openPractice, practiceKindLabel, practiceMinutes, practiceTitle, sessionLabel, shortDate } from '@/data/practice';
 import { track } from '@/lib/analytics';
 import { Enter, FADE_MS, STAGGER, spring, useReduceMotion } from '@/motion';
@@ -129,6 +131,15 @@ function primaryAction(review: Review, sub: Submission | undefined): { label: st
   return null;
 }
 
+/**
+ * "role-play with Darnell" / "role-play with Ms. Alvarez": what a trainer's note is about,
+ * named by the person in it (their scenario id means nothing to the learner).
+ */
+function sessionWhat(sub: Submission): string {
+  const scenario = sub.kind === 'roleplay' ? getScenario(sub.refId) : undefined;
+  return scenario ? `role-play with ${callName(scenario.persona.name)}` : sessionLabel(sub.kind, sub.refId);
+}
+
 function Feedback({ review, sub }: { review: Review; sub: Submission }) {
   const first = firstNameOf(review.trainerName) ?? 'Your trainer';
   const [audio, setAudio] = useState<{ url: string | null; error: boolean }>({
@@ -157,7 +168,7 @@ function Feedback({ review, sub }: { review: Review; sub: Submission }) {
             {review.trainerName}
           </Text>
           <Text variant="caption" color={color.muted}>
-            On your {sessionLabel(sub.kind, sub.refId)}: {practiceTitle(sub.kind, sub.refId)} · {shortDate(review.createdAt)}
+            On your {sessionWhat(sub)}: {practiceTitle(sub.kind, sub.refId)} · {shortDate(review.createdAt)}
           </Text>
         </View>
       </Enter>
@@ -214,7 +225,7 @@ function Feedback({ review, sub }: { review: Review; sub: Submission }) {
           {recommended ? (
             <Button
               variant="secondary"
-              label={`Try ${sub.refId} again`}
+              label="Try this one again"
               fullWidth
               icon={<ArrowCounterClockwiseIcon size={20} weight="bold" color={color.primary} />}
               iconPosition="leading"

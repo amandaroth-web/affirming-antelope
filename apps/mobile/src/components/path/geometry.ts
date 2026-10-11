@@ -12,6 +12,10 @@ export interface Pt {
 export interface TrailLayout {
   width: number;
   height: number;
+  /** Vertical spacing between weeks. */
+  step: number;
+  /** Serpentine half-width. */
+  amp: number;
   nodes: Pt[];
   /** SVG path data for the whole trail, lead-in to finish. */
   d: string;
@@ -26,18 +30,51 @@ export interface TrailLayout {
   finish: Pt;
 }
 
-export const STEP = 172;
 export const NODE = 72;
 
+/** Node spacing for the 12-week course; shorter courses breathe a little more. */
+export const STEP = 172;
+/** Gap from the last node down to the finish flag, beyond one step. */
+const FINISH_RUN = 18;
+/** Ground left below the finish flag: its caption, then the destination meadow. */
+export const FINISH_TAIL = 200;
+
+/**
+ * Spacing for a course of `count` weeks. The 12-week course keeps 172pt; an
+ * 8-week one opens up to 184pt so it reads as a journey rather than a short
+ * list, without leaving empty ground between labels (cap 190).
+ */
+export function trailStep(count: number): number {
+  return Math.min(190, STEP + Math.max(0, 12 - count) * 3);
+}
+
+/**
+ * Nodes sit on a sine serpentine. The swing rate is tuned per course so the
+ * last week always lands at a full swing (|sin| = 1) and the trail makes one
+ * confident sweep into the centred finish, whatever the length: the nearest
+ * odd quarter-turn to ~0.95 rad per week (12 weeks → 0.99, 8 weeks → 1.10).
+ */
+function swing(count: number, phase0: number): number {
+  if (count < 2) return 0;
+  const natural = phase0 + (count - 1) * 0.95;
+  const k = Math.max(1, Math.round(natural / Math.PI - 0.5));
+  return ((k + 0.5) * Math.PI - phase0) / (count - 1);
+}
+
 export function layoutTrail(width: number, count: number, top: number): TrailLayout {
-  const amp = Math.min(width * 0.27, 120);
+  const step = trailStep(count);
+  // a shorter course swings a touch wider (8 weeks: +4%), still leaving label room on narrow phones
+  const extra = Math.max(0, 12 - count);
+  const amp = Math.min(width * (0.27 + extra * 0.0025), 120 + extra * 1.5);
   const cx = width / 2;
+  const phase0 = 0.15;
+  const w = swing(count, phase0);
   const nodes: Pt[] = Array.from({ length: count }, (_, i) => ({
-    x: cx + amp * Math.sin(i * 0.95 + 0.15),
-    y: top + i * STEP,
+    x: cx + amp * Math.sin(phase0 + i * w),
+    y: top + i * step,
   }));
   const start = { x: nodes[0].x - amp * 0.35, y: top - 120 };
-  const finish = { x: cx, y: nodes[count - 1].y + STEP + 10 };
+  const finish = { x: cx, y: nodes[count - 1].y + step + FINISH_RUN };
   const pts = [start, ...nodes, finish];
 
   // Catmull-Rom to cubic Bezier
@@ -85,7 +122,7 @@ export function layoutTrail(width: number, count: number, top: number): TrailLay
     if (si < count) nodeLen.push(length); // end of segment si is node si
   });
 
-  return { width, height: finish.y + 220, nodes, d, length, nodeLen, ys, lens, start, finish };
+  return { width, height: finish.y + FINISH_TAIL, step, amp, nodes, d, length, nodeLen, ys, lens, start, finish };
 }
 
 /** Landscape bands: wavy ridgelines down the canvas. */
@@ -93,10 +130,38 @@ export interface Band {
   y: number;
   d: string;
   fill: string;
+  /** Scenery standing on (or floating above) this ridge, in band space (crest line at y = 0). */
+  props: Prop[];
+  /** The last ridge: the meadow the finish flag stands in. */
+  destination: boolean;
 }
 
-/** Band spacing, pt. Each band is 2.4 gaps tall, so every point is covered by two or three bands. */
+/**
+ * Scenery motif per track. Leaders cross a savanna (acacias, sand); clinicians
+ * follow a wetland (reeds, still pools, pale sage) — a watering hole being
+ * where a herd goes to recover. Both end in the same warm meadow at the finish.
+ */
+export type Motif = 'savanna' | 'wetland';
+
+export type PropKind = 'acacia' | 'reeds' | 'pool' | 'birds' | 'tuft';
+export interface Prop {
+  kind: PropKind;
+  x: number;
+  y: number;
+  s: number;
+  flip?: boolean;
+}
+
+/** Nominal band spacing, pt. Each band runs BAND_DEPTH below its crest, so every point is covered by two or three bands. */
 export const BAND_GAP = 300;
+/** Bands stretch to fit the course: spacing stays within this range. */
+const GAP_MIN = 240;
+const GAP_MAX = 360;
+export const BAND_DEPTH = BAND_GAP * 2.4;
+/** First ridge crest, pt from the top of the canvas (just under the sun). */
+const FIRST_RIDGE = 210;
+/** The destination ridge crests this far above the finish flag, so the flag stands in its meadow. */
+const DEST_ABOVE = 64;
 /** How far (pt) a ridge lags behind the trail by the time it reaches the top of the viewport. */
 export const PARALLAX_DEPTH = 44;
 /** Sun and birds in the sky: the farthest layer. Fraction of scroll they lag by. */
@@ -111,9 +176,10 @@ export const SKY_LAG = 0.35;
  * The lag is quadratic in screen position p (0 top, 1 bottom), so its rate
  * (≈ 2·D·(1.2 − p) / (1.44·H)) eases from ~1.5% of scroll at the bottom edge to
  * ~9% at the top: distant hills slow down, nearby ones keep pace, nothing sways.
+ * Being screen-relative, it feels the same on an 8-week and a 12-week trail.
  *
  * No gaps: lag is capped at 2.25·D ≈ 99pt and neighbouring ridges differ by
- * < 0.85·D ≈ 37pt, far less than the 300pt gap minus the 80pt hill swing, and
+ * < 0.85·D ≈ 37pt, far less than the ≥ 240pt gap minus the 80pt hill swing, and
  * every band runs 720pt below its crest, so a band never uncovers a hole.
  */
 export function ridgeLag(bandY: number, scrollY: number, viewportH: number): number {
@@ -123,15 +189,37 @@ export function ridgeLag(bandY: number, scrollY: number, viewportH: number): num
   return PARALLAX_DEPTH * q * q;
 }
 
-export function layoutBands(width: number, height: number, palette: string[]): Band[] {
+/** Ridge fills per motif: a pale horizon, alternating cool and earth tints, and the warm meadow at the finish. */
+export interface BandPalette {
+  horizon: string;
+  cool: string[];
+  earth: string[];
+  meadow: string;
+}
+
+/**
+ * Ridgelines from the horizon down to the finish. The spacing stretches (240 to
+ * 360pt) so that, on any course length, a whole number of ridges fits and the
+ * last one crests just above the finish flag: the trail always ends in a
+ * meadow rather than mid-hill. Fills are laid out from the finish back so the
+ * ridge before the meadow is always cool (a clear edge against the warm
+ * meadow) and the first ridge is always the pale horizon.
+ */
+export function layoutBands(width: number, finishY: number, palette: BandPalette, motif: Motif): Band[] {
+  const destY = finishY - DEST_ABOVE;
+  const span = Math.max(1, destY - FIRST_RIDGE);
+  let n = Math.max(1, Math.round(span / BAND_GAP));
+  while (n > 1 && span / n < GAP_MIN) n--;
+  while (span / n > GAP_MAX) n++;
+  const gap = span / n;
+
   const bands: Band[] = [];
-  const gap = BAND_GAP;
-  let i = 0;
-  for (let y = 210; y < height; y += gap, i++) {
-    const h = gap * 2.4;
+  for (let i = 0; i <= n; i++) {
+    const y = FIRST_RIDGE + i * gap;
+    const destination = i === n;
     const phase = (i * 1.7) % 3;
     const hill = (x: number) => 26 * Math.sin((x / width) * Math.PI * 1.6 + phase) + 14 * Math.sin((x / width) * Math.PI * 3.3 + phase * 2);
-    let d = `M0 ${(hill(0)).toFixed(1)}`;
+    let d = `M0 ${hill(0).toFixed(1)}`;
     const steps = 12;
     for (let k = 1; k <= steps; k++) {
       const x0 = ((k - 1) / steps) * width;
@@ -139,8 +227,56 @@ export function layoutBands(width: number, height: number, palette: string[]): B
       const xm = (x0 + x1) / 2;
       d += ` Q${xm.toFixed(1)} ${hill(xm).toFixed(1)} ${x1.toFixed(1)} ${hill(x1).toFixed(1)}`;
     }
-    d += ` L${width} ${h} L0 ${h} Z`;
-    bands.push({ y, d, fill: palette[i % palette.length] });
+    d += ` L${width} ${BAND_DEPTH} L0 ${BAND_DEPTH} Z`;
+
+    // fills: horizon first, meadow last, cool/earth alternating back from the meadow
+    const fromEnd = n - i; // 1 = the ridge before the meadow
+    const fill = destination
+      ? palette.meadow
+      : i === 0
+        ? palette.horizon
+        : fromEnd % 2 === 1
+          ? palette.cool[((fromEnd - 1) / 2) % palette.cool.length]
+          : palette.earth[(fromEnd / 2 - 1) % palette.earth.length];
+
+    const on = (fx: number, kind: PropKind, s: number, dy = 0, flip?: boolean): Prop => {
+      const x = fx * width;
+      return { kind, x, y: hill(x) + dy, s, flip };
+    };
+    const props: Prop[] = [];
+    if (destination) props.push(...destinationProps(motif, on));
+    else if (i > 0) props.push(...ridgeProps(motif, i, width, on));
+    bands.push({ y, d, fill, props, destination });
   }
   return bands;
+}
+
+type Place = (fx: number, kind: PropKind, s: number, dy?: number, flip?: boolean) => Prop;
+
+/** Scenery along the way: at the edges, clear of the trail, one or two things per ridge at most. */
+function ridgeProps(motif: Motif, i: number, width: number, on: Place): Prop[] {
+  const out: Prop[] = [];
+  if (motif === 'savanna') {
+    if (i % 3 === 1) out.push(on(0.07, 'acacia', 0.75, -2));
+    if (i % 4 === 2) out.push(on(0.94, 'acacia', 0.65, -2));
+  } else {
+    if (i % 3 === 1) out.push(on(0.06, 'reeds', 0.8, 1));
+    if (i % 4 === 2) {
+      out.push(on(0.9, 'pool', 0.85, 34));
+      out.push(on(0.97, 'reeds', 0.6, 1, true));
+    }
+    if (i % 4 === 0) out.push(on(0.95, 'reeds', 0.55, 1, true));
+  }
+  if (i % 5 === 3) out.push({ kind: 'birds', x: 0.62 * width, y: -70, s: 1 });
+  return out;
+}
+
+/** The finish: a gateway either side of the flag (the coach waits on its left). */
+function destinationProps(motif: Motif, on: Place): Prop[] {
+  // grass tufts in the meadow itself, below the flag's caption, so the trail's end has ground under it
+  const tufts = [on(0.2, 'tuft', 1, 150), on(0.34, 'tuft', 0.8, 196), on(0.7, 'tuft', 0.9, 168), on(0.86, 'tuft', 0.75, 214)];
+  if (motif === 'savanna') {
+    return [on(0.1, 'acacia', 0.7, -2), on(0.86, 'acacia', 1, -2), on(0.95, 'acacia', 0.6, 0), ...tufts];
+  }
+  return [on(0.08, 'reeds', 0.75, 1), on(0.8, 'pool', 1.15, 40), on(0.93, 'reeds', 0.9, 1, true), on(0.68, 'reeds', 0.5, 44), ...tufts];
 }

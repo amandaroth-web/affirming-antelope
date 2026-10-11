@@ -1,6 +1,7 @@
-import type { DemoSkillProgress, Json, SkillId } from '@antelope/core';
+import type { Json, PathwayId, SkillId } from '@antelope/core';
 import { errorCode, supabase } from '@/lib/supabase';
 import { useAccount } from '@/state/account';
+import { fillSkills, mergeProgress, skillRank, toRemoteDoc, upgradeDoc } from '@/state/learnerDoc';
 import { SYNCED_KEYS, syncedState, useLearner, type SyncedState } from '@/state/store';
 
 /**
@@ -34,9 +35,9 @@ export async function fetchState(userId: string): Promise<Row | null> {
 // ---------------------------------------------------------------------------
 // Merge. Every rule is monotonic (progress only moves forward), so merging is
 // order-independent: merge(a, b) == merge(b, a) for the fields that matter.
+// Documents are upgraded on read (`upgradeDoc`): v2 (one pathway at the top level)
+// becomes v3 (progress per pathway), and an untouched v2 demo seed becomes fresh.
 // ---------------------------------------------------------------------------
-
-const rank = (p: DemoSkillProgress) => (p.status === 'locked' ? -1 : p.level * 1000 + p.percent);
 
 function mergeSkills(a: SyncedState['skills'], b: Partial<SyncedState['skills']> | undefined): SyncedState['skills'] {
   if (!b) return a;
@@ -45,7 +46,7 @@ function mergeSkills(a: SyncedState['skills'], b: Partial<SyncedState['skills']>
     const theirs = b[k];
     if (!theirs) continue;
     const mine = out[k];
-    out[k] = !mine || rank(theirs) > rank(mine) ? theirs : mine;
+    out[k] = !mine || skillRank(theirs) > skillRank(mine) ? theirs : mine;
   }
   return out;
 }
@@ -58,13 +59,27 @@ function mergeStreak(a: SyncedState['streak'], b: SyncedState['streak'] | undefi
   return da > db ? a : b;
 }
 
+function mergeAllProgress(a: SyncedState['progress'], b: SyncedState['progress']): SyncedState['progress'] {
+  const out: SyncedState['progress'] = {};
+  for (const id of new Set([...Object.keys(a), ...Object.keys(b)]) as Set<PathwayId>) out[id] = mergeProgress(a[id], b[id]);
+  return out;
+}
+
+/** The track picked most recently wins (a pick beats no pick); ties go to the account's copy. */
+function laterChoice(local: SyncedState, remote: SyncedState): Pick<SyncedState, 'activePathwayId' | 'pathwayChosenAt'> {
+  const l = local.pathwayChosenAt ?? '';
+  const r = remote.pathwayChosenAt ?? '';
+  const pick = l > r ? local : remote;
+  return { activePathwayId: pick.activePathwayId, pathwayChosenAt: pick.pathwayChosenAt };
+}
+
 /** Fill gaps in a server document (older app versions, the seed) from local defaults. */
 export function normalizeSynced(remote: unknown, fallback: SyncedState): SyncedState {
-  const r = (remote && typeof remote === 'object' ? remote : {}) as Partial<SyncedState>;
+  const r = upgradeDoc(remote);
   const out = { ...fallback } as Record<string, unknown>;
-  for (const k of SYNCED_KEYS) if (r[k] !== undefined && r[k] !== null) out[k] = r[k];
+  for (const k of SYNCED_KEYS) if (r[k] !== undefined) out[k] = r[k];
   const s = out as SyncedState;
-  s.skills = { ...fallback.skills, ...(r.skills ?? {}) };
+  s.skills = fillSkills(fallback.skills, r.skills);
   return s;
 }
 
@@ -75,9 +90,8 @@ export function mergeSynced(local: SyncedState, remoteRaw: unknown): SyncedState
     // identity: the account's copy wins (it's what the learner set up)
     firstName: remote.firstName || local.firstName,
     role: remote.role || local.role,
-    pathwayId: remote.pathwayId || local.pathwayId,
-    currentWeek: Math.max(local.currentWeek, remote.currentWeek),
-    completedActivityIds: Array.from(new Set([...remote.completedActivityIds, ...local.completedActivityIds])),
+    ...laterChoice(local, remote),
+    progress: mergeAllProgress(local.progress, remote.progress),
     skills: mergeSkills(local.skills, remote.skills),
     streak: mergeStreak(local.streak, remote.streak),
     weekDays,
@@ -87,7 +101,6 @@ export function mergeSynced(local: SyncedState, remoteRaw: unknown): SyncedState
       hitCount: Math.max(local.weeklyGoal.hitCount, remote.weeklyGoal.hitCount),
     },
     scenariosCompleted: Math.max(local.scenariosCompleted, remote.scenariosCompleted),
-    pathSeenWeek: Math.max(local.pathSeenWeek, remote.pathSeenWeek),
   };
 }
 
@@ -110,7 +123,7 @@ export async function pushState(userId: string): Promise<void> {
       .upsert(
         {
           user_id: userId,
-          state: state as unknown as NonNullable<Json>,
+          state: toRemoteDoc(state) as unknown as NonNullable<Json>,
           version,
         },
         { onConflict: 'user_id' },
@@ -149,6 +162,13 @@ export async function pullState(userId: string): Promise<boolean> {
   return !same(merged, normalizeSynced(server.state, merged));
 }
 
+function adopt(local: SyncedState, remote: SyncedState): SyncedState {
+  const choice = laterChoice(local, remote);
+  const progress = { ...remote.progress };
+  if (!progress[choice.activePathwayId] && local.progress[choice.activePathwayId]) progress[choice.activePathwayId] = local.progress[choice.activePathwayId];
+  return { ...remote, ...choice, progress };
+}
+
 /**
  * Sign-in. If this device has no guest practice of its own (a fresh install, or
  * one that already belonged to another account), the account's saved progress
@@ -162,7 +182,9 @@ export async function adoptOnSignIn(userId: string, hasGuestWork: boolean): Prom
     return true;
   }
   const local = syncedState(useLearner.getState());
-  const next = hasGuestWork ? mergeSynced(local, server.state) : normalizeSynced(server.state, local);
+  // no guest practice: the account's progress replaces the device's fresh start, but a track
+  // picked on this device after the account's last pick still counts
+  const next = hasGuestWork ? mergeSynced(local, server.state) : adopt(local, normalizeSynced(server.state, local));
   apply(next);
   useAccount.getState().set({ stateVersion: server.version });
   return !same(next, normalizeSynced(server.state, next));

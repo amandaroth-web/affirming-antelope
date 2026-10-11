@@ -128,8 +128,8 @@ create trigger submissions_require_account
 
 revoke execute on function app_private.submissions_require_account() from public, anon, authenticated;
 
--- join_cohort / claim_trainer / create_cohort: same bodies as 20261011120100_rpc.sql
--- plus the anonymous check.
+-- join_cohort / claim_trainer (20261011120100_rpc.sql) and create_cohort
+-- (20261012120000_cohort_pathway.sql, 3 arguments): same bodies plus the anonymous check.
 
 create or replace function public.join_cohort(code text)
 returns public.cohorts
@@ -211,7 +211,7 @@ begin
 end;
 $$;
 
-create or replace function public.create_cohort(name text, starts_on date default null)
+create or replace function public.create_cohort(name text, starts_on date default null, pathway_id text default 'mi-for-leaders')
 returns public.cohorts
 language plpgsql volatile security definer set search_path = ''
 as $$
@@ -230,8 +230,9 @@ begin
     raise exception 'Only trainers can create cohorts' using errcode = '42501';
   end if;
 
-  insert into public.cohorts (name, trainer_id, join_code, starts_on)
-  values (btrim(create_cohort.name), uid, app_private.generate_join_code(), create_cohort.starts_on)
+  insert into public.cohorts (name, trainer_id, join_code, starts_on, pathway_id)
+  values (btrim(create_cohort.name), uid, app_private.generate_join_code(), create_cohort.starts_on,
+          coalesce(create_cohort.pathway_id, 'mi-for-leaders'))
   returning * into created;
 
   insert into public.cohort_members (cohort_id, user_id, role)

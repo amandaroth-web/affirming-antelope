@@ -169,7 +169,7 @@ async function signedIn(session: Session, fresh: boolean) {
   user = { id, email };
   setRecordOwner(id);
   // Supabase uuid only; the email stays out of analytics.
-  identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at });
+  identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at, pathway_id: useLearner.getState().activePathwayId });
   useAccount.getState().set({
     status: 'signed-in',
     // a fresh sign-in finishes its own flow (name step) before leaving the welcome
@@ -222,7 +222,13 @@ let lastPerson = '';
 function syncPerson() {
   const { profile, cohorts } = useAccount.getState();
   if (!user || !profile) return;
-  const person = { role: profile.canTrain ? ('trainer' as const) : ('learner' as const), is_trainer: !!profile.canTrain, cohort_count: cohorts.length };
+  const person = {
+    role: profile.canTrain ? ('trainer' as const) : ('learner' as const),
+    is_trainer: !!profile.canTrain,
+    cohort_count: cohorts.length,
+    // the account's track can change on adopt / merge
+    pathway_id: useLearner.getState().activePathwayId,
+  };
   const key = `${user.id}:${JSON.stringify(person)}`;
   if (key === lastPerson) return; // unchanged since the last refresh
   lastPerson = key;
@@ -260,7 +266,7 @@ function subscribeRealtime(userId: string) {
 async function decideOnboarding(hasSession: boolean) {
   const acct = useAccount.getState();
   if (acct.onboarded !== null) return;
-  if (hasSession || !supabaseConfigured) return acct.set({ onboarded: true });
+  if (hasSession) return acct.set({ onboarded: true });
   acct.set({ onboarded: await hadLearnerData });
 }
 

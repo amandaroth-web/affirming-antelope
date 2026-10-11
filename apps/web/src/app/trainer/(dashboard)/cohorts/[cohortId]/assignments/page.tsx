@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "@phosphor-icons/react/dist/ssr";
+import { getPathway } from "@antelope/core";
 import { createClient } from "@/lib/supabase/server";
 import { requireTrainedCohort, requireTrainer } from "@/lib/trainer/dal";
 import { dueLabel, isOverdue, itemDetail, itemTitle, summarizeItems, type ItemDraft, type ItemKind } from "@/lib/trainer/content";
@@ -89,7 +90,7 @@ export default async function AssignmentsPage({ params, searchParams }: PageProp
               ) : null
             }
           >
-            Pick a few short practices, a role-play, or a lesson from the MI for Leaders pathway, and give it a due date.
+            Pick a few short practices, a role-play, or a lesson from the {getPathway(cohort.pathwayId).title} pathway, and give it a due date.
             Learners see it at the top of their path.
           </EmptyState>
         </Card>

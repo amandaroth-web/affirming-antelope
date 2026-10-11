@@ -18,9 +18,9 @@ export function Hero() {
             Practice better conversations.
           </h1>
           <p className="mt-5 max-w-[38ch] text-lg font-semibold leading-snug text-muted">
-            Five-minute OARS drills and live role-plays with realistic
-            employees, from Amanda. Practice out loud, build a streak, and walk
-            into your next conversation ready.
+            Five-minute OARS drills and live role-plays with realistic patients
+            and employees, from Amanda. Practice out loud, build a streak, and
+            walk into your next conversation ready.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
             <GetTheApp location="hero" size="lg" />
