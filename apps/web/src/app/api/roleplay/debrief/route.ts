@@ -1,5 +1,6 @@
 import { getScenario } from "@antelope/core";
-import { ApiError, errorResponse, jsonResponse, optionsResponse, rateLimit, readJson, requireClientKey, requireAi } from "@/lib/ai/http";
+import { ApiError, errorResponse, jsonResponse, optionsResponse, readJson, requireAi } from "@/lib/ai/http";
+import { authorize } from "@/lib/ai/auth";
 import { mockDebrief } from "@/lib/ai/mock";
 import { runDebrief } from "@/lib/ai/pipeline";
 import { parseScenarioId, parseSelfReflection, parseTurns } from "@/lib/ai/validate";
@@ -14,9 +15,8 @@ export function OPTIONS(req: Request) {
 /** POST /api/roleplay/debrief -> Debrief */
 export async function POST(req: Request) {
   try {
-    requireClientKey(req);
+    await authorize(req, "debrief", { guestMax: 8 });
     const mode = requireAi();
-    rateLimit(req, "debrief", 8);
 
     const { id, obj } = parseScenarioId(await readJson(req));
     const spec = getScenario(id);
