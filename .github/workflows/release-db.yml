@@ -1,0 +1,51 @@
+name: Release DB migrations
+
+# Applies supabase/migrations to the hosted project when they land on main.
+# Migrations are forward-only and must be backwards-compatible: see RELEASING.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - supabase/migrations/**
+  workflow_dispatch:
+
+# Never run two pushes at once, and never cancel one mid-migration.
+concurrency:
+  group: release-db
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    name: supabase db push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: fiuqpmzqelzlxjcbdjac
+    steps:
+      - name: Require secrets
+        run: |
+          missing=0
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set on the 'production' environment. See RELEASING.md."
+              missing=1
+            fi
+          done
+          exit $missing
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.120.0
+      - name: Link hosted project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Dry run (migrations that will apply)
+        run: supabase db push --dry-run
+      - name: Apply migrations
+        run: supabase db push

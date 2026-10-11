@@ -15,5 +15,6 @@ Duolingo-style Motivational Interviewing practice app. npm-workspaces monorepo.
 - Mobile: `npm run mobile` (Expo dev server, scan QR with Expo Go); browser preview with `npm run web -w mobile` (port 8081).
 - Typecheck everything: `npm run typecheck`.
 - Mobile reaches the API via `EXPO_PUBLIC_API_URL`, else the dev machine's LAN host on port 3000 (see `apps/mobile/src/lib/api.ts`).
+- Releases: PR, CI, merge to `main` deploys. See `RELEASING.md` (never `vercel deploy --prod` from a laptop).
 
 @apps/web/AGENTS.md

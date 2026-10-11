@@ -7,5 +7,6 @@
   "headers": [
     { "source": "/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
   ],
-  "rewrites": [{ "source": "/((?!_expo/|assets/|.*\\..*).*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!_expo/|assets/|.*\\..*).*)", "destination": "/index.html" }],
+  "ignoreCommand": "git diff --quiet \"${VERCEL_GIT_PREVIOUS_SHA:-HEAD^}\" HEAD -- ':/apps/mobile' ':/packages/core' ':/package-lock.json'"
 }
