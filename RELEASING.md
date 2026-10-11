@@ -52,6 +52,7 @@ Never commit values. Vercel marks secrets as sensitive, so they cannot be read b
 **Vercel `affirming-antelope` (site, API, dashboard)**, Production:
 `ANTHROPIC_API_KEY`, `APP_CLIENT_TOKEN`, `CORS_ORIGINS`, `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_UI_HOST`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`.
 Optional, read by the code: `AI_MOCK`, `AI_LOG_USAGE`.
+Preview has only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which `next build` needs to prerender `/trainer`. Previews deliberately get no AI key, no analytics key and no app token.
 
 **Vercel `affirming-antelope-app` (learner web app)**, Production and Preview:
 `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_APP_TOKEN`, `EXPO_PUBLIC_POSTHOG_HOST`, `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SUPABASE_URL`.
