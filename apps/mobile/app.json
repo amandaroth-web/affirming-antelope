@@ -9,14 +9,19 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.anonymous.affirming-antelope"
+      "bundleIdentifier": "com.affirmingantelope.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.affirmingantelope.app"
     },
     "web": {
       "output": "single",
@@ -37,6 +42,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82a7b5c5-950b-4a70-8dcb-2a177100c31f"
+      }
+    },
+    "owner": "hamburgular"
   }
 }

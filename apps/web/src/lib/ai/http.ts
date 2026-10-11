@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { aiMode } from "./client";
 
@@ -49,7 +50,7 @@ function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin");
   const base: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, x-antelope-key",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
@@ -100,11 +101,31 @@ export function streamResponse(req: Request, body: ReadableStream<Uint8Array>): 
 }
 
 // ---------------------------------------------------------------------------
-// Abuse guard: in-memory sliding-window rate limit per IP.
-// NOT production grade: state is per server instance (resets on deploy, not
-// shared across serverless instances) and IPs come from spoofable headers
-// unless a trusted proxy sets them. Swap for Redis/Upstash before real launch.
+// Abuse guards
 // ---------------------------------------------------------------------------
+
+/**
+ * Shared app token gate. When APP_CLIENT_TOKEN is set, requests must carry a
+ * matching `x-antelope-key` header (constant-time compare) or get 401. When it
+ * is unset (local dev) the check is skipped. OPTIONS preflight never calls this.
+ *
+ * The token ships inside the app binary, so it only deters casual abuse. Real
+ * per-user auth arrives with accounts.
+ */
+export function requireClientKey(req: Request): void {
+  const expected = process.env.APP_CLIENT_TOKEN;
+  if (!expected) return;
+  const given = req.headers.get("x-antelope-key") ?? "";
+  // Hash both sides so lengths match and timingSafeEqual never throws.
+  const a = createHash("sha256").update(given).digest();
+  const b = createHash("sha256").update(expected).digest();
+  if (!timingSafeEqual(a, b)) throw new ApiError(401, "unauthorized");
+}
+
+// In-memory sliding-window rate limit per IP. Best effort only: on serverless
+// the state is per instance (not shared across instances, reset on cold start
+// and deploy), and IPs come from spoofable headers unless a trusted proxy sets
+// them. Swap for Redis/Upstash before real launch.
 
 const hits = new Map<string, number[]>();
 let lastSweep = 0;

@@ -1,5 +1,5 @@
 import { getScenario } from "@antelope/core";
-import { ApiError, errorResponse, optionsResponse, rateLimit, readJson, streamResponse, requireAi } from "@/lib/ai/http";
+import { ApiError, errorResponse, optionsResponse, rateLimit, readJson, requireClientKey, streamResponse, requireAi } from "@/lib/ai/http";
 import { mockEmployeeReply, mockStream } from "@/lib/ai/mock";
 import { streamEmployeeReply } from "@/lib/ai/roleplay";
 import { parseScenarioId, parseTurns } from "@/lib/ai/validate";
@@ -14,6 +14,7 @@ export function OPTIONS(req: Request) {
 /** POST /api/roleplay/turn -> text/plain stream of the employee's reply. */
 export async function POST(req: Request) {
   try {
+    requireClientKey(req);
     const mode = requireAi();
     rateLimit(req, "turn", 40);
 

@@ -57,3 +57,4 @@ next-env.d.ts
 apps/mobile/docs/motion/*.gif
 apps/mobile/docs/motion/*.mp4
 apps/mobile/docs/motion/*.png
+dist-web/

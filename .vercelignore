@@ -1,0 +1,5 @@
+# Native build output is not needed to build the web app/API.
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/.expo
+apps/web/.next

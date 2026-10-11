@@ -91,3 +91,11 @@ const { riveFile } = useRiveFile(require('../../assets/rive/mascot-wave.riv'));
 - `mascot-coach.riv`: the app's mascot (artboard `Coach`, state machine `Coach`, view model `Coach`); contract in `DESIGN.md` › Mascot. Built by `apps/web/scripts/mascot-coach-build.mjs`.
 - The default (new) iOS backend does **not** support state-machine inputs (`setNumberInputValue`/`triggerInput` throw "SMI inputs are not supported by the new runtime"). Drive state machines through view-model data binding (`useViewModelInstance(file, { async: true })` + `dataBind={instance}`).
 - Mascot playground (dev only): `antelope://dev/mascot?pose=wave&mood=idle&size=300&fire=wave&at=600&chrome=0` (`fire`: wave, hop, turn, cheer, nod, blink; change `n` to re-fire).
+
+## API token (`APP_CLIENT_TOKEN` / `EXPO_PUBLIC_APP_TOKEN`)
+
+The API in `apps/web` requires the header `x-antelope-key` when the server env var `APP_CLIENT_TOKEN` is set (it is set in production on Vercel). When unset, as in plain local dev, the check is skipped.
+
+- Server: `APP_CLIENT_TOKEN` in `apps/web/.env.local` (see `apps/web/.env.example`).
+- App: set `EXPO_PUBLIC_APP_TOKEN` to the same value in the environment of the `expo start` process (restart Metro with `--clear` after changing it). For EAS builds, put it in EAS environment variables, never in `eas.json`.
+- Caveat: `EXPO_PUBLIC_*` values are bundled into the app binary, so the token only deters casual abuse. Real per-user auth arrives with accounts.

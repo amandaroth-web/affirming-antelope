@@ -1,5 +1,5 @@
 import { getDrill } from "@antelope/core";
-import { ApiError, errorResponse, jsonResponse, optionsResponse, rateLimit, readJson, requireAi } from "@/lib/ai/http";
+import { ApiError, errorResponse, jsonResponse, optionsResponse, rateLimit, readJson, requireClientKey, requireAi } from "@/lib/ai/http";
 import { mockDrillFeedback } from "@/lib/ai/mock";
 import { runDrillFeedback } from "@/lib/ai/pipeline";
 import { parseDrillRequest } from "@/lib/ai/validate";
@@ -14,6 +14,7 @@ export function OPTIONS(req: Request) {
 /** POST /api/drill/feedback -> DrillFeedback */
 export async function POST(req: Request) {
   try {
+    requireClientKey(req);
     const mode = requireAi();
     rateLimit(req, "drill", 30);
 
