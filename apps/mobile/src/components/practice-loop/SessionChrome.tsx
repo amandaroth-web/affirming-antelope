@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, LayoutAnimation, Platform, StyleSheet, View, type KeyboardEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton, XIcon, color, layout, space } from '@/design';
+import { useReduceMotion } from '@/motion';
 import { DismissZone } from './SessionSurface';
+import { KEYBOARD_EASING, KEYBOARD_MS, useWebViewport } from './webKeyboard';
 
 /**
  * Shared chrome for the practice-loop screens (lesson, drill, role-play):
@@ -50,7 +53,8 @@ export function Dock({ children, style, rule = true }: { children: ReactNode; st
 /**
  * Keyboard handling that works in Expo Go and on web: the screen's column
  * (scroll + dock) lifts with the keyboard on iOS and Android (edge-to-edge),
- * and is a plain flex column on web where the browser handles it.
+ * and on the web pads by the keyboard's overlap with the layout viewport
+ * (see webKeyboard.ts: Safari would otherwise scroll the whole page).
  *
  * Not KeyboardAvoidingView: it measures itself relative to its parent, so a
  * column that sits below a header (the drill) was lifted short by the header's
@@ -59,8 +63,25 @@ export function Dock({ children, style, rule = true }: { children: ReactNode; st
  * by exactly the overlap, animated with the keyboard's own curve.
  */
 export function KeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  if (Platform.OS === 'web') return <View style={[styles.fill, style]}>{children}</View>;
+  if (Platform.OS === 'web') return <WebKeyboardColumn style={style}>{children}</WebKeyboardColumn>;
   return <NativeKeyboardColumn style={style}>{children}</NativeKeyboardColumn>;
+}
+
+/**
+ * Web: the session keeps the layout viewport's height while the keyboard is up
+ * (white under the keyboard, no page scroll), and the column pads by the keyboard's
+ * overlap. Safari reports the new viewport as the keyboard starts to move, so the
+ * pad runs on a curve close to the keyboard's and the composer rides up with it.
+ */
+function WebKeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const { keyboard } = useWebViewport();
+  const reduce = useReduceMotion();
+  const pad = useSharedValue(keyboard);
+  useEffect(() => {
+    pad.value = reduce ? keyboard : withTiming(keyboard, { duration: KEYBOARD_MS, easing: KEYBOARD_EASING });
+  }, [keyboard, reduce, pad]);
+  const lift = useAnimatedStyle(() => ({ paddingBottom: pad.value }));
+  return <Animated.View style={[styles.fill, style, lift]}>{children}</Animated.View>;
 }
 
 function NativeKeyboardColumn({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {

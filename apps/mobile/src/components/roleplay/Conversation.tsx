@@ -1,6 +1,6 @@
 import type { ScenarioSpec, Turn } from '@antelope/core';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Composer } from '@/components/practice-loop/Composer';
 import { ConfirmSheet } from '@/components/practice-loop/ConfirmSheet';
@@ -163,6 +163,8 @@ export function Conversation({
             onScroll={onScroll}
             scrollEventThrottle={32}
             onContentSizeChange={onContent}
+            // web: the keyboard shrinks the thread from below; keep the latest line in view
+            onLayout={Platform.OS === 'web' ? () => atBottom.current && scroll.current?.scrollToEnd({ animated: false }) : undefined}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
