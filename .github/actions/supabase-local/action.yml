@@ -1,0 +1,15 @@
+name: Supabase local stack
+description: Install the pinned Supabase CLI and start the local stack (migrations + seed applied).
+runs:
+  using: composite
+  steps:
+    - uses: supabase/setup-cli@v3
+      with:
+        # Pinned so `gen types` output is deterministic. Bump deliberately, regenerate
+        # packages/core/src/db.types.ts in the same PR.
+        version: 2.120.0
+    - name: supabase start
+      shell: bash
+      # Services the DB checks don't need. Keep auth (gotrue), storage-api, realtime,
+      # postgrest and postgres-meta: migrations and pgTAP tests touch those schemas.
+      run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,mailpit,supavisor
