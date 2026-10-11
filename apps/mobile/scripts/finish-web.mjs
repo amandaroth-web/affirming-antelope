@@ -1,6 +1,7 @@
 // Post-processes the Expo web export in dist-web for app.affirmingantelope.com.
 // Dependency-free so it runs in Vercel's build image (the old Python version
-// needed Pillow). Adds add-to-home-screen tags and the apple-touch-icon, and
+// needed Pillow). Adds add-to-home-screen tags and the apple-touch-icon, lets
+// the keyboard resize the layout where supported, and
 // noindexes every page: the learner app is a product surface, and
 // affirmingantelope.com is what ranks. robots.txt allows crawling on purpose,
 // since a disallow would hide the noindex from crawlers.
@@ -30,9 +31,18 @@ function htmlFiles(dir) {
     return name.endsWith(".html") ? [path] : [];
   });
 }
+// interactive-widget=resizes-content: browsers that support it (Chrome on Android)
+// shrink the layout for the on-screen keyboard instead of overlaying it, so the
+// practice composer docks above the keyboard with no page scroll. Safari ignores
+// it; the app handles Safari itself (src/components/practice-loop/webKeyboard.ts).
+const withKeyboard = (html) =>
+  html.replace(/<meta name="viewport" content="([^"]*)"/, (tag, content) =>
+    content.includes("interactive-widget") ? tag : `<meta name="viewport" content="${content}, interactive-widget=resizes-content"`,
+  );
 for (const page of htmlFiles(out)) {
-  const html = readFileSync(page, "utf8");
-  if (!html.includes("apple-touch-icon")) writeFileSync(page, html.replace("</head>", `${tags}</head>`));
+  let html = withKeyboard(readFileSync(page, "utf8"));
+  if (!html.includes("apple-touch-icon")) html = html.replace("</head>", `${tags}</head>`);
+  writeFileSync(page, html);
 }
 
 writeFileSync(join(out, "robots.txt"), "User-agent: *\nAllow: /\n");

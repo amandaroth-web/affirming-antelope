@@ -18,6 +18,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { color, haptic } from '@/design';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
 import { measure, takeLaunch, type HeroName, type Launch } from '@/motion/launch';
+import { usePinnedDocument, useWebViewport } from './webKeyboard';
 
 /**
  * The practice-screen container: every drill, role-play and lesson renders
@@ -101,7 +102,13 @@ function useRectSV(): RectSV {
 }
 
 export function SessionSurface({ children }: { children: ReactNode }) {
-  const { width: W, height: H } = useWindowDimensions();
+  const { width: W, height: windowH } = useWindowDimensions();
+  // Web: react-native-web's window is the visual viewport, which shrinks under the
+  // keyboard. The session keeps the layout height instead (KeyboardColumn makes room
+  // for the keyboard), and the document stays at the top while it's open.
+  const web = useWebViewport();
+  const H = Platform.OS === 'web' && web.height > 0 ? web.height : windowH;
+  usePinnedDocument();
   const reduce = useReduceMotion();
   const [launch] = useState<Launch | null>(() => takeLaunch());
   const hero = !!launch && launch.kind === 'hero' && !reduce;

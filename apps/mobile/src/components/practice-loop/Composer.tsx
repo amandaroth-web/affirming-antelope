@@ -1,8 +1,9 @@
-import { forwardRef, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View, type NativeSyntheticEvent, type TextInputKeyPressEventData } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { ArrowUpIcon, PressableSurface, border, color, font, haptic, radius, space } from '@/design';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
+import { useFocusWithoutScroll } from './webKeyboard';
 
 const MIN_H = 48;
 
@@ -49,6 +50,17 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
   const pop = useSharedValue(1);
   const focus = useSharedValue(0);
   const fieldRef = useRef<View>(null);
+  const inputRef = useRef<TextInput | null>(null);
+  const setInput = useCallback(
+    (node: TextInput | null) => {
+      inputRef.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+  // iOS web: tapping the field must not make Safari scroll the page (KeyboardColumn makes room)
+  useFocusWithoutScroll(inputRef);
 
   useEffect(() => {
     live.value = reduce ? withTiming(ready ? 1 : 0, { duration: FADE_MS }) : withSpring(ready ? 1 : 0, spring.snappy);
@@ -124,7 +136,7 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
           {value.endsWith('\n') ? ' ' : ''}
         </Text>
         <TextInput
-          ref={ref}
+          ref={setInput}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
