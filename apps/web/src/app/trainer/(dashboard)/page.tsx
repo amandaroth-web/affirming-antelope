@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CalendarBlank, ChatCircleText, UsersThree } from "@phosphor-icons/react/dist/ssr";
+import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { createClient } from "@/lib/supabase/server";
 import { getNeedsReviewCounts, getTrainerCohorts, requireTrainer } from "@/lib/trainer/dal";
 import { dueLabel, isOverdue } from "@/lib/trainer/content";
@@ -55,6 +56,8 @@ export default async function CohortsHome({ searchParams }: PageProps<"/trainer"
 
   return (
     <div className="mx-auto max-w-[1120px] px-6 py-8 md:px-10 md:py-10">
+      {/* claimTrainer redirects here with ?welcome=1; that redirect is the only client-visible success signal. */}
+      {welcome ? <TrackOnMount event="trainer_access_claimed" once="trainer_access_claimed" /> : null}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Eyebrow>Cohorts</Eyebrow>

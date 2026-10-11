@@ -1,6 +1,7 @@
 import type { AuthChangeEvent, RealtimeChannel, Session } from '@supabase/supabase-js';
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
+import { identifyUser, resetAnalytics, setPerson, track } from '@/lib/analytics';
 import { uuid } from '@/lib/uuid';
 import { onSimulatedOfflineChange, setCurrentSession, supabase, supabaseConfigured } from '@/lib/supabase';
 import { useAccount, type Submission } from '@/state/account';
@@ -128,6 +129,7 @@ export async function refresh(): Promise<void> {
     // offline: the cache stays; refreshCloud records `offline`
   }
   await refreshCloud(u.id, u.email);
+  syncPerson();
 }
 
 function scheduleRefresh(ms: number) {
@@ -166,6 +168,8 @@ async function signedIn(session: Session, fresh: boolean) {
   if (acct.profile && acct.profile.id !== id) acct.clearAccount();
   user = { id, email };
   setRecordOwner(id);
+  // Supabase uuid only; the email stays out of analytics.
+  identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at });
   useAccount.getState().set({
     status: 'signed-in',
     // a fresh sign-in finishes its own flow (name step) before leaving the welcome
@@ -189,6 +193,14 @@ async function signedIn(session: Session, fresh: boolean) {
     // offline right after sign-in: push what we have when the network is back
     if (fresh) useOutbox.getState().markStateDirty(id, true);
   }
+  if (fresh) {
+    const { last_sign_in_at: signedInAt, email_confirmed_at: confirmedAt } = session.user;
+    track('sign_in_completed', {
+      // the first sign-in confirms the email at the same moment it signs in
+      is_new_user: !!signedInAt && !!confirmedAt && Math.abs(Date.parse(signedInAt) - Date.parse(confirmedAt)) < 5000,
+      migrated_guest_data: hasGuestWork,
+    });
+  }
   if (hasGuestWork) {
     const ops: Op[] = [...work.sessions.map(sessionOp), ...work.completions.map(completionOp).filter((o): o is Op => !!o)];
     useOutbox.getState().enqueue(id, ops);
@@ -202,9 +214,24 @@ async function signedIn(session: Session, fresh: boolean) {
   subscribeRealtime(id);
   await flush();
   await refreshCloud(id, email);
+  syncPerson();
+}
+
+/** Person properties that come from the server: trainer status and cohort count. */
+let lastPerson = '';
+function syncPerson() {
+  const { profile, cohorts } = useAccount.getState();
+  if (!user || !profile) return;
+  const person = { role: profile.canTrain ? ('trainer' as const) : ('learner' as const), is_trainer: !!profile.canTrain, cohort_count: cohorts.length };
+  const key = `${user.id}:${JSON.stringify(person)}`;
+  if (key === lastPerson) return; // unchanged since the last refresh
+  lastPerson = key;
+  setPerson(person);
 }
 
 function signedOut() {
+  track('signed_out');
+  resetAnalytics();
   user = null;
   setRecordOwner(undefined);
   if (channel) {
@@ -366,6 +393,8 @@ export function submitForReview(
     local: true,
   };
   useAccount.getState().addLocalSubmission(sub);
+  // the note to the trainer is free text: never sent
+  track('submission_created', { kind: target.kind, ref_id: target.refId });
   enqueue([
     // a session from another device is already on the server; only this device's copy needs uploading
     ...(target.session ? [sessionOp(target.session)] : []),
@@ -378,6 +407,7 @@ export function submitForReview(
 export function withdrawSubmission(id: string) {
   if (!user) return;
   useAccount.getState().setSubmissionStatus(id, 'withdrawn');
+  track('submission_withdrawn');
   enqueue([{ type: 'withdraw', submissionId: id }]);
 }
 

@@ -9,6 +9,7 @@ import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/S
 import { SessionSurface, useSessionClose } from '@/components/practice-loop/SessionSurface';
 import { ArrowRightIcon, Button, CaretLeftIcon, Text, color, layout, space } from '@/design';
 import { findActivity, openActivity } from '@/data/routes';
+import { practiceSource, track } from '@/lib/analytics';
 import { FADE_MS, spring, useReduceMotion } from '@/motion';
 import { nextActivity } from '@/state/selectors';
 import { useLearner } from '@/state/store';
@@ -23,7 +24,7 @@ export default function LessonScreen() {
 
 function LessonSession() {
   const close = useSessionClose();
-  const { id, activityId, minutes } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string }>();
+  const { id, activityId, minutes, source } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string; source?: string }>();
   const lesson = getLesson(id);
   const stack = useRef<CardStackHandle>(null);
   const [index, setIndex] = useState(0);
@@ -31,9 +32,15 @@ function LessonSession() {
   const before = usePracticeSnapshot();
   const recordPractice = useLearner((s) => s.recordPractice);
   const completed = useLearner((s) => s.completedActivityIds);
+  const unit = lesson ? getUnit(lesson.unitId) : undefined;
+
+  useEffect(() => {
+    if (!lesson) return;
+    track('practice_started', { kind: 'lesson', ref_id: lesson.id, ...(unit?.skills[0] ? { skill: unit.skills[0] } : {}), source: practiceSource(source) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!lesson) return <Missing />;
-  const unit = getUnit(lesson.unitId);
   const last = index === lesson.cards.length - 1;
 
   const finish = () => {
@@ -71,7 +78,11 @@ function LessonSession() {
               <Button
                 label={up ? 'Start next' : 'Done'}
                 fullWidth
-                onPress={() => (up ? openActivity(up, 'path', { replace: true }) : close())}
+                onPress={() => {
+                  track('next_step_chosen', { from: 'lesson', choice: up ? 'one_more' : 'done' });
+                  if (up) openActivity(up, 'next_step', { replace: true });
+                  else close();
+                }}
                 icon={up ? <ArrowRightIcon size={20} weight="bold" color={color.white} /> : undefined}
               />
               {up ? <Button variant="secondary" label="Back to my path" fullWidth onPress={close} style={styles.second} /> : null}

@@ -1,16 +1,103 @@
-type GetTheAppProps = {
-  className?: string;
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { appHref, ctaTrack, TRAINER_PATH, type Audience } from "@/lib/site";
+
+type Size = "sm" | "md" | "lg";
+
+type Variant = "primary" | "secondary";
+
+const sizes: Record<Size, string> = {
+  sm: "px-4 py-2 text-[13px] active:translate-y-1",
+  md: "px-5 py-3 text-[15px] active:translate-y-1.5",
+  lg: "px-6 py-4 text-base active:translate-y-1.5",
 };
 
-export function GetTheApp({ className = "" }: GetTheAppProps) {
+const variants: Record<Variant, Record<Size, string>> = {
+  primary: {
+    sm: "bg-primary text-primary-ink shadow-[0_4px_0_var(--primary-shadow)] hover:brightness-105 active:shadow-[0_0_0_var(--primary-shadow)]",
+    md: "bg-primary text-primary-ink shadow-[0_6px_0_var(--primary-shadow)] hover:brightness-105 active:shadow-[0_0_0_var(--primary-shadow)]",
+    lg: "bg-primary text-primary-ink shadow-[0_6px_0_var(--primary-shadow)] hover:brightness-105 active:shadow-[0_0_0_var(--primary-shadow)]",
+  },
+  secondary: {
+    sm: "border-2 border-line bg-white text-ink shadow-[0_4px_0_var(--shadow)] hover:border-primary-tint active:shadow-[0_0_0_var(--shadow)]",
+    md: "border-2 border-line bg-white text-ink shadow-[0_6px_0_var(--shadow)] hover:border-primary-tint active:shadow-[0_0_0_var(--shadow)]",
+    lg: "border-2 border-line bg-white text-ink shadow-[0_6px_0_var(--shadow)] hover:border-primary-tint active:shadow-[0_0_0_var(--shadow)]",
+  },
+};
+
+export const buttonBase =
+  "inline-flex shrink-0 items-center justify-center rounded-2xl font-extrabold uppercase tracking-wide transition-[transform,filter,box-shadow,border-color] duration-75 ease-out";
+
+const focus =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+type GetTheAppProps = {
+  /** CTA location for `?src=` and `data-track-location` (hero, nav, download_band, ...). */
+  location: string;
+  audience?: Audience;
+  size?: Size;
+  variant?: Variant;
+  className?: string;
+  children?: ReactNode;
+};
+
+/** The primary CTA: opens the learner app in the browser. */
+export function GetTheApp({
+  location,
+  audience,
+  size = "md",
+  variant = "primary",
+  className = "",
+  children = "Start practicing free",
+}: GetTheAppProps) {
   return (
     <a
-      href="#download"
+      href={appHref(location)}
+      {...ctaTrack(location, "app", audience)}
       data-mascot-watch
       data-mascot-celebrate
-      className={`inline-flex shrink-0 items-center justify-center rounded-2xl bg-primary px-5 py-3 text-[15px] font-extrabold uppercase tracking-wide text-primary-ink shadow-[0_6px_0_var(--primary-shadow)] transition-[transform,filter,box-shadow] duration-75 ease-out hover:brightness-105 active:translate-y-1.5 active:shadow-[0_0_0_var(--primary-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${className}`}
+      className={`${buttonBase} ${focus} ${sizes[size]} ${variants[variant][size]} ${className}`}
     >
-      Get the app
+      {children}
     </a>
+  );
+}
+
+/** The quiet line under a primary CTA. */
+export function CtaNote({ className = "" }: { className?: string }) {
+  return (
+    <p className={`text-sm font-bold text-muted ${className}`}>
+      Free · Works in your browser · iOS coming soon
+    </p>
+  );
+}
+
+type TrainerCtaProps = {
+  location: string;
+  audience?: Audience;
+  size?: Size;
+  variant?: Variant;
+  className?: string;
+  children?: ReactNode;
+};
+
+/** Secondary CTA for trainers: the dashboard at /trainer. */
+export function TrainerCta({
+  location,
+  audience = "trainers",
+  size = "md",
+  variant = "secondary",
+  className = "",
+  children = "Open the trainer dashboard",
+}: TrainerCtaProps) {
+  return (
+    <Link
+      href={TRAINER_PATH}
+      prefetch={false}
+      {...ctaTrack(location, "trainer", audience)}
+      className={`${buttonBase} ${focus} ${sizes[size]} ${variants[variant][size]} ${className}`}
+    >
+      {children}
+    </Link>
   );
 }

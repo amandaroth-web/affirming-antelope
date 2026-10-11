@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowLeft, EnvelopeSimple } from "@phosphor-icons/react";
+import { identify, track } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
 import { buttonClass } from "./ui";
 
@@ -71,8 +72,16 @@ export function SignInForm({ next }: { next: string }) {
     setError(null);
     setPending(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.verifyOtp({ email: step.email, token, type: "email" });
+    const { data, error } = await supabase.auth.verifyOtp({ email: step.email, token, type: "email" });
     setPending(false);
+    if (!error && data.user) {
+      // Supabase user uuid only. A first sign-in confirms the email at the same moment it signs in.
+      identify(data.user.id);
+      const { last_sign_in_at: signedInAt, email_confirmed_at: confirmedAt } = data.user;
+      track("trainer_signed_in", {
+        is_new_user: !!signedInAt && !!confirmedAt && Math.abs(Date.parse(signedInAt) - Date.parse(confirmedAt)) < 5000,
+      });
+    }
     if (error) {
       setError("That code didn't match or has expired. Check the latest email, or send a new code.");
       return;

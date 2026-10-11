@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { createCohort } from "@/app/trainer/actions";
+import { track } from "@/lib/analytics/client";
 import { JoinCode } from "./join-code";
 import { Modal } from "./modal";
 import { buttonClass } from "./ui";
@@ -38,7 +39,10 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
     start(async () => {
       const res = await createCohort({ name, startsOn: startsOn || null });
       if (!res.ok) setError(res.error);
-      else setCreated(res.data);
+      else {
+        track("cohort_created");
+        setCreated(res.data);
+      }
     });
   }
 

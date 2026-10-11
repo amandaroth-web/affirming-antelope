@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SignOut } from "@phosphor-icons/react/dist/ssr";
-import { signOut } from "@/app/trainer/actions";
 import { RailNav, type RailCohort } from "./rail-nav";
+import { SignOutForm } from "./sign-out-form";
 import { Avatar, buttonClass, focusRing } from "./ui";
 
 export function TrainerShell({
@@ -40,11 +40,11 @@ export function TrainerShell({
               <p className="truncate text-[14px] font-extrabold text-ink">{viewer.name}</p>
               <p className="truncate text-[12px] font-semibold text-muted">{viewer.email}</p>
             </div>
-            <form action={signOut}>
+            <SignOutForm>
               <button type="submit" className={buttonClass("ghost", "sm", "!px-2")} aria-label="Sign out" title="Sign out">
                 <SignOut size={18} weight="bold" aria-hidden />
               </button>
-            </form>
+            </SignOutForm>
           </div>
         </div>
       </aside>
@@ -61,11 +61,11 @@ export function TrainerShell({
           <Link href="/trainer" className={buttonClass("ghost", "sm")}>
             Cohorts
           </Link>
-          <form action={signOut}>
+          <SignOutForm>
             <button type="submit" className={buttonClass("ghost", "sm")}>
               Sign out
             </button>
-          </form>
+          </SignOutForm>
         </nav>
       </header>
 

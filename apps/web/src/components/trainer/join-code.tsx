@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState, useTransition } from "react";
 import { ArrowsClockwise, Check, Copy } from "@phosphor-icons/react";
 import { rotateJoinCode } from "@/app/trainer/actions";
+import { track } from "@/lib/analytics/client";
 import { buttonClass } from "./ui";
 
 /** The join code, big, with copy and rotate. Rotating asks once, inline. */
@@ -29,6 +30,7 @@ export function JoinCode({
   async function copy() {
     try {
       await navigator.clipboard.writeText(code);
+      track("join_code_copied");
       setCopied(true);
       setAnnounce(`Copied ${code}`);
       setTimeout(() => setCopied(false), 1600);

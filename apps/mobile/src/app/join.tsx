@@ -7,6 +7,7 @@ import { FlowHeader, Notice, flowStyles } from '@/components/account/FlowChrome'
 import { Mascot, type MascotHandle } from '@/components/mascot';
 import { Avatar, Button, CheckIcon, Raised, Text, color, haptic, space } from '@/design';
 import { Burst, Enter, FADE_MS, spring, useFades, useReduceMotion, type BurstHandle } from '@/motion';
+import { track } from '@/lib/analytics';
 import { emitFlowClosed } from '@/lib/flowEvents';
 import { joinCohort } from '@/sync/cloud';
 import { refresh } from '@/sync/engine';
@@ -30,7 +31,7 @@ export default function Join() {
   if (status === 'guest') return <Redirect href={{ pathname: '/sign-in', params: { reason: 'cohort' } }} />;
 
   const submit = async (c = code) => {
-    if (c.length < 4 || state === 'busy') return;
+    if (c.length < 4 || state === 'busy' || state === 'success') return;
     setState('busy');
     setError(null);
     const res = await joinCohort(c);
@@ -46,6 +47,7 @@ export default function Join() {
       return;
     }
     setState('success');
+    track('cohort_joined', { cohort_id: res.cohort.id });
     // let the cells fill before the card takes over
     setTimeout(() => setJoined(res.cohort), 420);
     void refresh();

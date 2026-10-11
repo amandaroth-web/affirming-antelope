@@ -8,6 +8,7 @@ import { DIFFICULTY, FEELING, ago, duration, skillName } from "@/lib/trainer/con
 import { buildExchanges } from "@/lib/trainer/exchanges";
 import { Avatar, Badge, Card, Eyebrow, SectionTitle, buttonClass } from "@/components/trainer/ui";
 import { FadeIn } from "@/components/trainer/motion";
+import { ReviewOpened } from "@/components/analytics/review-opened";
 import { AiFeedback } from "@/components/trainer/review/ai-feedback";
 import { Transcript } from "@/components/trainer/review/transcript";
 import { FeedbackPanel, type ExistingReview } from "@/components/trainer/review/feedback-panel";
@@ -85,6 +86,7 @@ export default async function SubmissionPage({ params }: PageProps<"/trainer/sub
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 pt-6 pb-20 md:px-10">
+      <ReviewOpened submittedAt={sub.submitted_at} />
       <Link href={`/trainer/cohorts/${cohort.id}/reviews`} className={buttonClass("ghost", "sm", "-ml-3")}>
         <ArrowLeft size={16} weight="bold" aria-hidden /> {cohort.name} · Reviews
       </Link>

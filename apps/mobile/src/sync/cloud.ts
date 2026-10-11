@@ -22,13 +22,14 @@ import { useOutbox } from './outbox';
 const FALLBACK_TRAINER = 'Your trainer';
 
 async function fetchProfile(userId: string, email: string): Promise<Profile> {
-  const { data, error } = await supabase.from('profiles').select('id, display_name, display_name_set').eq('id', userId).single();
+  const { data, error } = await supabase.from('profiles').select('id, display_name, display_name_set, can_train').eq('id', userId).single();
   if (error) throw error;
   return {
     id: data.id,
     email,
     displayName: data.display_name,
     needsName: !data.display_name_set,
+    canTrain: !!data.can_train,
   };
 }
 

@@ -51,6 +51,19 @@ iOS 27 crashes at launch unless the app adopts the UIScene life cycle. SDK 57's 
 
 Optional params: `activityId`, `minutes`, `source` (`today|path|assignment|practice|challenge`). Full id lists live in `packages/core/src/{drills,lessons,scenarios}.ts`; route contract in `src/data/routes.ts`.
 
+## Analytics (PostHog)
+
+Contract: `docs/tracking-plan.md`. Facade: `src/lib/analytics.ts` (posthog-js on web, posthog-react-native on iOS/Android). With no key it is a no-op, so local dev sends nothing.
+
+| Variable | Value |
+| --- | --- |
+| `EXPO_PUBLIC_POSTHOG_KEY` | The project's public `phc_...` key. Leave unset locally. Baked into EAS builds via `eas.json` (`preview`, `production`); the web export for app.affirmingantelope.com needs it in that host's build environment. |
+| `EXPO_PUBLIC_POSTHOG_HOST` | Ingest host. Default `https://affirmingantelope.com/ingest` (the website proxies it to PostHog). To test locally, point it at a catcher or at `http://localhost:3000/ingest`. |
+
+Test the payloads without touching the real project: set a fake key and a local host, then run the web build, e.g. `EXPO_PUBLIC_POSTHOG_KEY=phc_test EXPO_PUBLIC_POSTHOG_HOST=http://localhost:9999 npm run web -w mobile`.
+
+Website guides deep-link with `https://app.affirmingantelope.com/drill/<drillId>?src=guide_<slug>`. `src` labels `app_opened` (`entry: 'guide'`), and the first practice that launch starts is `practice_started` with `source: 'guide'`. Never add free text to an event: ids, enums and counts only.
+
 ## Capture
 
 All output goes to `apps/mobile/docs/motion/`; frames and contact sheets go to the session scratchpad (`$SIM_SCRATCH`, default baked into the script).

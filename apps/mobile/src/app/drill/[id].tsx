@@ -16,6 +16,7 @@ import { Shimmer } from '@/components/practice-loop/Thinking';
 import { ArrowRightIcon, Button, Chip, Hoofprint, LevelPips, Raised, Text, TextLink, WifiSlashIcon, color, haptic, layout, radius, space } from '@/design';
 import { nextDrillId } from '@/data/routes';
 import { postJson } from '@/lib/api';
+import { practiceSource, track } from '@/lib/analytics';
 import { Enter, Expand, FADE_MS, RollingNumber, spring, useFades, useForwardSwap, useReduceMotion } from '@/motion';
 import { today, useLearner } from '@/state/store';
 
@@ -39,7 +40,7 @@ function DrillSession() {
   const heroTitle = useSession()?.title;
   const swap = useForwardSwap();
   const [reps, setReps] = useState(0);
-  const { id, activityId, minutes } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string; source?: string }>();
+  const { id, activityId, minutes, source } = useLocalSearchParams<{ id: string; activityId?: string; minutes?: string; source?: string }>();
   const [drillId, setDrillId] = useState(id);
   const [done, setDone] = useState<string[]>([]);
   const [complete, setComplete] = useState(false);
@@ -53,6 +54,13 @@ function DrillSession() {
   });
   const mins = Number(minutes) || 5;
   const drill = getDrill(drillId);
+
+  useEffect(() => {
+    const d = getDrill(id);
+    track('practice_started', { kind: 'drill', ref_id: id, ...(d ? { skill: d.skill, level: d.level } : {}), source: practiceSource(source) });
+    // once per screen: "One more" reports its own start below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const repDone = (d: Drill, rep: RepResult) => {
     setDone((xs) => (xs.includes(d.id) ? xs : [...xs, d.id]));
@@ -77,12 +85,17 @@ function DrillSession() {
   };
 
   const oneMore = () => {
+    const next = nextDrillId(drillId, done, activityId);
+    track('next_step_chosen', { from: 'drill', choice: 'one_more' });
+    const d = getDrill(next);
+    track('practice_started', { kind: 'drill', ref_id: next, ...(d ? { skill: d.skill, level: d.level } : {}), source: 'next_step' });
     setReps((n) => n + 1);
     setComplete(false);
-    setDrillId(nextDrillId(drillId, done, activityId));
+    setDrillId(next);
   };
 
   const finish = () => {
+    track('next_step_chosen', { from: 'drill', choice: 'done' });
     setReps((n) => n + 1);
     setComplete(true);
   };
@@ -204,7 +217,9 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
     setRevealed(true);
     const picks = selected.map((i) => drill.choices![i].text);
     const got = selected.filter((i) => targets.includes(i)).length;
-    onRepDone({ response: picks.join(' / '), picks, hit: got === targets.length && selected.length === targets.length, startedAt: repStarted });
+    const hitAll = got === targets.length && selected.length === targets.length;
+    track('drill_answered', { drill_id: drill.id, skill: drill.skill, level: drill.level, format: 'choice', hit_target: hitAll });
+    onRepDone({ response: picks.join(' / '), picks, hit: hitAll, startedAt: repStarted });
     toEnd();
   };
 
@@ -221,10 +236,15 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
     const started = Date.now();
     try {
       const fb = await postJson<DrillFeedback>('/api/drill/feedback', { drillId: drill.id, response: text }, req.signal);
+      // real round trip, measured before the pause below that lets the listening moment land
+      const latency = Date.now() - started;
       // let the listening moment land even when the reply is instant
       const wait = Math.max(0, 1100 - (Date.now() - started));
       await new Promise((r) => setTimeout(r, wait));
       if (req.signal.aborted) return;
+      // ids and enums only: never the learner's words or the coach's feedback text
+      track('drill_answered', { drill_id: drill.id, skill: drill.skill, level: drill.level, format: 'text', hit_target: !!fb.hitTarget });
+      track('drill_feedback_received', { drill_id: drill.id, latency_ms: latency, move: fb.move, hit_target: !!fb.hitTarget });
       setFeedback({ ...fb, possibleResponses: fb.possibleResponses ?? [] });
       setPhase('feedback');
       onRepDone({ response: text, feedback: { ...fb, possibleResponses: fb.possibleResponses ?? [] }, startedAt: repStarted });
@@ -247,7 +267,10 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
 
   // the panel drops away first (FeedbackPanel open=false → onExited), then the rep resets
   const [leavingPanel, setLeavingPanel] = useState<null | 'retry'>(null);
-  const tryAgain = () => setLeavingPanel('retry');
+  const tryAgain = () => {
+    track('next_step_chosen', { from: 'drill', choice: 'try_again' });
+    setLeavingPanel('retry');
+  };
   const panelExited = () => {
     setLeavingPanel(null);
     setDraft('');

@@ -23,8 +23,9 @@ import { Conversation } from '@/components/roleplay/Conversation';
 import { Debrief, type NextChoice } from '@/components/roleplay/Debrief';
 import { Reflection } from '@/components/roleplay/Reflection';
 import { Avatar, Button, Raised, Text, WifiSlashIcon, color, haptic, layout, space } from '@/design';
-import { openDrill, openRoleplay, pickDrill, type PracticeSource } from '@/data/routes';
+import { openDrill, openRoleplay, pickDrill } from '@/data/routes';
 import { postJson } from '@/lib/api';
+import { practiceSource, track } from '@/lib/analytics';
 import { FADE_MS, useReduceMotion } from '@/motion';
 import type { Rect } from '@/motion/launch';
 import { useLearner, type PracticeSession } from '@/state/store';
@@ -71,9 +72,14 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   // when this conversation started (the brief's START), for the session's duration
   const startedAt = useRef(new Date().toISOString());
   const inflight = useRef<ReturnType<typeof withTimeout> | null>(null);
-  const source = (params.source as PracticeSource) ?? 'practice';
 
   useEffect(() => () => inflight.current?.abort(), []);
+
+  // one start per role-play screen; "Try again" reports its own below
+  useEffect(() => {
+    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: practiceSource(params.source) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const requestDebrief = async (r: SelfReflection, t: Turn[]) => {
     setPhase('thinking');
@@ -84,12 +90,14 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
     const started = Date.now();
     try {
       const d = await postJson<DebriefData>('/api/roleplay/debrief', { scenarioId: scenario.id, turns: t, selfReflection: r }, req.signal);
+      const latency = Date.now() - started;
       // the coach takes a moment: long enough to read as intentional, never padded past ~2.4s
       await new Promise((res) => setTimeout(res, Math.max(0, 2400 - (Date.now() - started))));
       if (inflight.current !== req) return;
       const nd = normalize(d);
       setDebrief(nd);
       setPhase('debrief');
+      track('debrief_viewed', { scenario_id: scenario.id, latency_ms: latency, suggested_next_step: nd.suggestedNextStep });
       const ended = new Date();
       // the conversation itself, kept so it syncs and can be shared with a trainer
       setSaved(
@@ -122,6 +130,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   };
 
   const restart = () => {
+    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: 'next_step' });
     setTurns(opening);
     setReflection(null);
     setDebrief(null);
@@ -132,10 +141,14 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   };
 
   const next = (c: NextChoice) => {
+    track('next_step_chosen', {
+      from: 'debrief',
+      choice: c === 'try-again' ? 'try_again' : c === 'same-skill' ? 'same_skill' : c === 'harder' ? 'harder' : 'new_scenario',
+    });
     if (c === 'try-again') return restart();
     if (c === 'same-skill') {
       const lvl = useLearner.getState().skills[scenario.primaryChallenge]?.level ?? 1;
-      return openDrill(pickDrill(scenario.primaryChallenge, lvl), { minutes: 5, source, replace: true });
+      return openDrill(pickDrill(scenario.primaryChallenge, lvl), { minutes: 5, source: 'next_step', replace: true });
     }
     const target =
       c === 'harder'
@@ -143,7 +156,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
         : c === 'easier'
           ? scenario.easierId
           : SCENARIOS.filter((s) => s.id !== scenario.id)[Math.floor(Math.random() * (SCENARIOS.length - 1))]?.id;
-    if (target) openRoleplay(target, { minutes: 12, source, replace: true });
+    if (target) openRoleplay(target, { minutes: 12, source: 'next_step', replace: true });
   };
 
   let body: ReactNode;
@@ -194,6 +207,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
         onClose={close}
         onSubmit={(r) => {
           setReflection(r);
+          track('reflection_submitted', { scenario_id: scenario.id, feeling: r.feeling });
           requestDebrief(r, turns);
         }}
       />

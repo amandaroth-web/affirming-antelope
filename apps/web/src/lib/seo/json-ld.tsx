@@ -1,0 +1,117 @@
+import { APP_URL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+
+type Json = Record<string, unknown>;
+
+/** Renders schema.org JSON-LD, escaping `<` so content can't close the script tag. */
+export function JsonLd({ data }: { data: Json | Json[] }) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }}
+    />
+  );
+}
+
+const ORG_ID = `${SITE_URL}/#organization`;
+const SITE_ID = `${SITE_URL}/#website`;
+const APP_ID = `${SITE_URL}/#app`;
+
+export function organizationLd(): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": ORG_ID,
+    name: SITE_NAME,
+    url: SITE_URL,
+    logo: `${SITE_URL}/brand-logo.png`,
+    description: SITE_DESCRIPTION,
+  };
+}
+
+export function websiteLd(): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": SITE_ID,
+    name: SITE_NAME,
+    url: SITE_URL,
+    inLanguage: "en",
+    publisher: { "@id": ORG_ID },
+  };
+}
+
+export function softwareApplicationLd({
+  description = SITE_DESCRIPTION,
+  audience,
+}: { description?: string; audience?: string } = {}): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "@id": APP_ID,
+    name: SITE_NAME,
+    url: APP_URL,
+    applicationCategory: "EducationalApplication",
+    operatingSystem: "Web, iOS (coming soon)",
+    description,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    publisher: { "@id": ORG_ID },
+    ...(audience ? { audience: { "@type": "Audience", audienceType: audience } } : {}),
+  };
+}
+
+export function faqPageLd(faq: { q: string; a: string }[], url: string): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    url,
+    mainEntity: faq.map(({ q, a }) => ({
+      "@type": "Question",
+      name: q,
+      acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+}
+
+export function breadcrumbLd(items: { name: string; path: string }[]): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      item: new URL(item.path, SITE_URL).toString(),
+    })),
+  };
+}
+
+export function articleLd(a: {
+  title: string;
+  description: string;
+  path: string;
+  updated: string;
+  published?: string;
+  keywords?: string[];
+}): Json {
+  const url = new URL(a.path, SITE_URL).toString();
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: a.title,
+    description: a.description,
+    url,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    image: `${url}/opengraph-image`,
+    datePublished: a.published ?? a.updated,
+    dateModified: a.updated,
+    inLanguage: "en",
+    ...(a.keywords?.length ? { keywords: a.keywords.join(", ") } : {}),
+    author: { "@id": ORG_ID, "@type": "Organization", name: SITE_NAME },
+    publisher: {
+      "@type": "Organization",
+      "@id": ORG_ID,
+      name: SITE_NAME,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/brand-logo.png` },
+    },
+  };
+}

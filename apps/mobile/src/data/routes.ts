@@ -13,7 +13,7 @@ import { markReplace } from '@/motion/launch';
  * `source` is where the learner came from: 'today' | 'path' | 'assignment' | 'practice' | 'challenge' | 'review'.
  * `activityId` is set only for course activities; pass it to recordPractice so the path advances.
  */
-export type PracticeSource = 'today' | 'path' | 'assignment' | 'practice' | 'challenge' | 'review';
+export type PracticeSource = 'today' | 'path' | 'assignment' | 'practice' | 'challenge' | 'review' | 'next_step';
 
 /**
  * `replace: true` swaps the current practice screen instead of stacking a new
@@ -53,10 +53,10 @@ export function openRoleplay(scenarioId: string, opts: { activityId?: string; mi
   });
 }
 
-export function openLesson(id: string, opts: { activityId?: string; minutes?: number } & Nav) {
+export function openLesson(id: string, opts: { activityId?: string; minutes?: number; source?: PracticeSource } & Nav) {
   go(opts, {
     pathname: '/lesson/[id]',
-    params: { id, ...(opts.activityId ? { activityId: opts.activityId } : {}), ...(opts.minutes ? { minutes: String(opts.minutes) } : {}) },
+    params: { id, ...(opts.source ? { source: opts.source } : {}), ...(opts.activityId ? { activityId: opts.activityId } : {}), ...(opts.minutes ? { minutes: String(opts.minutes) } : {}) },
   });
 }
 
@@ -64,7 +64,7 @@ export function openActivity(a: PathActivity, source: PracticeSource = 'path', n
   const ref = a.refIds?.[0] ?? a.id;
   if (a.kind === 'drill') openDrill(ref, { activityId: a.id, minutes: a.minutes, source, ...nav });
   else if (a.kind === 'roleplay') openRoleplay(ref, { activityId: a.id, minutes: a.minutes, source, ...nav });
-  else openLesson(ref, { activityId: a.id, minutes: a.minutes, ...nav });
+  else openLesson(ref, { activityId: a.id, minutes: a.minutes, source, ...nav });
 }
 
 /** The path activity a practice screen was opened for, if any. */

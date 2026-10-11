@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { GetTheApp } from "./get-the-app";
+import { CtaNote, GetTheApp } from "./get-the-app";
 import { Mascot } from "./mascot";
 
 export function Hero() {
@@ -17,12 +17,13 @@ export function Hero() {
           <h1 className="max-w-[15ch] pb-1 font-display text-4xl font-bold leading-[1.04] tracking-tight text-ink md:text-5xl lg:text-[3.4rem]">
             Practice better conversations.
           </h1>
-          <p className="mt-5 max-w-[36ch] text-lg font-semibold leading-snug text-muted">
-            Five-minute OARS drills from Amanda. Practice out loud, build a
-            streak, and walk into your next session ready.
+          <p className="mt-5 max-w-[38ch] text-lg font-semibold leading-snug text-muted">
+            Five-minute OARS drills and live role-plays with realistic
+            employees, from Amanda. Practice out loud, build a streak, and walk
+            into your next conversation ready.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <GetTheApp />
+            <GetTheApp location="hero" size="lg" />
             <a
               href="#how-it-works"
               className="text-base font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -30,6 +31,7 @@ export function Hero() {
               How it works
             </a>
           </div>
+          <CtaNote className="mt-4" />
         </div>
 
         <div className="relative md:col-span-6">
@@ -56,7 +58,7 @@ export function Hero() {
                 alt="Affirming Antelope waving hello"
                 width={674}
                 height={978}
-                priority
+                preload
                 className="mx-auto h-[24rem] w-auto max-w-full md:h-[27rem]"
               />
             </div>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 
 const nunito = Nunito({
   variable: "--font-nunito",
@@ -15,23 +16,29 @@ const fredoka = Fredoka({
 });
 
 export const metadata: Metadata = {
-  title: "Affirming Antelope",
+  metadataBase: new URL("https://affirmingantelope.com"),
+  title: {
+    default: "Affirming Antelope: Motivational Interviewing practice",
+    template: "%s · Affirming Antelope",
+  },
   applicationName: "Affirming Antelope",
   description:
-    "The fun way to get better at Motivational Interviewing. Daily OARS drills from Amanda.",
+    "Free Motivational Interviewing practice: five-minute OARS drills, live AI role-plays with realistic employees, and opt-in trainer review. Works in your browser.",
   openGraph: {
     type: "website",
     siteName: "Affirming Antelope",
-    title: "Affirming Antelope",
+    locale: "en_US",
+    title: "Affirming Antelope: Motivational Interviewing practice",
     description:
-      "Five-minute OARS drills that help Motivational Interviewing skills stick.",
+      "Five-minute OARS drills and live role-plays that help Motivational Interviewing skills stick. Free, in your browser.",
   },
   twitter: {
-    card: "summary",
-    title: "Affirming Antelope",
+    card: "summary_large_image",
+    title: "Affirming Antelope: Motivational Interviewing practice",
     description:
-      "Five-minute OARS drills that help Motivational Interviewing skills stick.",
+      "Five-minute OARS drills and live role-plays that help Motivational Interviewing skills stick. Free, in your browser.",
   },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -46,6 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full bg-background font-sans text-foreground">
         {children}
+        <AnalyticsProvider />
       </body>
     </html>
   );

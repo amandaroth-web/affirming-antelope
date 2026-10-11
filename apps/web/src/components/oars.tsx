@@ -43,7 +43,7 @@ export function Oars() {
           >
             Your OARS path.
           </h2>
-          <p className="mt-3 max-w-[40ch] text-lg font-semibold text-muted">
+          <p className="mt-3 max-w-[40ch] text-lg font-semibold text-ink/80">
             Four skills. One conversation. Drill them like vocab.
           </p>
         </Reveal>
