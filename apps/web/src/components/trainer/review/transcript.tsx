@@ -19,12 +19,15 @@ export function Transcript({
   annotations,
   keyMomentIds,
   personaName,
+  counterpart,
   learnerName,
 }: {
   turns: Turn[];
   annotations: TurnAnnotation[];
   keyMomentIds: string[];
   personaName: string;
+  /** "Patient" or "Employee". */
+  counterpart: string;
   learnerName: string;
 }) {
   const ann = new Map(annotations.map((a) => [a.turnId, a]));
@@ -52,7 +55,7 @@ export function Transcript({
           return (
             <li key={t.id} id={`turn-${t.id}`} className={`flex scroll-mt-24 ${learner ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[min(560px,88%)] ${learner ? "items-end text-right" : ""} flex flex-col`}>
-                <p className="mb-1 px-1 text-[12px] font-extrabold text-muted">{learner ? learnerName : persona}</p>
+                <p className="mb-1 px-1 text-[12px] font-extrabold text-muted">{learner ? learnerName : `${persona} · ${counterpart}`}</p>
                 <div
                   className={`rounded-[20px] border-2 px-4 py-3 text-left text-[15px] font-semibold leading-relaxed ${
                     learner
@@ -80,7 +83,7 @@ export function Transcript({
                     ) : null}
                     {!learner && a.talk ? (
                       <Tag note={a.note} className={TALK_STYLE[a.talk]}>
-                        {TALK[a.talk].label}
+                        {counterpart}: {TALK[a.talk].label}
                         {a.stance ? <span className="font-bold opacity-75"> · {stanceLabel(a.stance, a.intensity)}</span> : null}
                       </Tag>
                     ) : null}

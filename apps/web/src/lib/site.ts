@@ -8,7 +8,7 @@ export const APP_URL = "https://app.affirmingantelope.com";
 export const SITE_NAME = "Affirming Antelope";
 export const SITE_TAGLINE = "Motivational Interviewing practice";
 export const SITE_DESCRIPTION =
-  "Free Motivational Interviewing practice: five-minute OARS drills, live AI role-plays with realistic employees, and opt-in trainer review. Works in your browser.";
+  "Free Motivational Interviewing practice for clinicians and leaders: five-minute OARS drills, live AI role-plays with realistic patients and employees, and opt-in trainer review. Works in your browser.";
 
 export type Audience = "clinicians" | "leaders" | "trainers";
 export type CtaTarget = "app" | "trainer";

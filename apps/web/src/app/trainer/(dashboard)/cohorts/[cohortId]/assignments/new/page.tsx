@@ -28,7 +28,7 @@ export default async function NewAssignmentPage({ params }: PageProps<"/trainer/
         <ArrowLeft size={16} weight="bold" aria-hidden /> Assignments
       </Link>
       <h2 className="mt-3 font-display text-[24px] font-bold text-ink">New assignment</h2>
-      <AssignmentComposer cohortId={cohort.id} trainerName={viewer.displayName} defaultDue={defaultDue()} />
+      <AssignmentComposer cohortId={cohort.id} pathwayId={cohort.pathwayId} trainerName={viewer.displayName} defaultDue={defaultDue()} />
     </div>
   );
 }

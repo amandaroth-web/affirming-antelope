@@ -5,18 +5,21 @@
 import {
   DRILLS,
   LESSONS,
-  MI_FOR_LEADERS,
   SCENARIOS,
   SKILLS,
+  counterpartLabel,
   getDrill,
   getLesson,
+  getPathway,
   getScenario,
   getSkill,
+  getUnit,
   type ActivityKind,
   type ClientTalk,
   type Difficulty,
   type LearnerMove,
   type MoveTallies,
+  type Setting,
   type SkillId,
   type Stance,
 } from "@antelope/core";
@@ -125,14 +128,6 @@ export function ratingLabel(r?: string | null): string | null {
 
 export const SKILL_OPTIONS = SKILLS.map((s) => ({ id: s.id, name: s.name, tagline: s.tagline }));
 
-/** Skills that have at least one drill, in SKILLS order. */
-export const DRILL_SKILLS: SkillId[] = SKILLS.map((s) => s.id).filter((id) => DRILLS.some((d) => d.skill === id));
-
-/** Skills that have at least one role-play (as the primary challenge). */
-export const ROLEPLAY_SKILLS: SkillId[] = SKILLS.map((s) => s.id).filter((id) =>
-  SCENARIOS.some((s) => s.primaryChallenge === id),
-);
-
 export function skillName(id?: string | null): string {
   if (!id) return "";
   try {
@@ -142,33 +137,78 @@ export function skillName(id?: string | null): string {
   }
 }
 
-/** Lessons with the pathway week and unit they sit in. */
-export const LESSON_OPTIONS = LESSONS.map((l) => {
-  const unit = MI_FOR_LEADERS.units.find((u) => u.id === l.unitId);
-  return { id: l.id, title: l.title, week: unit?.week ?? 0, unitTitle: unit?.title ?? "" };
-}).sort((a, b) => a.week - b.week);
+/** The label for the other person in a conversation: "Patient" for clinical, "Employee" for workplace. */
+export function counterpartOf(setting: Setting | undefined): string {
+  return counterpartLabel(setting ?? "workplace");
+}
 
-export const DRILL_OPTIONS = DRILLS.map((d) => ({
-  id: d.id,
-  skill: d.skill,
-  level: d.level,
-  context: d.context,
-  prompt: d.prompt,
-  instruction: d.instruction,
-}));
+export interface PickerCatalog {
+  setting: Setting;
+  pathwayId: string;
+  pathwayTitle: string;
+  /** Skills with at least one drill in this setting, in SKILLS order. */
+  drillSkills: SkillId[];
+  /** Drill count per skill, this setting only. */
+  drillCounts: Partial<Record<SkillId, number>>;
+  /** Lessons from this pathway, with the week and unit they sit in. */
+  lessons: { id: string; title: string; week: number; unitTitle: string }[];
+  drills: { id: string; skill: SkillId; level: number; context: string; prompt: string; instruction: string }[];
+  scenarios: {
+    id: string;
+    title: string;
+    context: string;
+    issue: string;
+    persona: string;
+    personaName: string;
+    brief: string;
+    goal: string;
+    difficulty: Difficulty;
+    skill: SkillId;
+  }[];
+}
 
-export const SCENARIO_OPTIONS = SCENARIOS.map((s) => ({
-  id: s.id,
-  title: s.title,
-  context: s.context,
-  issue: s.issue,
-  persona: `${s.persona.name}, ${s.persona.role}`,
-  personaName: s.persona.name,
-  brief: s.learnerBrief,
-  goal: s.learnerGoal,
-  difficulty: s.difficulty,
-  skill: s.primaryChallenge,
-}));
+/**
+ * Everything a trainer can pick for a cohort on this pathway: the pathway's lessons, and
+ * only the drills and role-plays written for its setting (clinical vs workplace).
+ */
+export function catalogFor(pathwayId: string | null | undefined): PickerCatalog {
+  const pathway = getPathway(pathwayId);
+  const setting = pathway.setting;
+  const drills = DRILLS.filter((d) => d.setting === setting);
+  const drillCounts: Partial<Record<SkillId, number>> = {};
+  for (const d of drills) drillCounts[d.skill] = (drillCounts[d.skill] ?? 0) + 1;
+  return {
+    setting,
+    pathwayId: pathway.id,
+    pathwayTitle: pathway.title,
+    drillSkills: SKILLS.map((s) => s.id).filter((id) => (drillCounts[id] ?? 0) > 0),
+    drillCounts,
+    lessons: LESSONS.flatMap((l) => {
+      const unit = pathway.units.find((u) => u.id === l.unitId);
+      return unit ? [{ id: l.id, title: l.title, week: unit.week, unitTitle: unit.title }] : [];
+    }).sort((a, b) => a.week - b.week),
+    drills: drills.map((d) => ({
+      id: d.id,
+      skill: d.skill,
+      level: d.level,
+      context: d.context,
+      prompt: d.prompt,
+      instruction: d.instruction,
+    })),
+    scenarios: SCENARIOS.filter((s) => s.setting === setting).map((s) => ({
+      id: s.id,
+      title: s.title,
+      context: s.context,
+      issue: s.issue,
+      persona: `${s.persona.name}, ${s.persona.role}`,
+      personaName: s.persona.name,
+      brief: s.learnerBrief,
+      goal: s.learnerGoal,
+      difficulty: s.difficulty,
+      skill: s.primaryChallenge,
+    })),
+  };
+}
 
 /** Human title for a content reference. */
 export function refTitle(kind: string | null | undefined, ref: string | null | undefined): string {
@@ -237,8 +277,9 @@ export function itemDetail(i: ItemDraft): string {
       return s ? `${s.persona.name} · ${s.context} · ${DIFFICULTY[s.difficulty]}` : "";
     }
     case "learn": {
-      const l = LESSON_OPTIONS.find((x) => x.id === i.refId);
-      return l ? `Week ${l.week} · ${l.unitTitle}` : "";
+      const l = i.refId ? getLesson(i.refId) : undefined;
+      const unit = l ? getUnit(l.unitId) : undefined;
+      return unit ? `Week ${unit.week} · ${unit.title}` : "";
     }
   }
 }
@@ -265,18 +306,41 @@ export function summarizeItems(items: ItemDraft[]): string {
   return parts.join(" + ");
 }
 
-/** Validates an item against core content. Returns an error message or null. */
-export function validateItem(i: ItemDraft): string | null {
+/**
+ * Validates an item against core content. Returns an error message or null. With a
+ * pathway, the item must also belong to it: drills and role-plays of its setting,
+ * lessons from its units.
+ */
+export function validateItem(i: ItemDraft, pathwayId?: string | null): string | null {
+  const pathway = pathwayId ? getPathway(pathwayId) : null;
   if (!Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 50) return "Pick between 1 and 50.";
   if (i.kind === "any-drill" || i.kind === "any-roleplay") {
     if (i.refId) return "Unexpected content id.";
     if (i.skill && !SKILLS.some((s) => s.id === i.skill)) return "Unknown skill.";
+    if (pathway && i.kind === "any-drill" && i.skill && !DRILLS.some((d) => d.setting === pathway.setting && d.skill === i.skill)) {
+      return `${pathway.title} has no drills on that skill.`;
+    }
+    if (pathway && i.kind === "any-roleplay" && i.skill && !SCENARIOS.some((s) => s.setting === pathway.setting && s.primaryChallenge === i.skill)) {
+      return `${pathway.title} has no role-plays on that skill.`;
+    }
     return null;
   }
   if (!i.refId) return "Pick something to practice.";
-  if (i.kind === "drill" && !getDrill(i.refId)) return "Unknown drill.";
-  if (i.kind === "roleplay" && !getScenario(i.refId)) return "Unknown role-play.";
-  if (i.kind === "learn" && !getLesson(i.refId)) return "Unknown lesson.";
+  if (i.kind === "drill") {
+    const d = getDrill(i.refId);
+    if (!d) return "Unknown drill.";
+    if (pathway && d.setting !== pathway.setting) return `That drill isn't part of ${pathway.title}.`;
+  }
+  if (i.kind === "roleplay") {
+    const s = getScenario(i.refId);
+    if (!s) return "Unknown role-play.";
+    if (pathway && s.setting !== pathway.setting) return `That role-play isn't part of ${pathway.title}.`;
+  }
+  if (i.kind === "learn") {
+    const l = getLesson(i.refId);
+    if (!l) return "Unknown lesson.";
+    if (pathway && !pathway.units.some((u) => u.id === l.unitId)) return `That lesson isn't part of ${pathway.title}.`;
+  }
   return null;
 }
 

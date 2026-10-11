@@ -3,8 +3,9 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { Plus } from "@phosphor-icons/react";
+import { useId, useState, useTransition } from "react";
+import { Plus, Stethoscope, UsersThree } from "@phosphor-icons/react";
+import { listPathways, type Pathway } from "@antelope/core";
 import { createCohort } from "@/app/trainer/actions";
 import { track } from "@/lib/analytics/client";
 import { JoinCode } from "./join-code";
@@ -12,12 +13,23 @@ import { Modal } from "./modal";
 import { buttonClass } from "./ui";
 import { fieldClass, hintClass, labelClass } from "./fields";
 
+const PATHWAY_ICON = { clinical: Stethoscope, workplace: UsersThree } as const;
+
+/** Clinicians first: it is the shorter pathway and the one most trainers start with. */
+function pathwayChoices(): Pathway[] {
+  return [...listPathways()].sort((a, b) => (a.setting === b.setting ? 0 : a.setting === "clinical" ? -1 : 1));
+}
+
 export function CreateCohortButton({ size = "md", label = "New cohort" }: { size?: "md" | "lg"; label?: string }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [startsOn, setStartsOn] = useState("");
+  const [pathwayId, setPathwayId] = useState<string | null>(null);
+  const uid = useId();
+  const choices = pathwayChoices();
+  const chosen = choices.find((p) => p.id === pathwayId);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; name: string; joinCode: string } | null>(null);
   const [pending, start] = useTransition();
@@ -29,6 +41,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
       setCreated(null);
       setName("");
       setStartsOn("");
+      setPathwayId(null);
       setError(null);
     }, 250);
   }
@@ -36,8 +49,9 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!pathwayId) return setError("Choose a pathway for this cohort.");
     start(async () => {
-      const res = await createCohort({ name, startsOn: startsOn || null });
+      const res = await createCohort({ name, startsOn: startsOn || null, pathwayId });
       if (!res.ok) setError(res.error);
       else {
         track("cohort_created");
@@ -58,7 +72,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
         description={
           created
             ? `Share this code with the people in ${created.name}. They enter it in the app to join.`
-            : "A cohort is a group of learners you train together on the MI for Leaders pathway."
+            : "A cohort is a group of learners you train together on one pathway."
         }
       >
         <AnimatePresence mode="wait" initial={false}>
@@ -95,6 +109,39 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
             </motion.div>
           ) : (
             <motion.form key="form" onSubmit={submit} exit={{ opacity: 0 }} className="grid gap-5">
+              <fieldset>
+                <legend className={labelClass}>Pathway</legend>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  {choices.map((p) => {
+                    const Icon = PATHWAY_ICON[p.setting];
+                    return (
+                      <label
+                        key={p.id}
+                        className="flex cursor-pointer flex-col rounded-2xl border-2 border-line bg-white p-4 transition-colors hover:border-primary-tint has-[:checked]:border-primary has-[:checked]:bg-primary-tint/40 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-primary/40"
+                      >
+                        <input
+                          type="radio"
+                          name={`${uid}-pathway`}
+                          value={p.id}
+                          checked={pathwayId === p.id}
+                          onChange={() => setPathwayId(p.id)}
+                          className="sr-only"
+                        />
+                        <span className="flex items-center gap-2.5">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-soft text-primary-shadow">
+                            <Icon size={20} weight="bold" aria-hidden />
+                          </span>
+                          <span className="font-display text-[17px] font-bold leading-tight text-ink">{p.title}</span>
+                        </span>
+                        <span className="mt-2.5 text-[14px] font-semibold leading-snug text-ink/80">{p.tagline}</span>
+                        <span className="mt-2 text-[13px] font-extrabold text-primary-shadow">{p.units.length} weeks</span>
+                        <span className="mt-0.5 text-[12px] font-semibold leading-snug text-muted">For {p.audience}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className={`${hintClass} mt-2`}>This sets the lessons, drills, and role-plays you can assign. You can't change it later.</p>
+              </fieldset>
               <div>
                 <label htmlFor="cohort-name" className={labelClass}>
                   Cohort name
@@ -106,7 +153,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
                   required
                   maxLength={120}
                   autoFocus
-                  placeholder="MI for Leaders — Spring cohort"
+                  placeholder={`${chosen?.title ?? "MI for Clinicians"} — Spring cohort`}
                   className={fieldClass}
                 />
               </div>
@@ -126,7 +173,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
                 <button type="button" onClick={close} className={buttonClass("ghost")}>
                   Cancel
                 </button>
-                <button type="submit" disabled={pending || !name.trim()} className={buttonClass("primary")}>
+                <button type="submit" disabled={pending || !name.trim() || !pathwayId} className={buttonClass("primary")}>
                   {pending ? "Creating…" : "Create cohort"}
                 </button>
               </div>

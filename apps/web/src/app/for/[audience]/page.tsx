@@ -66,13 +66,24 @@ const bubble: Record<AudiencePage["slug"], string> = {
   trainers: "Two to review!",
 };
 
+/** The hero drill per audience: a clinician-patient drill for clinicians, a manager-employee one for leaders. */
+const SHOWCASE_DRILL: Partial<Record<AudiencePage["slug"], string>> = {
+  clinicians: "drill-cl-oars-02",
+};
+
 function Showcase({ page }: { page: AudiencePage }) {
   if (page.showcase === "drill") {
-    const drill = getDrill("drill-oars-02");
+    const drill = getDrill(SHOWCASE_DRILL[page.slug] ?? "drill-oars-02");
     return drill ? <DrillShowcase drill={drill} /> : null;
   }
   if (page.showcase === "pathway") {
-    return <PathwayShowcase units={MI_FOR_LEADERS.units.slice(0, 5)} total={MI_FOR_LEADERS.units.length} />;
+    return (
+      <PathwayShowcase
+        title={MI_FOR_LEADERS.title}
+        units={MI_FOR_LEADERS.units.slice(0, 5)}
+        total={MI_FOR_LEADERS.units.length}
+      />
+    );
   }
   return <CohortShowcase />;
 }
@@ -102,7 +113,7 @@ export default async function AudienceRoute({ params }: PageProps<"/for/[audienc
         {/* Hero */}
         <section>
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-12 md:grid-cols-12 md:gap-8 md:px-8 md:py-16">
-            <div className="md:col-span-6">
+            <div className="min-w-0 md:col-span-6">
               <p className="mb-4 inline-flex rounded-xl bg-soft px-3 py-1.5 text-sm font-extrabold text-primary-shadow">
                 {page.eyebrow}
               </p>
@@ -128,7 +139,7 @@ export default async function AudienceRoute({ params }: PageProps<"/for/[audienc
                 <CtaNote className="mt-4" />
               )}
             </div>
-            <div className="relative md:col-span-6">
+            <div className="relative min-w-0 md:col-span-6">
               <Showcase page={page} />
               <div className="pointer-events-none relative z-10 mx-auto -mt-6 flex max-w-[26rem] items-end justify-end gap-1 pr-2">
                 <p className="mb-14 rounded-2xl rounded-br-md border-2 border-line bg-white px-3 py-2 text-sm font-extrabold text-ink shadow-[0_3px_0_var(--shadow)]">
@@ -242,13 +253,42 @@ export default async function AudienceRoute({ params }: PageProps<"/for/[audienc
           </div>
         </section>
 
-        <div className="border-t-2 border-line bg-soft">
+        {page.pathway && page.pathwaySection && (
+          <section className="border-t-2 border-line bg-soft" aria-labelledby="pathway-heading">
+            <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 md:grid-cols-2 md:px-8 md:py-24">
+              <Reveal className="min-w-0">
+                <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-primary-shadow">
+                  {page.pathway.title}
+                </p>
+                <h2
+                  id="pathway-heading"
+                  className="mt-2 max-w-[18ch] pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
+                >
+                  {page.pathwaySection.heading}
+                </h2>
+                <p className="mt-3 max-w-[44ch] text-lg font-semibold text-ink/80">{page.pathwaySection.body}</p>
+              </Reveal>
+              <div className="min-w-0">
+                <PathwayShowcase
+                  title={page.pathway.title}
+                  units={page.pathway.units.slice(0, 5)}
+                  total={page.pathway.units.length}
+                />
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className={`border-t-2 border-line ${page.pathway ? "" : "bg-soft"}`}>
           <Scenarios
+            setting={page.setting}
             heading={isTrainer ? "The role-plays you can assign" : "Who you'll talk to"}
             body={
               isTrainer
-                ? "Each scenario has a brief, a goal, and a difficulty. The employee's backstory stays hidden, so learners have to draw it out."
-                : "Every person here is fictional, with a history you don't see. Their first line is below. The rest depends on you."
+                ? "Each scenario has a brief, a goal, and a difficulty. Their backstory stays hidden, so learners have to draw it out."
+                : page.setting === "clinical"
+                  ? "Every patient here is fictional, with a history you don't see. Their first line is below. The rest depends on you."
+                  : "Every person here is fictional, with a history you don't see. Their first line is below. The rest depends on you."
             }
           />
         </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getPathway } from "@antelope/core";
 import { ArrowRight, CalendarBlank, ChatCircleText, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { TrackOnMount } from "@/components/analytics/track-on-mount";
 import { createClient } from "@/lib/supabase/server";
@@ -113,7 +114,10 @@ export default async function CohortsHome({ searchParams }: PageProps<"/trainer"
                     className={`group block h-full rounded-[20px] border-2 border-line bg-white p-6 shadow-[0_5px_0_var(--shadow)] transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-primary-tint hover:shadow-[0_7px_0_var(--shadow)] active:translate-y-[3px] active:shadow-[0_2px_0_var(--shadow)] ${focusRing}`}
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className="font-display text-[21px] font-bold leading-tight text-ink">{c.name}</h3>
+                      <div className="min-w-0">
+                        <h3 className="font-display text-[21px] font-bold leading-tight text-ink">{c.name}</h3>
+                        <p className="mt-1 text-[13px] font-extrabold text-primary-shadow">{getPathway(c.pathwayId).title}</p>
+                      </div>
                       {needs ? <Badge tone="gold">{needs} to review</Badge> : <Badge tone="teal">Caught up</Badge>}
                     </div>
                     <dl className="mt-5 grid grid-cols-2 gap-4 text-[14px]">

@@ -86,6 +86,8 @@ export function TrackCard({
       contentStyle={styles.face}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      // react-native-web 0.21 ignores accessibilityState; aria-checked is what the web build exposes
+      aria-checked={selected}
       accessibilityLabel={`${trackName(id)}. ${pathway.title}, ${weeks}. ${pathway.tagline}${compact ? '' : ` For ${pathway.audience}.`}${current ? ' Your current track.' : ''}`}
     >
       <Animated.View style={[StyleSheet.absoluteFill, styles.edge, edge]} pointerEvents="none" />

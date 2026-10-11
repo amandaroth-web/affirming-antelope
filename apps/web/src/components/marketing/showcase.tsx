@@ -79,14 +79,14 @@ export function DrillShowcase({ drill }: { drill: Drill }) {
   );
 }
 
-/** The first weeks of MI for Leaders, from @antelope/core. */
-export function PathwayShowcase({ units, total }: { units: PathUnit[]; total: number }) {
+/** The first weeks of a pathway (MI for Leaders or MI for Clinicians), from @antelope/core. */
+export function PathwayShowcase({ title, units, total }: { title: string; units: PathUnit[]; total: number }) {
   const reduce = useReducedMotion();
   return (
     <div className={card}>
       <div className="flex items-baseline justify-between">
         <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-primary-shadow">
-          MI for Leaders
+          {title}
         </p>
         <p className="text-sm font-extrabold text-muted">{total} weeks</p>
       </div>

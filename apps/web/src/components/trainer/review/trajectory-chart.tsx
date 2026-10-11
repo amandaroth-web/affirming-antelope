@@ -97,7 +97,16 @@ export function MoveShape({ family, x = 0, y = 0, size = 7, stroke = "white" }: 
   }
 }
 
-export function TrajectoryChart({ exchanges, personaName }: { exchanges: Exchange[]; personaName: string }) {
+export function TrajectoryChart({
+  exchanges,
+  personaName,
+  counterpart,
+}: {
+  exchanges: Exchange[];
+  personaName: string;
+  /** "Patient" or "Employee". */
+  counterpart: string;
+}) {
   const reduce = useReducedMotion();
   const uid = useId();
   const wrap = useRef<HTMLDivElement>(null);
@@ -180,7 +189,7 @@ export function TrajectoryChart({ exchanges, personaName }: { exchanges: Exchang
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[14px] font-semibold text-muted">
-          {asList ? "Each exchange, in order." : `How open ${first} was after each of the learner's replies.`}
+          {asList ? "Each exchange, in order." : `How open ${first}, the ${counterpart.toLowerCase()}, was after each of the learner's replies.`}
         </p>
         <button type="button" onClick={() => setAsList((v) => !v)} className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[13px] font-extrabold text-primary hover:bg-soft ${focusRing}`}>
           {asList ? <ChartLine size={16} weight="bold" aria-hidden /> : <ListBullets size={16} weight="bold" aria-hidden />}
@@ -305,7 +314,7 @@ export function TrajectoryChart({ exchanges, personaName }: { exchanges: Exchang
               </svg>
 
               {/* Focusable exchange targets (one per point), full plot height */}
-              <div role="group" aria-label={`${first}'s openness, exchange by exchange`} onKeyDown={onKey} className="absolute top-0 left-0" style={{ width: w, height: H }}>
+              <div role="group" aria-label={`${counterpart} ${first}'s openness, exchange by exchange`} onKeyDown={onKey} className="absolute top-0 left-0" style={{ width: w, height: H }}>
                 {geo.pts.map((p, i) => {
                   const e = exchanges[i];
                   const half = n > 1 ? geo.step / 2 : 40;
@@ -382,6 +391,12 @@ export function TrajectoryChart({ exchanges, personaName }: { exchanges: Exchang
               {FAMILY[f].label}
             </li>
           ))}
+          <li className="flex items-center gap-2 text-[13px] font-bold text-ink/80">
+            <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden>
+              <path d="M1 11 C5 11 5 4 8 4 S11 8 15 5" fill="none" stroke="var(--primary)" strokeWidth={2.5} strokeLinecap="round" />
+            </svg>
+            {counterpart}&apos;s openness
+          </li>
           {exchanges.some((e) => e.keyMoment) ? (
             <li className="flex items-center gap-2 text-[13px] font-bold text-ink/80">
               <span className="h-3.5 w-3.5 rounded-full border-2 border-gold bg-gold-tint" aria-hidden /> Key moment
