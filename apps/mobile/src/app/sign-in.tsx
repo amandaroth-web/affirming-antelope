@@ -82,12 +82,15 @@ export default function SignIn() {
     setStep(next);
   };
 
+  // Opened directly (e.g. a web reload on /sign-in) there's nothing to go back to.
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
   const finish = () => {
     if (reason === 'cohort' && useAccount.getState().cohorts.length === 0) {
       router.replace('/join');
       return;
     }
-    router.back();
+    close();
     // first launch: once the sheet is down, the welcome hands over to Home
     if (reason === 'welcome') setTimeout(() => useAccount.getState().set({ onboarded: true }), 360);
   };
@@ -185,7 +188,7 @@ export default function SignIn() {
   return (
     <View style={flowStyles.root}>
       <FlowHeader
-        onClose={step === 'code' ? undefined : () => router.back()}
+        onClose={step === 'code' ? undefined : close}
         onBack={step === 'code' ? () => go('email', true) : undefined}
         center={<Steps step={step} />}
       />
