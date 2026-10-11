@@ -1,9 +1,6 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { rolePlayerMessages, rolePlayerSystemPrompt, type ScenarioSpec, type Turn } from "@antelope/core";
-import { getClient } from "./client";
 import { ApiError } from "./http";
-import { effortFor, modelFor } from "./models";
-import { logUsage } from "./structured";
+import { logUsage, resolveRole } from "./providers";
 
 const TURN_TIMEOUT_MS = 45_000;
 const encoder = new TextEncoder();
@@ -20,31 +17,37 @@ export async function streamEmployeeReply(
   turns: Turn[],
   signal: AbortSignal,
 ): Promise<ReadableStream<Uint8Array>> {
-  const model = modelFor("rolePlayer");
+  const { provider, model } = resolveRole("rolePlayer");
   const started = Date.now();
-
-  const stream = getClient().messages.stream(
-    {
+  const log = async (label: string, ttfbMs?: number) =>
+    logUsage({
+      provider: provider.id,
       model,
-      max_tokens: 400, // replies are 1-4 sentences
-      system: [{ type: "text", text: rolePlayerSystemPrompt(spec), cache_control: { type: "ephemeral" } }],
-      messages: rolePlayerMessages(turns),
-      output_config: { effort: effortFor("rolePlayer") },
-      // Sonnet 5.5 rejects thinking: disabled; between_tools is the "off" switch.
-      // Short in-character replies do not benefit from deliberation and every
-      // thinking token delays the first visible word.
-      ...(model.startsWith("claude-sonnet-5-5") ? { thinking: { type: "between_tools" as const } } : {}),
-    },
-    { timeout: TURN_TIMEOUT_MS, signal },
-  );
+      role: "rolePlayer",
+      label,
+      ms: Date.now() - started,
+      ttfbMs,
+      usage: await stream.usage(),
+    });
 
-  const iterator = textDeltas(stream)[Symbol.asyncIterator]();
+  const stream = provider.streamText({
+    role: "rolePlayer",
+    model,
+    maxTokens: 400, // replies are 1-4 sentences
+    system: rolePlayerSystemPrompt(spec),
+    messages: rolePlayerMessages(turns),
+    timeoutMs: TURN_TIMEOUT_MS,
+    signal,
+    cacheKey: `rolePlayer:${spec.id}`,
+  });
+
+  const iterator = stream[Symbol.asyncIterator]();
   const first = await iterator.next();
   if (first.done || !first.value) {
-    const final = await stream.finalMessage().catch(() => null);
-    if (final) logUsage("roleplay.turn(empty)", final.usage, Date.now() - started);
+    await log("roleplay.turn(empty)");
     throw new ApiError(502, "The AI did not produce a reply. Please try again.");
   }
+  const ttfbMs = Date.now() - started;
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -55,8 +58,7 @@ export async function streamEmployeeReply(
           if (next.done) break;
           controller.enqueue(encoder.encode(next.value));
         }
-        const final = await stream.finalMessage();
-        logUsage("roleplay.turn", final.usage, Date.now() - started);
+        await log("roleplay.turn", ttfbMs);
         controller.close();
       } catch (err) {
         // Headers are already sent; the best we can do is end the stream.
@@ -65,17 +67,9 @@ export async function streamEmployeeReply(
       }
     },
     cancel() {
-      stream.controller.abort();
+      stream.abort();
     },
   });
-}
-
-async function* textDeltas(stream: ReturnType<Anthropic["messages"]["stream"]>): AsyncGenerator<string> {
-  for await (const event of stream) {
-    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-      yield event.delta.text;
-    }
-  }
 }
 
 function errName(err: unknown): string {

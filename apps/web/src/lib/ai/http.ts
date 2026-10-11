@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { aiMode } from "./client";
+import { ProviderError } from "./providers/types";
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -38,6 +40,31 @@ export function toApiError(err: unknown): ApiError {
   if (err instanceof Anthropic.APIError) {
     // Log status + message server-side only; never forward upstream bodies.
     console.error(`[ai] Anthropic API error ${err.status ?? "?"}: ${err.message}`);
+    return new ApiError(502, "The AI service returned an error. Please try again.");
+  }
+  if (err instanceof OpenAI.APIUserAbortError) return new ApiError(499, "Request cancelled.");
+  if (err instanceof OpenAI.APIConnectionTimeoutError) {
+    return new ApiError(504, "The AI took too long to respond. Please try again.");
+  }
+  if (err instanceof OpenAI.APIConnectionError) {
+    return new ApiError(502, "Could not reach the AI service. Please try again.");
+  }
+  // Mid-stream errors arrive as a status-less APIError carrying the error code.
+  if (err instanceof OpenAI.RateLimitError || (err instanceof OpenAI.APIError && err.code === "rate_limit_exceeded")) {
+    // 429 covers rate limits and an empty balance (code credit_balance_exhausted); the log says which.
+    console.error(`[ai] OpenAI rate limit ${err.code ?? ""}: ${err.message}`);
+    return new ApiError(503, "The AI service is busy right now. Please try again in a moment.", { "Retry-After": "10" });
+  }
+  if (err instanceof OpenAI.AuthenticationError || err instanceof OpenAI.PermissionDeniedError) {
+    console.error("[ai] OpenAI auth failure (check OPENAI_API_KEY).");
+    return new ApiError(502, "The AI service is misconfigured.");
+  }
+  if (err instanceof OpenAI.APIError) {
+    console.error(`[ai] OpenAI API error ${err.status ?? "?"}: ${err.message}`);
+    return new ApiError(502, "The AI service returned an error. Please try again.");
+  }
+  if (err instanceof ProviderError) {
+    console.error(`[ai] ${err.message}`);
     return new ApiError(502, "The AI service returned an error. Please try again.");
   }
   console.error("[ai] Unexpected error:", err instanceof Error ? err.message : "unknown");
