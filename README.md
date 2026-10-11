@@ -33,7 +33,7 @@ The AI endpoints live in `apps/web/src/app/api` (Node runtime); shared code is i
 | `POST /api/roleplay/debrief` `{scenarioId, turns, selfReflection}` | `Debrief` JSON. Observer call, then Coach call; tallies and trajectory are computed in code |
 | `POST /api/drill/feedback` `{drillId, response}` | `DrillFeedback` JSON |
 
-Setup: copy `apps/web/.env.example` to `apps/web/.env.local` and set `ANTHROPIC_API_KEY`. Model overrides (`AI_MODEL_*`) and `CORS_ORIGINS` are documented in the example file.
+Setup: copy `apps/web/.env.example` to `apps/web/.env.local` and set `ANTHROPIC_API_KEY`. To run some or all roles on OpenAI, set `OPENAI_API_KEY` and `AI_PROVIDER=openai` (or per role, `AI_PROVIDER_COACH=openai` etc.). Provider, model and effort overrides and `CORS_ORIGINS` are documented in the example file; the provider comparison is in `docs/ai-provider-comparison.md`.
 
 - **Mock mode:** with `AI_MOCK=1`, or no API key in development, the endpoints return deterministic canned responses (the turn endpoint streams in small chunks with delays) so the UI can be built without spending tokens. In production with no key they return 503.
 - **CORS:** development allows any origin (Expo web on `:8081`, LAN IPs). In production only origins listed in `CORS_ORIGINS` are allowed; native apps are unaffected.

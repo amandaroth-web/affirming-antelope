@@ -1,42 +1,35 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { missingKeys } from "./providers";
 
 export type AiMode = "live" | "mock" | "unavailable";
 
-let loggedMode: AiMode | null = null;
+let loggedMode: string | null = null;
 
 /**
- * live: real Anthropic calls.
- * mock: deterministic canned responses (AI_MOCK=1, or no key in development).
- * unavailable: production with no key (routes answer 503).
+ * live: real provider calls.
+ * mock: deterministic canned responses (AI_MOCK=1, or a missing key in development).
+ * unavailable: production with a missing key (routes answer 503).
+ *
+ * "Missing key" means the key of any provider a role is configured to use
+ * (AI_PROVIDER, AI_PROVIDER_<ROLE>; see ./models.ts).
  */
 export function aiMode(): AiMode {
   const flag = process.env.AI_MOCK?.trim().toLowerCase();
   const forcedMock = flag === "1" || flag === "true";
-  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const missing = missingKeys();
   const isProd = process.env.NODE_ENV === "production";
 
-  const mode: AiMode = forcedMock ? "mock" : hasKey ? "live" : isProd ? "unavailable" : "mock";
+  const mode: AiMode = forcedMock ? "mock" : missing.length === 0 ? "live" : isProd ? "unavailable" : "mock";
 
-  if (loggedMode !== mode) {
-    loggedMode = mode;
+  const logKey = `${mode}:${missing.join(",")}`;
+  if (loggedMode !== logKey) {
+    loggedMode = logKey;
     if (mode === "mock") {
       console.log(
-        `[ai] MOCK MODE active (${forcedMock ? "AI_MOCK=1" : "ANTHROPIC_API_KEY not set"}). Responses are canned; no Anthropic calls are made.`,
+        `[ai] MOCK MODE active (${forcedMock ? "AI_MOCK=1" : `${missing.join(", ")} not set`}). Responses are canned; no AI provider calls are made.`,
       );
     } else if (mode === "unavailable") {
-      console.error("[ai] ANTHROPIC_API_KEY is not set in production; AI endpoints will return 503.");
+      console.error(`[ai] ${missing.join(", ")} is not set in production; AI endpoints will return 503.`);
     }
   }
   return mode;
-}
-
-let client: Anthropic | null = null;
-
-export function getClient(): Anthropic {
-  if (!client) {
-    // One SDK-level retry for 429/5xx/connection errors; per-call timeouts are
-    // set at the call site so a retry cannot silently double a long wait.
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 1 });
-  }
-  return client;
 }
