@@ -20,6 +20,7 @@ import {
   radius,
   space,
 } from '@/design';
+import { track } from '@/lib/analytics';
 import { FADE_MS, spring, useFades, useListLayout, useReduceMotion, useTickSwap } from '@/motion';
 import { useEmployeeReply } from './useEmployeeReply';
 
@@ -82,6 +83,7 @@ export function Conversation({
     const text = draft.trim();
     if (!text || pending) return;
     const next: Turn[] = [...turns, { id: `t${turns.length}`, speaker: 'learner', text }];
+    track('roleplay_turn_sent', { scenario_id: scenario.id, turn_index: learnerCount }); // a count, never the text
     onTurns(next);
     setDraft('');
     atBottom.current = true;
@@ -104,6 +106,7 @@ export function Conversation({
     const final = partial ? [...turns, { id: `t${turns.length}`, speaker: 'employee' as const, text: partial }] : turns;
     // the debrief needs the learner to have spoken at least once
     if (!final.some((t) => t.speaker === 'learner')) return onLeave();
+    track('roleplay_ended', { scenario_id: scenario.id, learner_turns: final.filter((t) => t.speaker === 'learner').length, ended_early: !ready });
     onEnd(final);
   };
 

@@ -29,7 +29,7 @@ export function sessionLabel(kind: 'roleplay' | 'drill', ref: string): string {
 
 export function openPractice(kind: RefKind, ref: string, source: PracticeSource) {
   if (kind === 'roleplay') openRoleplay(ref, { minutes: 12, source });
-  else if (kind === 'learn') openLesson(ref, {});
+  else if (kind === 'learn') openLesson(ref, { source });
   else openDrill(ref, { minutes: 5, source });
 }
 

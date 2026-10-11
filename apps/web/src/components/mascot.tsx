@@ -3,8 +3,7 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useReducedMotion } from "motion/react";
-import { useCallback, useState } from "react";
-import { preload } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 
 const MascotThree = dynamic(
   () => import("./mascot-three").then((mod) => mod.MascotThree),
@@ -16,8 +15,42 @@ type MascotProps = {
   className?: string;
   width: number;
   height: number;
-  priority?: boolean;
+  /** Above the fold: load the still eagerly at high priority so it is the LCP. */
+  preload?: boolean;
+  /** Rendered width hint for the responsive srcset. */
+  sizes?: string;
 };
+
+/**
+ * Mount the WebGL mascot only once the page has loaded and the main thread is
+ * idle, so the static still is the LCP and three.js never competes with it.
+ */
+function useIdleMount(enabled: boolean) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    if (!enabled) return;
+    let idleId: number | undefined;
+    let timer: number | undefined;
+    const schedule = () => {
+      // A short beat after load, then wait for idle (with a ceiling).
+      timer = window.setTimeout(() => {
+        if ("requestIdleCallback" in window) {
+          idleId = window.requestIdleCallback(() => setMounted(true), { timeout: 2000 });
+        } else {
+          setMounted(true);
+        }
+      }, 600);
+    };
+    if (document.readyState === "complete") schedule();
+    else window.addEventListener("load", schedule, { once: true });
+    return () => {
+      window.removeEventListener("load", schedule);
+      if (timer) window.clearTimeout(timer);
+      if (idleId && "cancelIdleCallback" in window) window.cancelIdleCallback(idleId);
+    };
+  }, [enabled]);
+  return mounted;
+}
 
 // The WebGL mascot shows the artwork's linearised colours (a deeper brown). The
 // flat still is the same artwork with that transform baked in, so the mascot is
@@ -31,15 +64,13 @@ export function Mascot({
   className = "",
   width,
   height,
-  priority = false,
+  preload = false,
+  sizes = "(min-width: 768px) 300px, 270px",
 }: MascotProps) {
   const reduce = useReducedMotion();
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
-
-  if (priority) {
-    preload(still, { as: "image" });
-  }
+  const mount3d = useIdleMount(!reduce);
 
   if (reduce) {
     return (
@@ -48,7 +79,9 @@ export function Mascot({
         alt={alt}
         width={width}
         height={height}
-        priority={priority}
+        loading={preload ? "eager" : undefined}
+        fetchPriority={preload ? "high" : undefined}
+        sizes={sizes}
         className={className}
       />
     );
@@ -64,22 +97,26 @@ export function Mascot({
         alt={alt}
         width={width}
         height={height}
-        priority={priority}
+        loading={preload ? "eager" : undefined}
+        fetchPriority={preload ? "high" : undefined}
+        sizes={sizes}
         className={`h-full w-auto max-w-full transition-opacity duration-300 ${
           ready ? "opacity-0" : "opacity-100"
         }`}
       />
-      <MascotThree
-        src={texture}
-        depthSrc="/mascot-wave-depth.png"
-        eyesSrc="/mascot-wave-lids.png"
-        faceSrc="/mascot-wave-face.png"
-        armSrc="/mascot-wave-arm.png"
-        width={width}
-        height={height}
-        className="absolute -inset-[14%]"
-        onReady={onReady}
-      />
+      {mount3d && (
+        <MascotThree
+          src={texture}
+          depthSrc="/mascot-wave-depth.png"
+          eyesSrc="/mascot-wave-lids.png"
+          faceSrc="/mascot-wave-face.png"
+          armSrc="/mascot-wave-arm.png"
+          width={width}
+          height={height}
+          className="absolute -inset-[14%]"
+          onReady={onReady}
+        />
+      )}
     </div>
   );
 }

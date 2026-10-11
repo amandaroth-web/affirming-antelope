@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mascot } from '@/components/mascot';
 import { Dock } from '@/components/practice-loop/SessionChrome';
 import { Button, ChatsCircleIcon, LightningIcon, SealCheckIcon, Text, color, layout, radius, space } from '@/design';
+import { track } from '@/lib/analytics';
 import { Enter } from '@/motion';
 import { useAccount } from '@/state/account';
 
@@ -19,7 +20,10 @@ import { useAccount } from '@/state/account';
 export default function Welcome() {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const tryIt = () => useAccount.getState().set({ onboarded: true });
+  const tryIt = () => {
+    track('onboarding_chosen', { choice: 'guest' });
+    useAccount.getState().set({ onboarded: true });
+  };
 
   return (
     <View style={styles.root}>
@@ -74,12 +78,13 @@ export default function Welcome() {
             variant="secondary"
             label="Sign in"
             fullWidth
-            onPress={() =>
+            onPress={() => {
+              track('onboarding_chosen', { choice: 'sign_in' });
               router.push({
                 pathname: '/sign-in',
                 params: { reason: 'welcome' },
-              })
-            }
+              });
+            }}
             style={styles.second}
           />
           <Text variant="caption" color={color.muted} align="center" style={styles.foot}>

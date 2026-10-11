@@ -1,5 +1,7 @@
 import Constants from 'expo-constants';
 import { fetch as expoFetch } from 'expo/fetch';
+import type { AiEndpoint } from '@antelope/core';
+import { track } from './analytics';
 import { currentSession } from './supabase';
 
 const DEV_API_PORT = 3000;
@@ -55,19 +57,46 @@ export class ApiError extends Error {
   }
 }
 
-async function failure(res: { status: number; text(): Promise<string> }): Promise<ApiError> {
+/** Which AI endpoint a path is, for `ai_request_failed`. Other paths aren't AI calls. */
+function aiEndpoint(path: string): AiEndpoint | null {
+  if (path.startsWith('/api/drill')) return 'drill';
+  if (path.startsWith('/api/roleplay/turn')) return 'turn';
+  if (path.startsWith('/api/roleplay/debrief')) return 'debrief';
+  return null;
+}
+
+/** Status code only (0 = never got a response). Never the request, the response body or the error text. */
+function reportFailure(path: string, status: number) {
+  const endpoint = aiEndpoint(path);
+  if (endpoint) track('ai_request_failed', { endpoint, status });
+}
+
+/** A request that threw before any response (offline, DNS, timeout). Caller-initiated aborts aren't failures. */
+function reportThrown(path: string, e: unknown) {
+  if ((e as { name?: string } | null)?.name === 'AbortError') return;
+  reportFailure(path, 0);
+}
+
+async function failure(res: { status: number; text(): Promise<string> }, path?: string): Promise<ApiError> {
+  if (path) reportFailure(path, res.status);
   const text = await res.text().catch(() => '');
   return new ApiError(res.status, text || `Request failed with status ${res.status}`);
 }
 
 export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(apiUrl(path), {
-    method: 'POST',
-    headers: apiHeaders(),
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) throw await failure(res);
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(path), {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    reportThrown(path, e);
+    throw e;
+  }
+  if (!res.ok) throw await failure(res, path);
   return (await res.json()) as T;
 }
 
@@ -88,13 +117,19 @@ export async function postStream(
   signal?: AbortSignal,
 ): Promise<string> {
   const doFetch = (expoFetch as unknown as typeof fetch) ?? fetch;
-  const res = await doFetch(apiUrl(path), {
-    method: 'POST',
-    headers: apiHeaders(),
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) throw await failure(res);
+  let res: Response;
+  try {
+    res = await doFetch(apiUrl(path), {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    reportThrown(path, e);
+    throw e;
+  }
+  if (!res.ok) throw await failure(res, path);
 
   const reader = res.body?.getReader?.();
   if (!reader) {

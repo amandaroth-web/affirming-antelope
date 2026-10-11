@@ -25,6 +25,7 @@ import {
   space,
 } from '@/design';
 import { openPractice, practiceKindLabel, practiceMinutes, practiceTitle, sessionLabel, shortDate } from '@/data/practice';
+import { track } from '@/lib/analytics';
 import { Enter, FADE_MS, STAGGER, spring, useReduceMotion } from '@/motion';
 import { reviewAudioUrl } from '@/sync/cloud';
 import { markReviewSeen, submitForReview, syncNow, withdrawSubmission } from '@/sync/engine';
@@ -62,6 +63,14 @@ export default function ReviewDetail() {
   useEffect(() => {
     if (review && !review.learnerSeenAt) markReviewSeen(review.id);
   }, [review]);
+
+  // once per review opened: a rating level and two flags, never the feedback text or the clip
+  const reviewId = review?.id;
+  useEffect(() => {
+    if (!review) return;
+    track('review_viewed', { ...(review.rating ? { rating: review.rating } : {}), has_audio: !!review.audioPath, try_again: review.tryAgain });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewId]);
 
   const trainerName = review?.trainerName ?? cohort?.trainerName ?? 'Your trainer';
   const primary = review ? primaryAction(review, sub) : null;

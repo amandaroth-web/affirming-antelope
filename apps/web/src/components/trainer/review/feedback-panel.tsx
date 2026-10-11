@@ -4,7 +4,9 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { CheckCircle, Info, PencilSimple } from "@phosphor-icons/react";
+import type { ReviewRating } from "@antelope/core";
 import { saveReview } from "@/app/trainer/actions";
+import { track } from "@/lib/analytics/client";
 import { createClient } from "@/lib/supabase/client";
 import {
   DIFFICULTY,
@@ -169,6 +171,14 @@ export function FeedbackPanel({
       setError(res.error);
       return;
     }
+    // Flags and an enum only: never the feedback text, the audio, or the learner.
+    track("review_saved", {
+      ...(rating ? { rating: rating as ReviewRating } : {}),
+      has_audio: hasAudio,
+      has_recommendation: !!kind && !!ref,
+      try_again: tryAgain,
+      is_edit: !!existing || status === "reviewed",
+    });
     // New stored clip: play it back from the blob we already have.
     if (uploaded && clip) setStoredUrl(clip.url);
     if (removeStored) setStoredUrl(null);

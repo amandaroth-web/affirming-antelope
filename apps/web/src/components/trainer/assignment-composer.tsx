@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Minus, Plus, Trash } from "@phosphor-icons/react";
 import { createAssignment } from "@/app/trainer/actions";
+import { track } from "@/lib/analytics/client";
 import {
   DIFFICULTY,
   DRILL_OPTIONS,
@@ -118,8 +119,18 @@ export function AssignmentComposer({ cohortId, trainerName, defaultDue }: { coho
         dueAt: dueIso(due),
         items: items.map(({ kind, refId, skill, quantity }) => ({ kind, refId, skill, quantity })),
       });
-      if (!res.ok) setError(res.error);
-      else router.push(`/trainer/cohorts/${cohortId}/assignments?created=${res.data.id}`);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      // Counts and kinds only: never the title, instructions, or any text the trainer wrote.
+      const dueAt = dueIso(due);
+      track("assignment_created", {
+        item_count: items.length,
+        kinds: [...new Set(items.map((i) => i.kind))],
+        ...(dueAt ? { due_in_days: Math.max(0, Math.round((Date.parse(dueAt) - Date.now()) / 86_400_000)) } : {}),
+      });
+      router.push(`/trainer/cohorts/${cohortId}/assignments?created=${res.data.id}`);
     });
   }
 

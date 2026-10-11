@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { BrandSplash } from '@/components/brand/BrandSplash';
 import { useBrandFonts } from '@/design/fonts';
+import { screenView, startAnalytics } from '@/lib/analytics';
 import { color } from '@/design/tokens';
 import { spring } from '@/motion/springs';
 import { useReduceMotion } from '@/motion/useMotionPrefs';
@@ -14,6 +15,7 @@ import { useAccount } from '@/state/account';
 import { useLearner } from '@/state/store';
 import { startSync } from '@/sync/engine';
 
+startAnalytics(); // first: reads the website's ph_did/ph_sid from the URL before the router normalises it
 SplashScreen.preventAutoHideAsync().catch(() => {});
 // accounts + sync: guest mode and offline keep working whether or not this ever reaches a server
 startSync();
@@ -43,6 +45,8 @@ const SHEET = { presentation: 'modal', gestureEnabled: true, contentStyle: { bac
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useBrandFonts();
   const hydrated = useHydrated();
+  const pathname = usePathname();
+  useEffect(() => screenView(pathname), [pathname]);
   const ready = (fontsLoaded || !!fontError) && hydrated;
   const onboarded = useAccount((s) => s.onboarded) === true;
   const reduce = useReduceMotion();

@@ -6,6 +6,7 @@ import { CodeInput, type CodeInputHandle, type CodeState } from '@/components/ac
 import { FlowHeader, Notice, TextField, flowStyles } from '@/components/account/FlowChrome';
 import { Mascot, type MascotHandle, type MascotMood } from '@/components/mascot';
 import { Button, Text, TextLink, color, space } from '@/design';
+import { track } from '@/lib/analytics';
 import { emitFlowClosed } from '@/lib/flowEvents';
 import { isLocalSupabase, supabase } from '@/lib/supabase';
 import { Enter, useFades, useForwardSwap } from '@/motion';
@@ -66,6 +67,7 @@ export default function SignIn() {
   const coach = useRef<MascotHandle>(null);
   const codeRef = useRef<CodeInputHandle>(null);
   const nameRef = useRef<TextInput>(null);
+  useEffect(() => track('sign_in_started', { reason }), [reason]);
   // whoever handed off to this flow (the review sheet) picks up again once it's gone
   useEffect(() => () => emitFlowClosed('sign-in'), []);
 

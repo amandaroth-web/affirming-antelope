@@ -18,6 +18,8 @@ export interface Profile {
   displayName: string;
   /** True when display_name is still the trigger's default (the email's local part). */
   needsName: boolean;
+  /** profiles.can_train. Analytics only (person property); absent in older caches. */
+  canTrain?: boolean;
 }
 
 export interface Cohort {

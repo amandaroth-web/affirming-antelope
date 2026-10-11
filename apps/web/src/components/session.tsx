@@ -44,8 +44,11 @@ export function Session() {
           {beats.map((beat, i) => {
             const Icon = beat.icon;
             return (
-              <Reveal key={beat.title} delay={0.05 * i}>
-                <li className="flex items-start gap-4 rounded-[1.25rem] border-2 border-line bg-white p-5 text-ink shadow-[0_5px_0_var(--primary-shadow)]">
+              <li key={beat.title}>
+                <Reveal
+                  delay={0.05 * i}
+                  className="flex items-start gap-4 rounded-[1.25rem] border-2 border-line bg-white p-5 text-ink shadow-[0_5px_0_var(--primary-shadow)]"
+                >
                   <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gold text-ink shadow-[0_3px_0_var(--gold-shadow)]">
                     <Icon size={26} weight="bold" aria-hidden />
                   </span>
@@ -55,8 +58,8 @@ export function Session() {
                       {beat.body}
                     </p>
                   </div>
-                </li>
-              </Reveal>
+                </Reveal>
+              </li>
             );
           })}
         </ul>

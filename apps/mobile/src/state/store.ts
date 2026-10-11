@@ -14,6 +14,7 @@ import {
 } from '@antelope/core';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { track } from '@/lib/analytics';
 import { isUuid, uuid } from '@/lib/uuid';
 
 export const LEARNER_KEY = 'antelope.learner.v1';
@@ -217,6 +218,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
 
       recordPractice: (input) => {
         const record: PracticeRecord = { ...input, id: uuid(), at: input.at ?? new Date().toISOString(), ownerId: currentOwner };
+        const before = get();
         set((s) => {
           const day = today();
           const firstToday = s.streak.lastPracticeDay !== day;
@@ -239,6 +241,20 @@ export const useLearner = create<LearnerState & LearnerActions>()(
           };
         });
         if (input.activityId) get().completeActivity(input.activityId);
+        // ids, enums and counts only
+        track('practice_completed', {
+          kind: input.kind === 'learn' ? 'lesson' : input.kind,
+          ref_id: input.refId ?? '',
+          ...(input.skill ? { skill: input.skill } : {}),
+          minutes: input.minutes,
+          ...(input.activityId ? { activity_id: input.activityId } : {}),
+          in_course: !!input.activityId,
+        });
+        const after = get();
+        if (after.streak.days > before.streak.days) track('streak_extended', { streak_days: after.streak.days });
+        if (after.weeklyGoal.done === after.weeklyGoal.target && before.weeklyGoal.done !== before.weeklyGoal.target) {
+          track('weekly_goal_hit', { target: after.weeklyGoal.target });
+        }
         return record;
       },
 

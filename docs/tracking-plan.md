@@ -1,0 +1,97 @@
+# Tracking plan (PostHog)
+
+One PostHog project for the website (`affirmingantelope.com`), the learner app (web at
+`app.affirmingantelope.com`, iOS/Android later), and the trainer dashboard (`/trainer`).
+Event names and property types live in `packages/core/src/analytics.ts` so every surface
+uses the same vocabulary. Snake_case, `object_verb` past tense.
+
+## Privacy rules (non-negotiable)
+
+- **Never send content.** No transcript text, learner replies, reflections, notes to
+  trainers, trainer feedback, audio, or free-text inputs. Ids and enums only.
+- **No PII.** Never send email or display names. Identify signed-in people by their
+  Supabase user uuid only.
+- **Website is cookieless:** `persistence: 'memory'`, no cookies or local storage, so no
+  consent banner. A visitor's anonymous id travels to the app only through the CTA link
+  (`?ph_did=<id>&ph_sid=<session>`), and the app bootstraps PostHog with it.
+- **App** persists its anonymous id in local storage / AsyncStorage (needed for retention).
+- **Session replay off.** Autocapture on the website only (clicks on `[data-track]`
+  elements and links); off in the app and dashboard, where we send explicit events.
+- Respect Do Not Track / Global Privacy Control: if set, don't initialise.
+- Ingest through a first-party proxy: `https://affirmingantelope.com/ingest` (Next
+  rewrites to `us.i.posthog.com` / `us-assets.i.posthog.com`).
+
+## Env
+
+- Web: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST=/ingest` (proxy), `NEXT_PUBLIC_POSTHOG_UI_HOST=https://us.posthog.com`
+- App: `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST=https://affirmingantelope.com/ingest`
+- No key → analytics is a no-op (local dev, tests).
+
+## Super properties (on every event)
+
+`surface`: `'website' | 'app' | 'trainer'`, `platform`: `'web' | 'ios' | 'android'`,
+`app_version`, `signed_in`: boolean.
+
+## Person properties (signed-in only)
+
+`role`: `'learner' | 'trainer'`, `is_trainer`: boolean, `cohort_count`: number,
+`signed_up_at`: ISO date. Set on sign-in / when they change.
+
+## Website events
+
+| event | properties | when |
+|---|---|---|
+| `$pageview` | (auto, incl. UTM + referrer) | every page |
+| `cta_clicked` | `location` (`hero`, `nav`, `download_band`, `audience_<x>`, `guide_<slug>`, `guide_index`, `footer`), `target` (`app`, `trainer`), `audience?` (`clinicians`, `leaders`, `trainers`) | any primary CTA, via `data-track` attributes |
+| `guide_drill_clicked` | `slug`, `drill_id` | "Try this drill" inside a guide |
+
+## Learner app events
+
+| event | properties |
+|---|---|
+| `app_opened` | `entry` (`direct`, `website_cta`, `guide`, `deep_link`), `src?` (CTA location) |
+| `onboarding_chosen` | `choice` (`guest`, `sign_in`) |
+| `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`) |
+| `sign_in_completed` | `is_new_user`, `migrated_guest_data` |
+| `signed_out` | — |
+| `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`) |
+| `drill_answered` | `drill_id`, `skill`, `level`, `format` (`choice`, `text`), `hit_target` |
+| `drill_feedback_received` | `drill_id`, `latency_ms`, `move`, `hit_target` |
+| `roleplay_turn_sent` | `scenario_id`, `turn_index` |
+| `roleplay_ended` | `scenario_id`, `learner_turns`, `ended_early` |
+| `reflection_submitted` | `scenario_id`, `feeling` |
+| `debrief_viewed` | `scenario_id`, `latency_ms`, `suggested_next_step` |
+| `next_step_chosen` | `from` (`drill`, `debrief`, `lesson`), `choice` (`try_again`, `same_skill`, `harder`, `new_scenario`, `one_more`, `done`) |
+| `practice_completed` | `kind`, `ref_id`, `skill?`, `minutes`, `activity_id?`, `in_course` |
+| `streak_extended` | `streak_days` |
+| `weekly_goal_hit` | `target` |
+| `cohort_joined` | `cohort_id` |
+| `submission_created` | `kind`, `ref_id` |
+| `submission_withdrawn` | — |
+| `review_viewed` | `rating?`, `has_audio`, `try_again` |
+| `ai_request_failed` | `endpoint` (`turn`, `debrief`, `drill`), `status` |
+
+## Trainer dashboard events
+
+| event | properties |
+|---|---|
+| `trainer_signed_in` | `is_new_user` |
+| `trainer_access_claimed` | — |
+| `cohort_created` | — |
+| `join_code_copied` | — |
+| `assignment_created` | `item_count`, `kinds` (array), `due_in_days` |
+| `review_opened` | `hours_since_submitted` |
+| `review_saved` | `rating?`, `has_audio`, `has_recommendation`, `try_again`, `is_edit` |
+
+## Dashboards to build in PostHog
+
+1. **Acquisition funnel:** `$pageview` (website) → `cta_clicked` → `app_opened` →
+   `practice_completed` (first) → `sign_in_completed` → `cohort_joined`. Breakdown by UTM
+   source, landing page, `audience`.
+2. **Activation:** % of `app_opened` with a `practice_completed` within the session.
+3. **Retention:** weekly retention on `practice_completed`.
+4. **Practice loop health:** `roleplay_ended.ended_early` rate, `debrief_viewed.latency_ms` p50/p90,
+   `next_step_chosen` mix (dead ends = sessions ending at debrief).
+5. **Trainer activation:** `trainer_signed_in` → `cohort_created` → `assignment_created` →
+   `review_saved`; time from `submission_created` to `review_saved`.
+6. **Content:** guide pageviews → `guide_drill_clicked` → `practice_completed` with `source = guide`.

@@ -15,7 +15,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://affirmingantelope.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://fiuqpmzqelzlxjcbdjac.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_CtEr2uYboyEmGzdqE2cKjB7zp9fWcwNP5AxgTExVDfVJ",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://affirmingantelope.com/ingest"
       }
     },
     "production": {
@@ -23,7 +25,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://affirmingantelope.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://fiuqpmzqelzlxjcbdjac.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_GaG88dYT9VolliLOuAc7-A_U9kR1bnW",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_CtEr2uYboyEmGzdqE2cKjB7zp9fWcwNP5AxgTExVDfVJ",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://affirmingantelope.com/ingest"
       },
       "environment": "production"
     }

@@ -2,7 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/trainer/dal";
 import { BecomeTrainerForm } from "@/components/trainer/become-form";
-import { signOut } from "../actions";
+import { SignOutForm } from "@/components/trainer/sign-out-form";
 import { buttonClass } from "@/components/trainer/ui";
 
 export const metadata = { title: "Become a trainer" };
@@ -15,11 +15,11 @@ export default async function BecomeTrainerPage() {
     <div className="flex min-h-dvh flex-col bg-soft/50">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
         <Image src="/brand-lockup-horizontal-deep.svg" alt="Affirming Antelope" width={700} height={180} className="h-9 w-auto" priority />
-        <form action={signOut}>
+        <SignOutForm>
           <button type="submit" className={buttonClass("ghost", "sm")}>
             Sign out
           </button>
-        </form>
+        </SignOutForm>
       </header>
       <main className="flex flex-1 items-center justify-center px-6 pb-16">
         <div className="grid w-full max-w-[880px] items-center gap-10 md:grid-cols-[1fr_auto]">
