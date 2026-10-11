@@ -21,8 +21,10 @@ import { backoff, completionOp, flushOps, resetBackoff, sessionOp, useOutbox, ty
  *             done without a session, learner_state sync; no identify, no cloud data.
  *             Anonymous → permanent on the same uid (email verified) → `converted`.
  *             Permanent session → owner, guest merge (merge-anonymous) or upload,
- *             learner_state adopt-or-merge, flush, refresh. SIGNED_OUT → a fresh
- *             guest (local practice stays; the account cache is cleared).
+ *             learner_state adopt-or-merge, flush, refresh. SIGNED_OUT of an account →
+ *             `resetDevice`: everything of theirs is wiped from the device, then a clean
+ *             guest starts (the account's practice lives on the server, so signing back
+ *             in restores it). A guest that merely loses its session keeps its practice.
  *   practice  a new completion or session in the learner store → outbox op.
  *             A change to the synced part of the state → learner_state marked dirty.
  *   flush     on enqueue (debounced), foreground, reconnect, sign-in and a backoff
@@ -43,6 +45,9 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 let stateAttempts = 0;
 let lastRefresh = 0;
 let channel: RealtimeChannel | null = null;
+/** A permanent account has been on this device since the last wipe. */
+let accountLive = false;
+let wiping: Promise<void> | null = null;
 
 export function currentUserId(): string | undefined {
   return user?.id;
@@ -227,6 +232,7 @@ async function converted(session: Session) {
   const id = session.user.id;
   const email = session.user.email ?? '';
   user = { id, email, anonymous: false };
+  accountLive = true;
   setRecordOwner(id);
   // identify on conversion, never before (docs/tracking-plan.md): the guest's earlier events join this person
   identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at, pathway_id: useLearner.getState().activePathwayId });
@@ -287,6 +293,7 @@ async function signedIn(session: Session, fresh: boolean, fromGuest: string | nu
   const acct = useAccount.getState();
   if (acct.profile && acct.profile.id !== id) acct.clearAccount();
   user = { id, email, anonymous: false };
+  accountLive = true;
   setRecordOwner(id);
   // Supabase uuid only; the email stays out of analytics.
   identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at, pathway_id: useLearner.getState().activePathwayId });
@@ -355,20 +362,75 @@ function syncPerson() {
   setPerson(person);
 }
 
-function signedOut(wasGuest: boolean) {
-  if (!wasGuest) {
-    track('signed_out');
-    resetAnalytics();
-  }
+function stopSyncing() {
   user = null;
   setRecordOwner(undefined);
+  for (const t of [retryTimer, debounceTimer, refreshTimer]) if (t) clearTimeout(t);
+  retryTimer = debounceTimer = refreshTimer = null;
+  stateAttempts = 0;
+  lastRefresh = 0;
+  lastPerson = '';
   if (channel) {
     void supabase.removeChannel(channel);
     channel = null;
   }
-  useAccount.getState().clearAccount();
-  // keep going as a fresh guest; practice stays on this device
-  void ensureSession();
+}
+
+/**
+ * Forget everything the signed-out account left on this device, so the next person
+ * (clinicians share devices) starts as a brand-new learner: the learner store, the
+ * outbox, the cached cohorts / assignments / submissions / reviews / inbox / name, the
+ * welcome, and the analytics identity. The persisted AsyncStorage / localStorage copies
+ * go too. Runs once per account; concurrent callers share it.
+ */
+export function resetDevice(): Promise<void> {
+  if (wiping) return wiping;
+  if (!accountLive) return Promise.resolve();
+  accountLive = false;
+  wiping = (async () => {
+    track('signed_out');
+    stopSyncing();
+    useLearner.getState().wipe();
+    useOutbox.getState().clear();
+    useAccount.getState().resetAll();
+    resetAnalytics();
+    // the stores persist on every change; drop the stored copies of the two that would otherwise
+    // keep the old person's data until the next write (the account store keeps `onboarded: false`)
+    await Promise.all([useLearner.persist.clearStorage(), useOutbox.persist.clearStorage()]).catch(() => {});
+  })().finally(() => {
+    wiping = null;
+  });
+  return wiping;
+}
+
+/**
+ * Before signing out: send everything still waiting, giving up after `timeoutMs`.
+ * Resolves true when nothing is left that exists only on this device. Offline (or a
+ * slow network) resolves false: the caller warns before the wipe loses it.
+ */
+export async function flushBeforeSignOut(timeoutMs = 8000): Promise<boolean> {
+  const u = user;
+  if (!u) return true;
+  resetBackoff(u.id);
+  stateAttempts = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([flush(), new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))]);
+  if (timer) clearTimeout(timer);
+  const { entries, stateDirty } = useOutbox.getState();
+  // a flush still running past the timeout may not have landed
+  return !flushing && !entries.some((e) => e.userId === u.id) && !stateDirty[u.id];
+}
+
+function signedOut(wasGuest: boolean) {
+  if (wasGuest) {
+    // a guest whose session was lost keeps their practice; the next guest picks it up
+    stopSyncing();
+    useAccount.getState().clearAccount();
+    void ensureSession();
+    return;
+  }
+  // an account signed out (on purpose, or its session was revoked): the device starts clean
+  void resetDevice().then(() => ensureSession());
 }
 
 function subscribeRealtime(userId: string) {

@@ -1,5 +1,6 @@
 import { currentSession, errorCode, isTransient, supabase } from '@/lib/supabase';
 import { useAccount } from '@/state/account';
+import { resetDevice } from './engine';
 
 /**
  * Email one-time code sign-in, for a learner who is a guest (an anonymous Supabase
@@ -96,9 +97,13 @@ export async function verifyCode(email: string, token: string): Promise<{ ok: tr
 }
 
 /**
- * Sign out of the account on this device. Local practice stays, and the engine starts
- * a fresh guest (a new anonymous user) once the old session is gone.
+ * Sign out of the account and leave the device clean for the next person. Call
+ * `flushBeforeSignOut` first (it reports practice that hasn't reached the server).
+ * The account's practice lives on the server, so signing back in restores it. After
+ * the session is gone, everything of theirs is wiped from the device and a new
+ * anonymous guest is created through `ensureSession`.
  */
 export async function signOut() {
   await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  await resetDevice();
 }

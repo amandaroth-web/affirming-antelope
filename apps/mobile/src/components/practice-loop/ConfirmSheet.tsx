@@ -13,6 +13,7 @@ export function ConfirmSheet({
   stay,
   leave,
   onLeave,
+  busy,
 }: {
   open: boolean;
   onClose: () => void;
@@ -21,6 +22,8 @@ export function ConfirmSheet({
   stay: string;
   leave: string;
   onLeave: () => void;
+  /** The leaving choice is working (e.g. saving before sign-out): both buttons wait. */
+  busy?: boolean;
 }) {
   return (
     <BottomSheet open={open} onClose={onClose} accessibilityLabel={title}>
@@ -31,8 +34,8 @@ export function ConfirmSheet({
         {body}
       </Text>
       <View style={styles.actions}>
-        <Button label={stay} fullWidth onPress={onClose} />
-        <Button variant="secondary" label={leave} fullWidth onPress={onLeave} />
+        <Button label={stay} fullWidth onPress={onClose} disabled={busy} />
+        <Button variant="secondary" label={busy ? 'Saving…' : leave} fullWidth onPress={onLeave} disabled={busy} />
       </View>
     </BottomSheet>
   );

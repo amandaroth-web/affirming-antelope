@@ -125,8 +125,10 @@ export interface AccountState {
 
 export interface AccountActions {
   set: (patch: Partial<AccountState>) => void;
-  /** Sign-out: forget everything account-specific; practice data stays in the learner store. */
+  /** The anonymous guest lost its session: forget the account cache; practice data stays in the learner store. */
   clearAccount: () => void;
+  /** Sign-out: forget everything about this device's user, including the welcome, so the next person starts fresh. */
+  resetAll: () => void;
   addLocalSubmission: (s: Submission) => void;
   setSubmissionStatus: (id: string, status: SubmissionStatus) => void;
   markReviewSeen: (id: string, at: string) => void;
@@ -154,6 +156,7 @@ export const useAccount = create<AccountState & AccountActions>()(
       ...EMPTY,
       set: (patch) => set(patch),
       clearAccount: () => set({ ...EMPTY, status: 'guest' }),
+      resetAll: () => set({ ...EMPTY, status: 'guest', refreshing: false, onboarded: false, anonymousId: null, pendingMerge: null }),
       addLocalSubmission: (sub) =>
         set((s) => ({
           submissions: [sub, ...s.submissions.filter((x) => x.id !== sub.id)],
@@ -172,7 +175,7 @@ export const useAccount = create<AccountState & AccountActions>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
       // status is decided at launch from the stored auth session; refreshing never persists
-      partialize: ({ status: _s, refreshing: _r, set: _a, clearAccount: _c, addLocalSubmission: _l, setSubmissionStatus: _t, markReviewSeen: _m, ...rest }) =>
+      partialize: ({ status: _s, refreshing: _r, set: _a, clearAccount: _c, resetAll: _x, addLocalSubmission: _l, setSubmissionStatus: _t, markReviewSeen: _m, ...rest }) =>
         rest,
     },
   ),

@@ -27,7 +27,7 @@ import {
 import { usePressScale, useTickSwap } from '@/motion';
 import { signOut } from '@/sync/auth';
 import { leaveCohort, renameSelf } from '@/sync/cloud';
-import { syncNow } from '@/sync/engine';
+import { flushBeforeSignOut, syncNow } from '@/sync/engine';
 import { useOutbox } from '@/sync/outbox';
 import { personSeed, useAccount, type Cohort } from '@/state/account';
 
@@ -66,6 +66,37 @@ function SignedIn() {
   const [rename, setRename] = useState(false);
   const [leaving, setLeaving] = useState<Cohort | null>(null);
   const [out, setOut] = useState(false);
+  // 'ask': the normal confirm. 'saving': sending what's waiting. 'unsynced': some of it couldn't be sent.
+  const [outStep, setOutStep] = useState<'ask' | 'saving' | 'unsynced'>('ask');
+
+  const openSignOut = () => {
+    setOutStep('ask');
+    setOut(true);
+  };
+  const closeSignOut = () => {
+    if (outStep === 'saving') return;
+    setOut(false);
+  };
+  const unsynced = outStep === 'unsynced';
+  // Wait: stay signed in and keep trying to send
+  const waitForSync = () => {
+    setOut(false);
+    void syncNow();
+  };
+  const signOutAnyway = async () => {
+    setOut(false);
+    await signOut();
+  };
+  const confirmSignOut = async () => {
+    setOutStep('saving');
+    // send everything first: signing out wipes this device, so the server must have it
+    if (await flushBeforeSignOut()) {
+      setOut(false);
+      await signOut();
+    } else {
+      setOutStep('unsynced');
+    }
+  };
 
   return (
     <>
@@ -98,8 +129,8 @@ function SignedIn() {
         <Row
           icon={<SignOutIcon size={20} weight="bold" color={color.muted} />}
           title="Sign out"
-          detail="Your practice stays on this phone"
-          onPress={() => setOut(true)}
+          detail="Your practice is saved to your account"
+          onPress={openSignOut}
           a11y="Sign out"
           last
         />
@@ -121,15 +152,17 @@ function SignedIn() {
       />
       <ConfirmSheet
         open={out}
-        onClose={() => setOut(false)}
+        onClose={unsynced ? waitForSync : closeSignOut}
         title="Sign out?"
-        body="Your practice stays on this phone, and you can keep going as a guest. Sign back in any time and it syncs."
-        stay="Stay signed in"
-        leave="Sign out"
-        onLeave={async () => {
-          setOut(false);
-          await signOut();
-        }}
+        body={
+          unsynced
+            ? 'Some practice hasn’t synced yet. Sign out anyway? Whatever hasn’t sent is only on this phone, and signing out removes it.'
+            : 'Your practice is saved to your account. This device starts fresh for the next person, and you can sign back in any time to pick up where you left off.'
+        }
+        stay={unsynced ? 'Wait' : 'Stay signed in'}
+        leave={unsynced ? 'Sign out anyway' : 'Sign out'}
+        busy={outStep === 'saving'}
+        onLeave={unsynced ? signOutAnyway : confirmSignOut}
       />
     </>
   );
