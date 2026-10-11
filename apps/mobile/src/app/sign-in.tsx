@@ -22,8 +22,12 @@ import { useAccount } from '@/state/account';
  *   cohort   then straight on to Join cohort
  *   review   back to the debrief, where the review sheet carries on
  *   me       back to Me
+ *   quota    a guest hit today's free AI limit; back to the practice
+ *
+ * A guest (anonymous user) with a new email keeps the same account and all their
+ * practice; with an email that already has an account, their practice moves into it.
  */
-type Reason = 'welcome' | 'cohort' | 'review' | 'me';
+type Reason = 'welcome' | 'cohort' | 'review' | 'me' | 'quota';
 type Step = 'email' | 'code' | 'name';
 
 const LEDE: Record<Reason, string> = {
@@ -31,6 +35,7 @@ const LEDE: Record<Reason, string> = {
   cohort: 'Sign in to join your cohort and see what your trainer assigned.',
   review: 'Sign in to send this role-play to your trainer.',
   me: 'Your progress follows you, and your trainer can see what you share.',
+  quota: 'Keep everything you’ve practiced and get more practice each day.',
 };
 
 const RESEND_S = 30;

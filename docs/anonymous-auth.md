@@ -1,7 +1,8 @@
 # Anonymous auth and AI quotas
 
-Design note for phase 2 (mobile client). Phase 1, the database and API, has shipped on
-branch `anon-auth`: migrations `20261012130000_anonymous_users.sql`,
+Design note and record. Phase 1 (database and API) and phase 2 (the mobile client:
+`apps/mobile/src/sync/{anonymous,auth,engine}.ts`, `src/lib/api.ts`) are on branch
+`anon-auth`. Phase 1 added migrations `20261012130000_anonymous_users.sql`,
 `20261012130100_ai_quotas.sql` and `20261012130200_merge_anonymous_user.sql`, plus the
 API changes in `apps/web/src/lib/ai/auth.ts` and `apps/web/src/app/api/account/merge-anonymous`.
 
@@ -118,9 +119,12 @@ Response `200`:
 
 What the server does (`public.merge_anonymous_user`, which only the service role can call):
 
-- **`learner_state`** is merged with the client's `mergeSynced` rules. The account counts
-  as "remote" and the guest as "local". The SQL matches the TypeScript on 300 random
-  cases.
+- **`learner_state`**: the route reads both documents and merges them with the app's own
+  code (`mergeGuestIntoAccount` in `packages/core/src/learnerDoc.ts`: the account is
+  "remote", the guest "local", exactly as a guest device signing in). The SQL stores the
+  result only if the account's version is still the one read (else `PT409 state_changed`,
+  and the route re-reads and retries). A guest with no completions leaves the account's
+  document as it was.
 - **Completions and sessions** move to the account, except `client_id`s the account
   already has.
 - **The guest's chosen display name** fills the account's name if the account never
@@ -133,9 +137,11 @@ What the server does (`public.merge_anonymous_user`, which only the service role
 
 ### Sign out
 
-- Call `supabase.auth.signOut()`, clear local learner data (as today), then call
-  `signInAnonymously()` for a fresh guest with a new uid and empty progress. If that
-  fails, stay local-only until it succeeds.
+- Call `supabase.auth.signOut({ scope: 'local' })`. The engine then calls
+  `signInAnonymously()` for a fresh guest with a new uid. Local practice stays on the
+  device (as before: "Your practice stays on this phone"); the device's progress document
+  becomes the new guest's first `learner_state`, and the account's records stay local
+  without syncing to the guest. If the sign-in fails, stay local-only until it succeeds.
 - Don't sign out an anonymous user who has progress unless they confirm. Their data is
   only reachable through that session, so signing out loses it. Offer "Save your
   progress" (upgrade) first.
@@ -224,7 +230,7 @@ generic permission error.
 
 ## Hosted settings (Blake)
 
-Do this when phase 2 ships. Before then, nothing calls `signInAnonymously`.
+Do this when the anonymous-auth app release ships.
 
 - **Auth > Sign In / Providers > Allow anonymous sign-ins**: on.
 - **Auth > Sign In / Providers > Email > Confirm email**: **on**. Without it, anonymous

@@ -2,7 +2,8 @@ import Constants from 'expo-constants';
 import { fetch as expoFetch } from 'expo/fetch';
 import type { AiEndpoint } from '@antelope/core';
 import { track } from './analytics';
-import { currentSession } from './supabase';
+import { sessionWithin } from '@/sync/anonymous';
+import { supabase } from './supabase';
 
 const DEV_API_PORT = 3000;
 
@@ -27,33 +28,47 @@ function apiBase(): string {
 }
 
 /**
- * Headers sent on every API call.
- * - Signed in: `Authorization: Bearer <Supabase access token>` (verified server-side,
- *   per-user rate limit). supabase-js keeps the token fresh while the app is open.
- * - Always, when set: `x-antelope-key`, the shared guest app token
- *   (`EXPO_PUBLIC_APP_TOKEN`). It ships inside the binary, so it only deters casual
- *   abuse; guests rely on it, and it's a fallback if a bearer token is rejected.
+ * Headers sent on every API call: `Authorization: Bearer <Supabase access token>`.
+ * Every learner has one: guests are anonymous Supabase users (docs/anonymous-auth.md),
+ * created on first launch, or here if that hasn't happened yet (offline launch).
+ * supabase-js keeps the token fresh while the app is open.
  */
-function apiHeaders(): Record<string, string> {
+async function apiHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = process.env.EXPO_PUBLIC_APP_TOKEN;
-  if (token) headers['x-antelope-key'] = token;
-  const access = currentSession()?.access_token;
+  const access = (await sessionWithin(4000))?.access_token;
   if (access) headers.Authorization = `Bearer ${access}`;
   return headers;
+}
+
+/** A 401 means the token went stale (or its guest is gone): refresh once and retry. */
+async function refreshedHeaders(): Promise<Record<string, string> | null> {
+  const { data } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }));
+  if (!data.session) return null;
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` };
 }
 
 export function apiUrl(path: string): string {
   return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/** API error bodies: `{ error, code?, reason?, retry_after?, ... }` (docs/anonymous-auth.md). */
 export class ApiError extends Error {
+  /** e.g. `quota_exceeded`, `ai_resting`, `auth_required`, `invalid_token`. */
+  code?: string;
+  /** For `quota_exceeded`: `daily` or `burst`. */
+  reason?: string;
+  /** Seconds until trying again makes sense. */
+  retryAfter?: number;
   constructor(
     public status: number,
     message: string,
+    body?: { code?: unknown; reason?: unknown; retry_after?: unknown },
   ) {
     super(message);
     this.name = 'ApiError';
+    if (typeof body?.code === 'string') this.code = body.code;
+    if (typeof body?.reason === 'string') this.reason = body.reason;
+    if (typeof body?.retry_after === 'number') this.retryAfter = body.retry_after;
   }
 }
 
@@ -80,22 +95,35 @@ function reportThrown(path: string, e: unknown) {
 async function failure(res: { status: number; text(): Promise<string> }, path?: string): Promise<ApiError> {
   if (path) reportFailure(path, res.status);
   const text = await res.text().catch(() => '');
-  return new ApiError(res.status, text || `Request failed with status ${res.status}`);
+  let body: { error?: unknown; code?: unknown; reason?: unknown; retry_after?: unknown } | undefined;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = undefined;
+  }
+  const message = typeof body?.error === 'string' ? body.error : text || `Request failed with status ${res.status}`;
+  return new ApiError(res.status, message, body);
 }
 
-export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+/** POST with the bearer token; on a 401, refresh the session once and try again. */
+async function send(doFetch: typeof fetch, path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const init = (headers: Record<string, string>) => ({ method: 'POST', headers, body: JSON.stringify(body), signal });
   let res: Response;
   try {
-    res = await fetch(apiUrl(path), {
-      method: 'POST',
-      headers: apiHeaders(),
-      body: JSON.stringify(body),
-      signal,
-    });
+    res = await doFetch(apiUrl(path), init(await apiHeaders()));
+    if (res.status === 401) {
+      const retry = await refreshedHeaders();
+      if (retry) res = await doFetch(apiUrl(path), init(retry));
+    }
   } catch (e) {
     reportThrown(path, e);
     throw e;
   }
+  return res;
+}
+
+export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const res = await send(fetch, path, body, signal);
   if (!res.ok) throw await failure(res, path);
   return (await res.json()) as T;
 }
@@ -117,18 +145,7 @@ export async function postStream(
   signal?: AbortSignal,
 ): Promise<string> {
   const doFetch = (expoFetch as unknown as typeof fetch) ?? fetch;
-  let res: Response;
-  try {
-    res = await doFetch(apiUrl(path), {
-      method: 'POST',
-      headers: apiHeaders(),
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch (e) {
-    reportThrown(path, e);
-    throw e;
-  }
+  const res = await send(doFetch, path, body, signal);
   if (!res.ok) throw await failure(res, path);
 
   const reader = res.body?.getReader?.();
@@ -155,4 +172,22 @@ export async function postStream(
     onChunk(rest);
   }
   return full;
+}
+
+/**
+ * POST /api/account/merge-anonymous: move a guest's practice into the account the
+ * learner just signed in to (docs/anonymous-auth.md). `accountToken` is the account's
+ * access token, `guestToken` the guest's, kept from before the switch.
+ */
+export async function mergeAnonymous(
+  accountToken: string,
+  guestToken: string,
+): Promise<{ merged: true; learnerState: string; completionsMoved: number; sessionsMoved: number }> {
+  const res = await fetch(apiUrl('/api/account/merge-anonymous'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accountToken}` },
+    body: JSON.stringify({ anonymousAccessToken: guestToken }),
+  });
+  if (!res.ok) throw await failure(res);
+  return res.json();
 }

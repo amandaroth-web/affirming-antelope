@@ -2,10 +2,12 @@ import type { AuthChangeEvent, RealtimeChannel, Session } from '@supabase/supaba
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
 import { identifyUser, resetAnalytics, setPerson, track } from '@/lib/analytics';
+import { ApiError, mergeAnonymous } from '@/lib/api';
 import { uuid } from '@/lib/uuid';
-import { onSimulatedOfflineChange, setCurrentSession, supabase, supabaseConfigured } from '@/lib/supabase';
+import { isTransient, onSimulatedOfflineChange, setCurrentSession, supabase, supabaseConfigured } from '@/lib/supabase';
 import { useAccount, type Submission } from '@/state/account';
 import { hadLearnerData, setRecordOwner, SYNCED_KEYS, useLearner, type PracticeSession } from '@/state/store';
+import { ensureSession, retryAnonymousNow } from './anonymous';
 import { refreshCloud } from './cloud';
 import { adoptOnSignIn, applyingRemote, pullState, pushState } from './learnerState';
 import { backoff, completionOp, flushOps, resetBackoff, sessionOp, useOutbox, type Op } from './outbox';
@@ -13,9 +15,14 @@ import { backoff, completionOp, flushOps, resetBackoff, sessionOp, useOutbox, ty
 /**
  * The sync engine. Starts once at launch (`startSync`) and then:
  *
- *   auth      INITIAL_SESSION / SIGNED_IN → owner for new records, guest migration,
- *             learner_state adopt-or-merge, flush, refresh. SIGNED_OUT → guest (local
- *             practice stays; the account cache is cleared).
+ *   auth      Guests are anonymous Supabase users (docs/anonymous-auth.md): with no
+ *             session at launch, one is created quietly (retried while offline).
+ *             Anonymous session → owner for new records, one-time upload of practice
+ *             done without a session, learner_state sync; no identify, no cloud data.
+ *             Anonymous → permanent on the same uid (email verified) → `converted`.
+ *             Permanent session → owner, guest merge (merge-anonymous) or upload,
+ *             learner_state adopt-or-merge, flush, refresh. SIGNED_OUT → a fresh
+ *             guest (local practice stays; the account cache is cleared).
  *   practice  a new completion or session in the learner store → outbox op.
  *             A change to the synced part of the state → learner_state marked dirty.
  *   flush     on enqueue (debounced), foreground, reconnect, sign-in and a backoff
@@ -27,7 +34,7 @@ import { backoff, completionOp, flushOps, resetBackoff, sessionOp, useOutbox, ty
  */
 
 let started = false;
-let user: { id: string; email: string } | null = null;
+let user: { id: string; email: string; anonymous: boolean } | null = null;
 let flushing: Promise<void> | null = null;
 let again = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -39,6 +46,11 @@ let channel: RealtimeChannel | null = null;
 
 export function currentUserId(): string | undefined {
   return user?.id;
+}
+
+/** Signed in to a real account (not a guest). Cohorts, reviews and submissions need this. */
+function permanent(): boolean {
+  return !!user && !user.anonymous;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +132,7 @@ export async function refresh(): Promise<void> {
   const u = user;
   if (!u) return;
   lastRefresh = Date.now();
+  if (!u.anonymous && useAccount.getState().pendingMerge) await finishGuestMerge(u.id);
   try {
     if (await pullState(u.id)) {
       useOutbox.getState().markStateDirty(u.id, true);
@@ -128,6 +141,7 @@ export async function refresh(): Promise<void> {
   } catch {
     // offline: the cache stays; refreshCloud records `offline`
   }
+  if (u.anonymous) return; // guests have no cohorts, reviews or profile to fetch
   await refreshCloud(u.id, u.email);
   syncPerson();
 }
@@ -142,7 +156,10 @@ function scheduleRefresh(ms: number) {
 
 /** Foreground / reconnect / pull-to-refresh: retry now, then refresh. */
 export async function syncNow(): Promise<void> {
-  if (!user) return;
+  if (!user) {
+    retryAnonymousNow();
+    return;
+  }
   resetBackoff(user.id);
   stateAttempts = 0;
   await flush();
@@ -153,20 +170,123 @@ export async function syncNow(): Promise<void> {
 // Auth transitions
 // ---------------------------------------------------------------------------
 
-function guestWork() {
+/**
+ * Practice this device did without an account session: records with no owner (older
+ * installs, or before the first anonymous session existed), plus records of an earlier
+ * guest on this device whose session is gone.
+ */
+function guestWork(previousGuest?: string | null) {
   const s = useLearner.getState();
+  const mine = (r: { ownerId?: string }) => !r.ownerId || (!!previousGuest && r.ownerId === previousGuest);
   return {
-    completions: s.practiceLog.filter((r) => !r.ownerId),
-    sessions: s.sessions.filter((r) => !r.ownerId),
+    completions: s.practiceLog.filter(mine),
+    sessions: s.sessions.filter(mine),
   };
 }
 
-async function signedIn(session: Session, fresh: boolean) {
+/** Queue a one-time upload of `work` for `id`, and stamp it as theirs. */
+function uploadWork(id: string, work: ReturnType<typeof guestWork>, previousGuest?: string | null) {
+  if (!work.completions.length && !work.sessions.length) return;
+  const ops: Op[] = [...work.sessions.map(sessionOp), ...work.completions.map(completionOp).filter((o): o is Op => !!o)];
+  useOutbox.getState().enqueue(id, ops);
+  if (previousGuest) useLearner.getState().reownRecords(previousGuest, id);
+  useLearner.getState().claimRecords(
+    id,
+    work.completions.map((r) => r.id),
+    work.sessions.map((r) => r.id),
+  );
+}
+
+/** A guest: an anonymous Supabase user. Practice syncs; nothing account-shaped happens. */
+async function anonymousSession(session: Session, fresh: boolean) {
+  const id = session.user.id;
+  user = { id, email: '', anonymous: true };
+  setRecordOwner(id);
+  const acct = useAccount.getState();
+  const previousGuest = acct.anonymousId && acct.anonymousId !== id ? acct.anonymousId : null;
+  acct.set({ status: 'guest', anonymousId: id });
+
+  // practice from before this guest existed goes up once, under this guest
+  const work = guestWork(previousGuest);
+  const hasWork = work.completions.length + work.sessions.length > 0;
+  const dirty = !!useOutbox.getState().stateDirty[id];
+  try {
+    // a new guest's first document is simply this device's progress
+    const needsPush = fresh ? await adoptOnSignIn(id, true) : await pullState(id);
+    if (needsPush || dirty) useOutbox.getState().markStateDirty(id, true);
+  } catch {
+    if (fresh) useOutbox.getState().markStateDirty(id, true);
+  }
+  if (hasWork) uploadWork(id, work, previousGuest);
+  if (previousGuest) useOutbox.getState().rekey(previousGuest, id);
+  await flush();
+}
+
+/** The guest verified an email (updateUser + verifyOtp): same uid, now a real account. */
+async function converted(session: Session) {
+  const id = session.user.id;
+  const email = session.user.email ?? '';
+  user = { id, email, anonymous: false };
+  setRecordOwner(id);
+  // identify on conversion, never before (docs/tracking-plan.md): the guest's earlier events join this person
+  identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at, pathway_id: useLearner.getState().activePathwayId });
+  useAccount.getState().set({
+    status: 'signed-in',
+    anonymousId: null,
+    pendingMerge: null,
+    profile: { id, email, displayName: '', needsName: true },
+  });
+  track('sign_in_completed', { is_new_user: true, migrated_guest_data: useLearner.getState().practiceLog.length > 0 });
+  subscribeRealtime(id);
+  await flush();
+  await refreshCloud(id, email);
+  syncPerson();
+}
+
+/**
+ * The guest signed in to an existing account: ask the API to move their practice into
+ * it (merge-anonymous, with the guest token kept before the switch), then treat the
+ * guest's local records and waiting uploads as the account's. Retried on refresh while
+ * the network is down; dropped when the guest can no longer be merged.
+ */
+async function finishGuestMerge(id: string): Promise<boolean> {
+  const pending = useAccount.getState().pendingMerge;
+  if (!pending || pending.anonId === id) return false;
+  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  if (!token) return false;
+  const learner = useLearner.getState();
+  const theirs = {
+    completions: learner.practiceLog.filter((r) => r.ownerId === pending.anonId),
+    sessions: learner.sessions.filter((r) => r.ownerId === pending.anonId),
+  };
+  let moved = false;
+  let terminal = false;
+  try {
+    const res = await mergeAnonymous(token, pending.token);
+    moved = res.completionsMoved + res.sessionsMoved > 0 || res.learnerState !== 'none';
+  } catch (e) {
+    const transient = isTransient(e) || (e instanceof ApiError && (e.status >= 500 || e.status === 0));
+    if (transient) return false; // try again on the next refresh
+    terminal = true; // guest expired, already merged, or gone
+  }
+  useAccount.getState().set({ pendingMerge: null, anonymousId: null });
+  // the guest's records and queued uploads are the account's now
+  useLearner.getState().reownRecords(pending.anonId, id);
+  useOutbox.getState().rekey(pending.anonId, id);
+  // the server couldn't move them: upload this device's copies instead (client_id dedupes)
+  if (terminal) {
+    const ops: Op[] = [...theirs.sessions.map(sessionOp), ...theirs.completions.map(completionOp).filter((o): o is Op => !!o)];
+    if (ops.length) useOutbox.getState().enqueue(id, ops);
+  }
+  return moved;
+}
+
+async function signedIn(session: Session, fresh: boolean, fromGuest: string | null = null) {
   const id = session.user.id;
   const email = session.user.email ?? '';
   const acct = useAccount.getState();
   if (acct.profile && acct.profile.id !== id) acct.clearAccount();
-  user = { id, email };
+  user = { id, email, anonymous: false };
   setRecordOwner(id);
   // Supabase uuid only; the email stays out of analytics.
   identifyUser(id, { role: 'learner', is_trainer: false, signed_up_at: session.user.created_at, pathway_id: useLearner.getState().activePathwayId });
@@ -182,12 +302,20 @@ async function signedIn(session: Session, fresh: boolean) {
     },
   });
 
-  // Guest practice on this device now belongs to this account.
+  // A guest signing in to an existing account: their practice moves on the server.
+  const pending = useAccount.getState().pendingMerge;
+  const merging = !!pending && pending.anonId !== id && (!fromGuest || pending.anonId === fromGuest);
+  // a guest who never practiced doesn't change the account's progress (same as a fresh install signing in)
+  const guestPractised =
+    merging && useLearner.getState().practiceLog.some((r) => r.ownerId === pending.anonId || !r.ownerId);
+  const merged = merging ? await finishGuestMerge(id) : false;
+
+  // Practice made without any session (offline first launch, older installs) uploads to this account.
   const work = guestWork();
   const hasGuestWork = work.completions.length + work.sessions.length > 0;
   const dirty = !!useOutbox.getState().stateDirty[id];
   try {
-    const needsPush = fresh ? await adoptOnSignIn(id, hasGuestWork || dirty) : await pullState(id);
+    const needsPush = fresh ? await adoptOnSignIn(id, hasGuestWork || dirty || guestPractised) : await pullState(id);
     if (needsPush) useOutbox.getState().markStateDirty(id, true);
   } catch {
     // offline right after sign-in: push what we have when the network is back
@@ -198,18 +326,10 @@ async function signedIn(session: Session, fresh: boolean) {
     track('sign_in_completed', {
       // the first sign-in confirms the email at the same moment it signs in
       is_new_user: !!signedInAt && !!confirmedAt && Math.abs(Date.parse(signedInAt) - Date.parse(confirmedAt)) < 5000,
-      migrated_guest_data: hasGuestWork,
+      migrated_guest_data: hasGuestWork || merged,
     });
   }
-  if (hasGuestWork) {
-    const ops: Op[] = [...work.sessions.map(sessionOp), ...work.completions.map(completionOp).filter((o): o is Op => !!o)];
-    useOutbox.getState().enqueue(id, ops);
-    useLearner.getState().claimRecords(
-      id,
-      work.completions.map((r) => r.id),
-      work.sessions.map((r) => r.id),
-    );
-  }
+  uploadWork(id, work);
 
   subscribeRealtime(id);
   await flush();
@@ -235,9 +355,11 @@ function syncPerson() {
   setPerson(person);
 }
 
-function signedOut() {
-  track('signed_out');
-  resetAnalytics();
+function signedOut(wasGuest: boolean) {
+  if (!wasGuest) {
+    track('signed_out');
+    resetAnalytics();
+  }
   user = null;
   setRecordOwner(undefined);
   if (channel) {
@@ -245,6 +367,8 @@ function signedOut() {
     channel = null;
   }
   useAccount.getState().clearAccount();
+  // keep going as a fresh guest; practice stays on this device
+  void ensureSession();
 }
 
 function subscribeRealtime(userId: string) {
@@ -300,21 +424,40 @@ export function startSync() {
 
     let booted = false;
     let lastUserId: string | null = null;
+    let lastAnonymous = false;
     const handle = (event: AuthChangeEvent, session: Session | null) => {
       setCurrentSession(session);
       const nextId = session?.user.id ?? null;
+      const anonymous = !!session?.user.is_anonymous;
       if (event === 'INITIAL_SESSION' || !booted) {
         booted = true;
         lastUserId = nextId;
-        void decideOnboarding(!!session);
-        if (session) void signedIn(session, false);
-        else useAccount.getState().set({ status: 'guest' });
+        lastAnonymous = anonymous;
+        // a stored guest session isn't a reason to skip the welcome
+        void decideOnboarding(!!session && !anonymous);
+        if (session && anonymous) void anonymousSession(session, false);
+        else if (session) void signedIn(session, false);
+        else {
+          useAccount.getState().set({ status: 'guest' });
+          void ensureSession(); // first launch: become a guest quietly (retries while offline)
+        }
         return;
       }
-      if (nextId === lastUserId) return; // token refresh, user update
+      if (nextId === lastUserId) {
+        // same uid: token refresh, user update, or the guest just verified an email
+        if (session && lastAnonymous && !anonymous) {
+          lastAnonymous = false;
+          void converted(session);
+        }
+        return;
+      }
+      const fromGuest = lastAnonymous ? lastUserId : null;
+      const wasGuest = lastAnonymous;
       lastUserId = nextId;
-      if (session) void signedIn(session, true);
-      else signedOut();
+      lastAnonymous = anonymous;
+      if (session && anonymous) void anonymousSession(session, true);
+      else if (session) void signedIn(session, true, fromGuest);
+      else signedOut(wasGuest);
     };
     // supabase-js warns against awaiting other supabase calls inside the callback
     supabase.auth.onAuthStateChange((event, session) => {
@@ -346,6 +489,7 @@ export function startSync() {
   });
 
   AppState.addEventListener('change', (state) => {
+    if (state === 'active' && !user) retryAnonymousNow();
     if (state !== 'active' || !user) return;
     resetBackoff(user.id);
     void flush();
@@ -383,7 +527,7 @@ export function submitForReview(
   cohortId: string,
   note: string,
 ): Submission | null {
-  if (!user) return null;
+  if (!permanent()) return null; // guests sign in first (the review sheet asks)
   const active = useAccount.getState().submissions.find((x) => x.sessionId === target.sessionId && x.status !== 'withdrawn');
   if (active) return active;
   const sub: Submission = {
@@ -411,7 +555,7 @@ export function submitForReview(
 
 /** Take a submission back while it's still waiting for review. */
 export function withdrawSubmission(id: string) {
-  if (!user) return;
+  if (!permanent()) return;
   useAccount.getState().setSubmissionStatus(id, 'withdrawn');
   track('submission_withdrawn');
   enqueue([{ type: 'withdraw', submissionId: id }]);
@@ -419,7 +563,7 @@ export function withdrawSubmission(id: string) {
 
 /** The learner opened a review. */
 export function markReviewSeen(reviewId: string) {
-  if (!user) return;
+  if (!permanent()) return;
   const r = useAccount.getState().reviews.find((x) => x.id === reviewId);
   if (!r || r.learnerSeenAt) return;
   const at = new Date().toISOString();

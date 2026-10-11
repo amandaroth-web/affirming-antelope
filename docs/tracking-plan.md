@@ -57,7 +57,7 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 |---|---|
 | `app_opened` | `entry` (`direct`, `website_cta`, `guide`, `deep_link`), `src?` (CTA location) |
 | `onboarding_chosen` | `choice` (`guest`, `sign_in`) |
-| `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`) |
+| `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`, `quota`: a guest at today's free AI limit) |
 | `sign_in_completed` | `is_new_user`, `migrated_guest_data` (conversion: always the same uid; existing account: merge-anonymous moved rows) |
 | `signed_out` | — |
 | `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`), `pathway_id` |

@@ -59,6 +59,8 @@ interface OutboxState {
   stalled: boolean;
   enqueue: (userId: string, ops: Op[]) => void;
   markStateDirty: (userId: string, dirty: boolean) => void;
+  /** Hand one user's waiting ops to another (a guest merged into an account). Rows carry no user id. */
+  rekey: (fromUserId: string, toUserId: string) => void;
 }
 
 export const useOutbox = create<OutboxState>()(
@@ -82,6 +84,14 @@ export const useOutbox = create<OutboxState>()(
           ],
         })),
       markStateDirty: (userId, dirty) => set((s) => ({ stateDirty: { ...s.stateDirty, [userId]: dirty } })),
+      rekey: (fromUserId, toUserId) =>
+        set((s) => {
+          const { [fromUserId]: was, ...stateDirty } = s.stateDirty;
+          return {
+            entries: s.entries.map((e) => (e.userId === fromUserId ? { ...e, userId: toUserId, nextAt: 0 } : e)),
+            stateDirty: was ? { ...stateDirty, [toUserId]: true } : stateDirty,
+          };
+        }),
     }),
     {
       name: 'antelope.outbox.v1',

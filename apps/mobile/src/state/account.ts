@@ -10,6 +10,11 @@ import { createJSONStorage, persist } from 'zustand/middleware';
  * lives in `store.ts` (the device is the source of truth for that).
  */
 
+/**
+ * `guest` is anyone without a permanent account: an anonymous Supabase user (the
+ * normal case; practice syncs) or no session yet (offline first launch). Cohorts,
+ * reviews and the account UI need `signed-in`.
+ */
 export type AuthStatus = 'loading' | 'guest' | 'signed-in';
 
 export interface Profile {
@@ -106,6 +111,16 @@ export interface AccountState {
   refreshing: boolean;
   /** The last refresh failed on the network (cached data is showing). */
   offline: boolean;
+  /**
+   * This device's guest (anonymous Supabase user), while it is one. Kept so a guest
+   * whose session is lost (e.g. cleaned up server-side) hands its practice to the next one.
+   */
+  anonymousId: string | null;
+  /**
+   * A guest signing in to an existing account: the guest's access token, kept until
+   * POST /api/account/merge-anonymous has moved their practice into the account.
+   */
+  pendingMerge: { anonId: string; token: string } | null;
 }
 
 export interface AccountActions {
@@ -134,6 +149,8 @@ export const useAccount = create<AccountState & AccountActions>()(
       onboarded: null,
       status: 'loading',
       refreshing: false,
+      anonymousId: null,
+      pendingMerge: null,
       ...EMPTY,
       set: (patch) => set(patch),
       clearAccount: () => set({ ...EMPTY, status: 'guest' }),
