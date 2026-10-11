@@ -45,6 +45,7 @@ function DrillSession() {
   const [complete, setComplete] = useState(false);
   const before = usePracticeSnapshot();
   const recordPractice = useLearner((s) => s.recordPractice);
+  const recordSession = useLearner((s) => s.recordSession);
   const recorded = useRef(false);
   const [day] = useState(() => {
     const s = useLearner.getState().streak;
@@ -53,8 +54,23 @@ function DrillSession() {
   const mins = Number(minutes) || 5;
   const drill = getDrill(drillId);
 
-  const repDone = (d: Drill) => {
+  const repDone = (d: Drill, rep: RepResult) => {
     setDone((xs) => (xs.includes(d.id) ? xs : [...xs, d.id]));
+    // every rep is kept as a practice session (what was said, what the coach saw)
+    const ended = new Date();
+    recordSession({
+      kind: 'drill',
+      refId: d.id,
+      skill: d.skill,
+      transcript: [
+        { id: 't0', speaker: 'employee', text: d.prompt },
+        { id: 't1', speaker: 'learner', text: rep.response },
+      ],
+      debrief: rep.feedback ?? { picks: rep.picks ?? [], hitTarget: !!rep.hit },
+      startedAt: rep.startedAt,
+      endedAt: ended.toISOString(),
+      durationSec: Math.max(0, (ended.getTime() - new Date(rep.startedAt).getTime()) / 1000),
+    });
     if (recorded.current) return;
     recorded.current = true;
     recordPractice({ kind: 'drill', skill: d.skill, refId: id, activityId, minutes: mins });
@@ -138,7 +154,7 @@ function DrillSession() {
     <View style={sessionStyles.root}>
       {header}
       <Animated.View key={`${drill.id}-${reps}`} entering={reps ? swap.entering : undefined} exiting={swap.exiting} style={styles.flex}>
-        <DrillRep drill={drill} onRepDone={() => repDone(drill)} onOneMore={oneMore} onDone={finish} />
+        <DrillRep drill={drill} onRepDone={(rep) => repDone(drill, rep)} onOneMore={oneMore} onDone={finish} />
       </Animated.View>
     </View>
   );
@@ -146,7 +162,17 @@ function DrillSession() {
 
 type Phase = 'answer' | 'waiting' | 'feedback' | 'error';
 
-function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRepDone: () => void; onOneMore: () => void; onDone: () => void }) {
+/** One finished rep: the learner's words (or picks) and the coach's read. */
+interface RepResult {
+  response: string;
+  feedback?: DrillFeedback;
+  picks?: string[];
+  hit?: boolean;
+  startedAt: string;
+}
+
+function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRepDone: (rep: RepResult) => void; onOneMore: () => void; onDone: () => void }) {
+  const [repStarted] = useState(() => new Date().toISOString());
   const focused = useIsFocused();
   const scroll = useRef<ScrollView>(null);
   const coach = useRef<MascotHandle>(null);
@@ -176,7 +202,9 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
     if (!selected.length || !drill.choices) return;
     // haptics + bursts are ChoiceTiles' (on the check frame); the coach hops from onResolved
     setRevealed(true);
-    onRepDone();
+    const picks = selected.map((i) => drill.choices![i].text);
+    const got = selected.filter((i) => targets.includes(i)).length;
+    onRepDone({ response: picks.join(' / '), picks, hit: got === targets.length && selected.length === targets.length, startedAt: repStarted });
     toEnd();
   };
 
@@ -199,7 +227,7 @@ function DrillRep({ drill, onRepDone, onOneMore, onDone }: { drill: Drill; onRep
       if (req.signal.aborted) return;
       setFeedback({ ...fb, possibleResponses: fb.possibleResponses ?? [] });
       setPhase('feedback');
-      onRepDone();
+      onRepDone({ response: text, feedback: { ...fb, possibleResponses: fb.possibleResponses ?? [] }, startedAt: repStarted });
       // FeedbackPanel owns the hit/miss haptics, on its chip pop
     } catch (e) {
       if (inflight.current !== req) return;

@@ -10,9 +10,13 @@ import { useBrandFonts } from '@/design/fonts';
 import { color } from '@/design/tokens';
 import { spring } from '@/motion/springs';
 import { useReduceMotion } from '@/motion/useMotionPrefs';
+import { useAccount } from '@/state/account';
 import { useLearner } from '@/state/store';
+import { startSync } from '@/sync/engine';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// accounts + sync: guest mode and offline keep working whether or not this ever reaches a server
+startSync();
 
 const SESSION = {
   presentation: 'transparentModal',
@@ -29,13 +33,18 @@ function useHydrated() {
     if (useLearner.persist.hasHydrated()) setDone(true);
     return unsub;
   }, [done]);
-  return done;
+  // the welcome-or-Home decision is made once the account cache and auth session are read
+  const onboarded = useAccount((s) => s.onboarded);
+  return done && onboarded !== null;
 }
+
+const SHEET = { presentation: 'modal', gestureEnabled: true, contentStyle: { backgroundColor: color.white } } as const;
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useBrandFonts();
   const hydrated = useHydrated();
   const ready = (fontsLoaded || !!fontError) && hydrated;
+  const onboarded = useAccount((s) => s.onboarded) === true;
   const reduce = useReduceMotion();
   const [splashGone, setSplashGone] = useState(false);
   const rise = useSharedValue(0);
@@ -56,12 +65,22 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Animated.View style={[styles.root, app]}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.white } }}>
-          <Stack.Screen name="(tabs)" />
-          {/* Practice screens: transparent modals with no native animation. SessionSurface owns the
-              transition (container transform from the source, swipe-down dismiss, collapse on close). */}
-          <Stack.Screen name="drill/[id]" options={SESSION} />
-          <Stack.Screen name="roleplay/[scenarioId]" options={SESSION} />
-          <Stack.Screen name="lesson/[id]" options={SESSION} />
+          <Stack.Protected guard={onboarded}>
+            {/* fades in when the welcome hands over on first launch */}
+            <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+            {/* Practice screens: transparent modals with no native animation. SessionSurface owns the
+                transition (container transform from the source, swipe-down dismiss, collapse on close). */}
+            <Stack.Screen name="drill/[id]" options={SESSION} />
+            <Stack.Screen name="roleplay/[scenarioId]" options={SESSION} />
+            <Stack.Screen name="lesson/[id]" options={SESSION} />
+            <Stack.Screen name="review/[id]" />
+            <Stack.Screen name="join" options={SHEET} />
+          </Stack.Protected>
+          <Stack.Protected guard={!onboarded}>
+            <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+          </Stack.Protected>
+          {/* reachable from the welcome, Me, Home and the review sheet */}
+          <Stack.Screen name="sign-in" options={SHEET} />
         </Stack>
       </Animated.View>
       {!splashGone && <BrandSplash reduce={reduce} onDone={onSplashDone} />}

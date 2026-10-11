@@ -50,7 +50,7 @@ function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin");
   const base: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-antelope-key",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-antelope-key",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
@@ -105,12 +105,12 @@ export function streamResponse(req: Request, body: ReadableStream<Uint8Array>): 
 // ---------------------------------------------------------------------------
 
 /**
- * Shared app token gate. When APP_CLIENT_TOKEN is set, requests must carry a
- * matching `x-antelope-key` header (constant-time compare) or get 401. When it
- * is unset (local dev) the check is skipped. OPTIONS preflight never calls this.
+ * Shared app token gate for guests. When APP_CLIENT_TOKEN is set, requests must
+ * carry a matching `x-antelope-key` header (constant-time compare) or get 401.
+ * When it is unset (local dev) the check is skipped. OPTIONS preflight never calls
+ * this. Signed-in callers skip it: see `authorize()` in ./auth.ts.
  *
- * The token ships inside the app binary, so it only deters casual abuse. Real
- * per-user auth arrives with accounts.
+ * The token ships inside the app binary, so it only deters casual abuse.
  */
 export function requireClientKey(req: Request): void {
   const expected = process.env.APP_CLIENT_TOKEN;
@@ -135,13 +135,18 @@ function clientIp(req: Request): string {
   return fwd || req.headers.get("x-real-ip") || "local";
 }
 
+/** Per-IP limit (guests). */
 export function rateLimit(req: Request, bucket: string, max: number, windowMs = 60_000): void {
+  rateLimitKey(`${bucket}:ip:${clientIp(req)}`, max, windowMs);
+}
+
+/** Limit on an arbitrary key, e.g. `${bucket}:user:${userId}` for signed-in callers. */
+export function rateLimitKey(key: string, max: number, windowMs = 60_000): void {
   const now = Date.now();
   if (now - lastSweep > windowMs * 5) {
     lastSweep = now;
     for (const [k, v] of hits) if (v.every((t) => now - t > 10 * 60_000)) hits.delete(k);
   }
-  const key = `${bucket}:${clientIp(req)}`;
   const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   if (recent.length >= max) {
     const retry = Math.max(1, Math.ceil((windowMs - (now - recent[0])) / 1000));

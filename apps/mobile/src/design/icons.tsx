@@ -43,6 +43,19 @@ export {
   TargetIcon,
   UserIcon,
   XIcon,
+  WarningCircleIcon,
+  EnvelopeSimpleIcon,
+  SignOutIcon,
+  UsersThreeIcon,
+  PlayIcon,
+  PauseIcon,
+  PencilSimpleIcon,
+  CloudCheckIcon,
+  CloudArrowUpIcon,
+  HourglassIcon,
+  MicrophoneIcon,
+  ArrowUUpLeftIcon,
+  ChatTeardropTextIcon,
 } from 'phosphor-react-native';
 
 /**

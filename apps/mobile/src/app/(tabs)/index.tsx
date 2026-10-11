@@ -1,8 +1,8 @@
-import { getSkill, type DemoAssignmentItem } from '@antelope/core';
+import { getSkill } from '@antelope/core';
 import { DEMO_LEARNER } from '@antelope/core';
 import { router, useIsFocused } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -22,6 +22,10 @@ import { useSeen } from '@/components/home/motion';
 import { ProgressList } from '@/components/home/ProgressList';
 import { ThisWeek } from '@/components/home/ThisWeek';
 import { TodayHero } from '@/components/home/TodayHero';
+import { FeedbackCard, GuestCohortPrompt, JoinCohortCard, NothingAssigned } from '@/components/home/TrainerCards';
+import { assignmentView, demoAssignmentView } from '@/data/assignments';
+import { firstNameOf, unseenReviews, useAccount } from '@/state/account';
+import { syncNow } from '@/sync/engine';
 import { Mascot } from '@/components/mascot';
 import { ChatsCircleIcon, Hoofprint, LightningIcon, Screen, ShuffleIcon, SparkleIcon, Text, border, color, layout, space } from '@/design';
 import { openDrill, openRoleplay, pickDrill, pickScenario } from '@/data/routes';
@@ -43,7 +47,22 @@ function dateLine(d = new Date()) {
 
 export default function Home() {
   const focused = useIsFocused();
-  const firstName = useLearner((s) => s.firstName);
+  const localName = useLearner((s) => s.firstName);
+  const signedIn = useAccount((s) => s.status === 'signed-in');
+  const profile = useAccount((s) => s.profile);
+  const cohorts = useAccount((s) => s.cohorts);
+  const assignments = useAccount((s) => s.assignments);
+  const reviews = useAccount((s) => s.reviews);
+  const submissions = useAccount((s) => s.submissions);
+  const practiceLog = useLearner((s) => s.practiceLog);
+  const firstName = (signedIn && firstNameOf(profile?.displayName)) || localName;
+  const unseen = useMemo(() => unseenReviews(reviews), [reviews]);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncNow();
+    setRefreshing(false);
+  }, []);
   const streak = useLearner((s) => s.streak.days);
   const goal = useLearner((s) => s.weeklyGoal);
   const weekDays = useLearner((s) => s.weekDays);
@@ -67,7 +86,15 @@ export default function Home() {
 
   // Home keeps updating under the practice screens. Hold what it shows until
   // it's back in view, so each change animates once, where it can be seen.
-  const seen = useSeen({ streak, goal, weekDays, assignment, skills, rows: liveRows, currentWeek }, focused);
+  // signed in: real assignments, with progress topped up by practice on this phone that hasn't synced yet
+  const seen = useSeen(
+    { streak, goal, weekDays, assignment, skills, rows: liveRows, currentWeek, assignments, cohorts, practiceLog, unseen, signedIn },
+    focused,
+  );
+  const views = seen.signedIn
+    ? seen.assignments.map((a) => assignmentView(a, seen.cohorts.find((c) => c.id === a.cohortId), seen.practiceLog, profile?.id))
+    : [demoAssignmentView(seen.assignment)];
+  const newest = seen.unseen[0];
 
   // Header handoff: the big greeting leaves under a compact title bar.
   const scrollY = useSharedValue(0);
@@ -99,14 +126,10 @@ export default function Home() {
     };
   });
 
-  const openAssignment = (it: DemoAssignmentItem) => {
-    if (it.kind === 'roleplay') openRoleplay(it.refId, { source: 'assignment' });
-    else openDrill(it.refId, { source: 'assignment' });
-  };
-
   return (
     <Screen
       scrollHandler={onScroll}
+      refreshControl={signedIn ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={color.primary} /> : undefined}
       overlay={<CompactBar title={`${greeting()}, ${firstName}`} streak={seen.streak} scrollY={scrollY} greetH={greetH} reduce={reduce} />}
     >
       <Enter style={styles.header}>
@@ -141,6 +164,20 @@ export default function Home() {
         />
       </Enter>
 
+      {/* a trainer's feedback is the most personal thing on Home: right under today's practice */}
+      {newest ? (
+        <Animated.View layout={listLayout}>
+          <Enter index={2} from="scale" style={styles.feedback}>
+            <FeedbackCard
+              review={newest}
+              sub={submissions.find((x) => x.id === newest.submissionId)}
+              more={seen.unseen.length - 1}
+              onPress={() => router.push({ pathname: '/review/[id]', params: { id: newest.submissionId } })}
+            />
+          </Enter>
+        </Animated.View>
+      ) : null}
+
       <Animated.View layout={listLayout}>
         <Enter index={2} style={styles.block}>
           <ThisWeek streak={seen.streak} goal={seen.goal} weekDays={seen.weekDays} />
@@ -150,7 +187,22 @@ export default function Home() {
       <Animated.View layout={listLayout}>
         <Enter index={3}>
           <SectionHeader title="From your trainer" />
-          <AssignmentCard assignment={seen.assignment} onOpenItem={openAssignment} />
+          {!seen.signedIn ? (
+            <>
+              <AssignmentCard assignment={views[0]} />
+              <GuestCohortPrompt onPress={() => router.push({ pathname: '/sign-in', params: { reason: 'cohort' } })} />
+            </>
+          ) : !seen.cohorts.length ? (
+            <JoinCohortCard onJoin={() => router.push('/join')} />
+          ) : views.length ? (
+            <View style={styles.assignments}>
+              {views.map((v) => (
+                <AssignmentCard key={v.id} assignment={v} />
+              ))}
+            </View>
+          ) : (
+            <NothingAssigned trainerName={seen.cohorts[0].trainerName} />
+          )}
         </Enter>
       </Animated.View>
 
@@ -301,5 +353,7 @@ const styles = StyleSheet.create({
   hello: { marginTop: 4 },
   mascot: { marginRight: space[2] },
   heroWrap: { zIndex: 1 },
+  feedback: { marginTop: space[5] },
+  assignments: { gap: space[4] },
   block: { marginTop: space[5] },
 });

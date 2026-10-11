@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { fetch as expoFetch } from 'expo/fetch';
+import { currentSession } from './supabase';
 
 const DEV_API_PORT = 3000;
 
@@ -24,14 +25,19 @@ function apiBase(): string {
 }
 
 /**
- * Headers sent on every API call. `x-antelope-key` carries the shared app
- * token (`EXPO_PUBLIC_APP_TOKEN`) when set. It ships inside the app binary, so
- * it only deters casual abuse; real per-user auth arrives with accounts.
+ * Headers sent on every API call.
+ * - Signed in: `Authorization: Bearer <Supabase access token>` (verified server-side,
+ *   per-user rate limit). supabase-js keeps the token fresh while the app is open.
+ * - Always, when set: `x-antelope-key`, the shared guest app token
+ *   (`EXPO_PUBLIC_APP_TOKEN`). It ships inside the binary, so it only deters casual
+ *   abuse; guests rely on it, and it's a fallback if a bearer token is rejected.
  */
 function apiHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   const token = process.env.EXPO_PUBLIC_APP_TOKEN;
   if (token) headers['x-antelope-key'] = token;
+  const access = currentSession()?.access_token;
+  if (access) headers.Authorization = `Bearer ${access}`;
   return headers;
 }
 

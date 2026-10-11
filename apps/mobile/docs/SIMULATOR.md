@@ -25,6 +25,8 @@ scripts/sim-capture.sh relaunch
 
 Gotchas:
 - A plain `simctl launch` shows the dev launcher; the attach `openurl` is what loads the bundle (about 8s).
+- Foregrounding a running app with `simctl launch` can leave it on a cached bundle ("bundle scheme is file" in the Metro log): fast refresh and logs stop. `relaunch` fixes it.
+- After `idb ui text` the simulator treats input as a hardware keyboard and stops showing the software keyboard; reboot the sim (`xcrun simctl shutdown` / `boot`) or use the second sim to check keyboard layouts.
 - **Adding or renaming a route file needs `relaunch`**; fast refresh alone leaves the deep link "Unmatched Route".
 - The dev-menu floating "Tools" button is turned off in this simulator (`defaults write com.anonymous.affirming-antelope EXDevMenuShowFloatingActionButton -bool false`) so it does not appear in captures. A red/yellow dev overlay still can; dismiss with a tap on its Dismiss button (bottom-left, about 45,718).
 - Screenshots are 1206x2622 px (3x). Read a downscaled copy, not the raw PNG: `ffmpeg -y -i x.png -vf scale=300:-1 -q:v 5 small.jpg`.
@@ -70,9 +72,39 @@ Targeting another simulator: every command honours `SIM_UDID=<udid>` (default `b
 
 Typical motion loop: start `record` in the background, fire `open`/`tap`, wait, then `frames` and view the contact sheet.
 
+## Backend: Supabase (accounts, sync, cohorts, trainer review)
+
+The app talks to Supabase directly (`src/lib/supabase.ts`, `@supabase/supabase-js`, session in AsyncStorage). Guest mode needs none of this; everything below is for signed-in flows.
+
+- **Env** (in the environment of the `expo start` process; restart Metro with `--clear` after changing):
+  - `EXPO_PUBLIC_SUPABASE_URL`: the API URL. Unset in a dev build: the dev machine's LAN host from the Expo `hostUri` on port **54321** (same derivation as the AI API in `src/lib/api.ts`), so the simulator and a phone on the same Wi-Fi both reach `supabase start`. Falls back to `http://127.0.0.1:54321`.
+  - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: the publishable (anon) key. Unset in a dev build: the local stack's public default `sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH`.
+  - Release builds with neither set have no backend: the Account section hides and the app is guest-only. For EAS builds set both in EAS environment variables.
+- **Local stack:** `npm run db:start` from the repo root (Docker). Studio http://127.0.0.1:54323, Postgres `127.0.0.1:54322` (postgres/postgres), Mailpit http://127.0.0.1:54324. `npm run db:reset` restores the seed. Contract: `docs/data-model.md`.
+- **Sign-in codes** land in Mailpit. From a script: `curl -s 'http://127.0.0.1:54324/api/v1/messages?limit=20'` (the subject is "Your Affirming Antelope code: 123456"; filter on `To[0].Address`). The code screen shows this hint only in native dev builds pointed at a local stack.
+- **Seed accounts:** amanda@example.com (learner in "MI for Leaders — Fall pilot", PM-017 submitted), jordan@, priya@, marcus@ (EN-003 reviewed), rosa@example.com (trainer Dr. Rosa Lin). Join code `MIL-DEMO`, trainer code `TRAIN-PILOT`.
+- **Acting as the trainer** (to test the inbox): get Rosa a token with `POST /auth/v1/otp` + `POST /auth/v1/verify` (`{"email","token","type":"email"}`, `apikey` header), then `POST /rest/v1/reviews` with `submission_id`, `feedback`, `rating` (`emerging|developing|proficient|strong`), `recommended_kind`/`recommended_ref`, `try_again`. Voice notes go to `POST /storage/v1/object/review-audio/{cohort_id}/{submission_id}/{uuid}.m4a` (`content-type: audio/mp4`; `say -o note.m4a --file-format=m4af --data-format=aac "…"` makes one) and the review's `audio_path`. Pull to refresh Home, or background and foreground the app.
+- **Offline:** Me › Demo › **Simulate offline** (dev builds, any account) makes every Supabase request fail like a dropped connection. Practice queues in the outbox (Me › Account shows "N waiting to sync"); switch it off and the outbox flushes. The simulator shares the Mac's network, so this is the practical way to test it; it also survives a JS reload only until the app restarts (it's not persisted).
+- **Fresh install** (to see the welcome, or test a first sign-in): `xcrun simctl uninstall $SIM_UDID com.anonymous.affirming-antelope && xcrun simctl install $SIM_UDID ~/Library/Developer/Xcode/DerivedData/AffirmingAntelope-*/Build/Products/Debug-iphonesimulator/AffirmingAntelope.app`, re-set the floating-button default above, then `scripts/sim-capture.sh relaunch`. The dev menu opens once on first launch; close it (X near 360,419).
+- **Typing in tests:** `idb ui text --udid $SIM_UDID "…"` types into the focused field. It can drop the first characters while a field is still focusing, so wait about a second after the tap (or lead with two spaces where the app trims). `idb ui key-sequence 42 42 …` is backspace.
+- **Realtime:** `reviews` and `submissions` are in the `supabase_realtime` publication, so a review Rosa saves (or a submission made on another device) shows up on Home / Me within a second, no refresh. RLS limits events to the learner's own rows.
+
+Native modules added for accounts (need a dev-client rebuild, all Expo Go compatible): `expo-audio` (voice notes; config plugin with `microphonePermission: false`), `expo-network` (reconnect → flush), `expo-crypto` (uuid client ids). No URL polyfill is needed on RN 0.86.
+
 ## API dev server
 
 Practice AI routes live in `apps/web`: `npm run dev -w web` (port 3000, or 3001 if 3000 is taken). The simulator reaches it on localhost. Point the app at it with `EXPO_PUBLIC_API_URL=http://localhost:3001` set in the environment of the `expo start` process (restart Metro with `--clear` after changing it). Default is the dev machine LAN host on port 3000 (`src/lib/api.ts`).
+
+For app testing without model calls, run a second, mocked server on its own port and point Metro at it:
+
+```sh
+cd apps/web && AI_MOCK=1 npx next dev -p 3007        # deterministic canned replies
+cd apps/mobile && EXPO_PUBLIC_API_URL=http://localhost:3007 \
+  EXPO_PUBLIC_APP_TOKEN=$(grep ^APP_CLIENT_TOKEN= ../web/.env.local | cut -d= -f2-) \
+  npx expo start --dev-client --port 8081 --clear
+```
+
+`apps/web/.env.local` sets `APP_CLIENT_TOKEN`, so the guest token is required even locally. Signed in, the app also sends `Authorization: Bearer <access token>` on every AI call.
 
 ## Rive
 
@@ -92,7 +124,9 @@ const { riveFile } = useRiveFile(require('../../assets/rive/mascot-wave.riv'));
 - The default (new) iOS backend does **not** support state-machine inputs (`setNumberInputValue`/`triggerInput` throw "SMI inputs are not supported by the new runtime"). Drive state machines through view-model data binding (`useViewModelInstance(file, { async: true })` + `dataBind={instance}`).
 - Mascot playground (dev only): `antelope://dev/mascot?pose=wave&mood=idle&size=300&fire=wave&at=600&chrome=0` (`fire`: wave, hop, turn, cheer, nod, blink; change `n` to re-fire).
 
-## API token (`APP_CLIENT_TOKEN` / `EXPO_PUBLIC_APP_TOKEN`)
+## API auth (`APP_CLIENT_TOKEN` / `EXPO_PUBLIC_APP_TOKEN`, Supabase bearer)
+
+Signed in, `src/lib/api.ts` sends `Authorization: Bearer <Supabase access token>` (kept fresh by supabase-js while the app is in the foreground). It always sends the guest `x-antelope-key` too when it's set, which is what guests rely on.
 
 The API in `apps/web` requires the header `x-antelope-key` when the server env var `APP_CLIENT_TOKEN` is set (it is set in production on Vercel). When unset, as in plain local dev, the check is skipped.
 

@@ -1,4 +1,4 @@
-import type { DemoAssignmentItem, DemoTrainerAssignment } from '@antelope/core';
+import type { AssignmentRowView, AssignmentView } from '@/data/assignments';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -13,8 +13,6 @@ import { Avatar, CaretRightIcon, Callout, CheckIcon, Chip, ListRow, ProgressBar,
 import { FADE_MS, STAGGER, spring, useReduceMotion } from '@/motion';
 import { useOnChange } from './motion';
 
-const KIND: Record<DemoAssignmentItem['kind'], string> = { drill: 'Short practice', roleplay: 'AI role-play', learn: 'Lesson' };
-
 /** The check pops first; the summary bar fills after it. */
 const SEG_AFTER_CHECK = 220;
 
@@ -23,26 +21,22 @@ const SEG_AFTER_CHECK = 220;
  * An item that becomes done: its check pops in ochre and the row settles,
  * then its segment of the summary bar fills. Nothing changes height.
  */
-export function AssignmentCard({
-  assignment,
-  onOpenItem,
-}: {
-  assignment: DemoTrainerAssignment;
-  onOpenItem: (item: DemoAssignmentItem) => void;
-}) {
+export function AssignmentCard({ assignment }: { assignment: AssignmentView }) {
   const done = assignment.items.filter((i) => i.done).length;
   const total = assignment.items.length;
   return (
     <Raised contentStyle={styles.face}>
       <View style={styles.head}>
-        <Avatar seed="rosa-lin-trainer" size={44} accessibilityLabel={assignment.assignedBy.name} />
+        <Avatar seed={assignment.trainer.seed} size={44} accessibilityLabel={assignment.trainer.name} />
         <View style={styles.from}>
-          <Text variant="label">From {assignment.assignedBy.name}</Text>
-          <Text variant="caption" color={color.muted}>
-            {assignment.assignedBy.role}
-          </Text>
+          <Text variant="label">From {assignment.trainer.name}</Text>
+          {assignment.trainer.role ? (
+            <Text variant="caption" color={color.muted} numberOfLines={1}>
+              {assignment.trainer.role}
+            </Text>
+          ) : null}
         </View>
-        <Chip label={assignment.dueLabel} tone="gold" />
+        <Chip label={assignment.dueLabel} tone={assignment.overdue ? 'neutral' : 'gold'} />
       </View>
 
       <Text variant="heading" style={styles.title}>
@@ -61,7 +55,7 @@ export function AssignmentCard({
       ) : null}
 
       <ProgressBar
-        fills={assignment.items.map((it) => (it.done ? 1 : 0))}
+        fills={assignment.items.map((it) => it.fill)}
         tint={color.gold}
         delay={SEG_AFTER_CHECK}
         style={styles.bar}
@@ -70,14 +64,14 @@ export function AssignmentCard({
 
       <View style={styles.items}>
         {assignment.items.map((it, i) => (
-          <ItemRow key={it.refId + i} item={it} onPress={() => onOpenItem(it)} last={i === total - 1} />
+          <ItemRow key={it.key} item={it} onPress={it.open} last={i === total - 1} />
         ))}
       </View>
     </Raised>
   );
 }
 
-function ItemRow({ item, onPress, last }: { item: DemoAssignmentItem; onPress: () => void; last: boolean }) {
+function ItemRow({ item, onPress, last }: { item: AssignmentRowView; onPress: () => void; last: boolean }) {
   const reduce = useReduceMotion();
   const c = useSharedValue(item.done ? 1 : 0);
   const settle = useSharedValue(0);
@@ -103,7 +97,7 @@ function ItemRow({ item, onPress, last }: { item: DemoAssignmentItem; onPress: (
     <ListRow
       onPress={onPress}
       last={last}
-      accessibilityLabel={`${item.title}, ${KIND[item.kind]}${item.done ? ', done' : ''}`}
+      accessibilityLabel={`${item.title}, ${item.caption}${item.done ? ', done' : ''}`}
       contentStyle={rowStyle}
     >
       <View style={styles.check}>
@@ -120,7 +114,7 @@ function ItemRow({ item, onPress, last }: { item: DemoAssignmentItem; onPress: (
           {item.title}
         </Text>
         <Text variant="caption" color={color.muted}>
-          {KIND[item.kind]}
+          {item.caption}
         </Text>
       </View>
       <CaretRightIcon size={18} weight="bold" color={color.faint} />

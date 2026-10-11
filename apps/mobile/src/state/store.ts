@@ -6,6 +6,7 @@ import {
   type DemoSkillProgress,
   type DemoTrainerAssignment,
   type Debrief,
+  type DrillFeedback,
   type SelfReflection,
   type SkillId,
   type SkillLevelNumber,
@@ -13,6 +14,18 @@ import {
 } from '@antelope/core';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { isUuid, uuid } from '@/lib/uuid';
+
+export const LEARNER_KEY = 'antelope.learner.v1';
+
+/**
+ * Whether this device already had learner data before this launch (an existing
+ * guest install, e.g. a tester's web link). Read before the store can write, so
+ * the welcome screen only shows on a true first launch.
+ */
+export const hadLearnerData: Promise<boolean> = AsyncStorage.getItem(LEARNER_KEY)
+  .then((v) => v != null)
+  .catch(() => false);
 
 /** Local calendar day, YYYY-MM-DD. */
 export function today(d = new Date()): string {
@@ -27,6 +40,7 @@ export function weekdayIndex(d = new Date()): number {
 }
 
 export interface PracticeRecord {
+  /** uuid, created on the device. Also the row's `client_id` in activity_completions. */
   id: string;
   kind: ActivityKind;
   skill?: SkillId;
@@ -36,18 +50,26 @@ export interface PracticeRecord {
   activityId?: string;
   minutes: number;
   at: string; // ISO timestamp
+  /** The account this was recorded under. Unset: made in guest mode, uploaded on first sign-in. */
+  ownerId?: string;
 }
 
-export interface ReviewSubmission {
+/** A finished drill rep or role-play, as stored in practice_sessions. */
+export interface PracticeSession {
+  /** uuid, created on the device: both `client_id` and `id` of the practice_sessions row. */
   id: string;
-  scenarioId: string;
-  turns: Turn[];
+  kind: 'roleplay' | 'drill';
+  /** Drill id or ScenarioSpec id. */
+  refId: string;
+  skill?: SkillId;
+  transcript: Turn[];
+  /** Role-play: the AI debrief. Drill: the coach's feedback, or the multiple-choice picks. */
+  debrief?: Debrief | DrillFeedback | { picks: string[]; hitTarget: boolean };
   selfReflection?: SelfReflection;
-  /** The AI debrief the learner saw, shared so the trainer reviews the same feedback. */
-  debrief?: Debrief;
-  note?: string;
-  submittedAt: string;
-  status: 'pending' | 'reviewed';
+  startedAt: string;
+  endedAt: string;
+  durationSec: number;
+  ownerId?: string;
 }
 
 export interface Settings {
@@ -71,7 +93,8 @@ export interface LearnerState {
   scenariosCompleted: number;
   assignment: DemoTrainerAssignment;
   practiceLog: PracticeRecord[];
-  reviews: ReviewSubmission[];
+  /** Finished drill reps and role-plays (newest first), kept so they can sync and be sent for review. */
+  sessions: PracticeSession[];
   settings: Settings;
   /** Day the mascot last waved on Home; it greets once per day. */
   lastGreetedDay: string | null;
@@ -86,9 +109,13 @@ export interface LearnerActions {
   /** Mark a path activity done. Advances the week when every activity in the unit is done. */
   completeActivity: (activityId: string) => void;
   /** Log any finished practice (drill, role-play, lesson). Updates streak, weekly goal, and skill progress. */
-  recordPractice: (p: Omit<PracticeRecord, 'id' | 'at'> & { at?: string }) => PracticeRecord;
-  /** Queue a role-play for the trainer. */
-  submitForReview: (s: Omit<ReviewSubmission, 'id' | 'submittedAt' | 'status'>) => ReviewSubmission;
+  recordPractice: (p: Omit<PracticeRecord, 'id' | 'at' | 'ownerId'> & { at?: string }) => PracticeRecord;
+  /** Keep a finished drill rep or role-play. Returns it with its client id. */
+  recordSession: (p: Omit<PracticeSession, 'id' | 'ownerId'>) => PracticeSession;
+  /** After a guest migration: guest-made records now belong to this account. */
+  claimRecords: (userId: string, completionIds: string[], sessionIds: string[]) => void;
+  /** Replace the synced part of the state (sign-in adoption, merges from the server). */
+  applySynced: (synced: SyncedState) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   markGreeted: () => void;
   /** Path played the unlock for the current week. */
@@ -100,7 +127,36 @@ export interface LearnerActions {
   previewPathwayComplete: () => void;
 }
 
-const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+/**
+ * The part of the store mirrored to `learner_state` so progress follows the account.
+ * Practice history goes to its own tables; settings and greetings stay on the device.
+ */
+export const SYNCED_KEYS = [
+  'firstName',
+  'role',
+  'pathwayId',
+  'currentWeek',
+  'completedActivityIds',
+  'skills',
+  'streak',
+  'weekDays',
+  'weeklyGoal',
+  'scenariosCompleted',
+  'pathSeenWeek',
+] as const satisfies readonly (keyof LearnerState)[];
+export type SyncedState = Pick<LearnerState, (typeof SYNCED_KEYS)[number]>;
+
+export function syncedState(s: LearnerState): SyncedState {
+  const out = {} as Record<string, unknown>;
+  for (const k of SYNCED_KEYS) out[k] = s[k];
+  return out as SyncedState;
+}
+
+/** Who's signed in, if anyone. Set by the auth listener; new records are stamped with it. */
+let currentOwner: string | undefined;
+export function setRecordOwner(userId: string | undefined) {
+  currentOwner = userId;
+}
 
 function seed(): LearnerState {
   const d = DEMO_LEARNER;
@@ -124,7 +180,7 @@ function seed(): LearnerState {
     scenariosCompleted: 4,
     assignment: structuredClone(d.trainerAssignment),
     practiceLog: [],
-    reviews: [],
+    sessions: [],
     settings: { motion: 'system', haptics: true },
     lastGreetedDay: null,
     pathSeenWeek: d.currentWeek,
@@ -160,7 +216,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
         }),
 
       recordPractice: (input) => {
-        const record: PracticeRecord = { ...input, id: uid(), at: input.at ?? new Date().toISOString() };
+        const record: PracticeRecord = { ...input, id: uuid(), at: input.at ?? new Date().toISOString(), ownerId: currentOwner };
         set((s) => {
           const day = today();
           const firstToday = s.streak.lastPracticeDay !== day;
@@ -186,11 +242,23 @@ export const useLearner = create<LearnerState & LearnerActions>()(
         return record;
       },
 
-      submitForReview: (input) => {
-        const sub: ReviewSubmission = { ...input, id: uid(), submittedAt: new Date().toISOString(), status: 'pending' };
-        set((s) => ({ reviews: [sub, ...s.reviews] }));
-        return sub;
+      recordSession: (input) => {
+        const session: PracticeSession = { ...input, id: uuid(), ownerId: currentOwner };
+        set((s) => ({ sessions: [session, ...s.sessions].slice(0, 100) }));
+        return session;
       },
+
+      claimRecords: (userId, completionIds, sessionIds) =>
+        set((s) => {
+          const c = new Set(completionIds);
+          const ss = new Set(sessionIds);
+          return {
+            practiceLog: s.practiceLog.map((r) => (c.has(r.id) && !r.ownerId ? { ...r, ownerId: userId } : r)),
+            sessions: s.sessions.map((r) => (ss.has(r.id) && !r.ownerId ? { ...r, ownerId: userId } : r)),
+          };
+        }),
+
+      applySynced: (synced) => set(synced),
 
       setSetting: (key, value) => set((s) => ({ settings: { ...s.settings, [key]: value } })),
       markGreeted: () => set({ lastGreetedDay: today() }),
@@ -204,9 +272,19 @@ export const useLearner = create<LearnerState & LearnerActions>()(
         }),
     }),
     {
-      name: 'antelope.learner.v1',
+      name: LEARNER_KEY,
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
+      // v2 (accounts): every record gets a uuid client id; sessions replace the local-only review queue.
+      migrate: (persisted, from) => {
+        const s = (persisted ?? {}) as Partial<LearnerState> & { reviews?: unknown };
+        if (from < 2) {
+          s.practiceLog = (s.practiceLog ?? []).map((r) => (isUuid(r.id) ? r : { ...r, id: uuid() }));
+          s.sessions = [];
+          delete s.reviews;
+        }
+        return s as LearnerState & LearnerActions;
+      },
     },
   ),
 );
