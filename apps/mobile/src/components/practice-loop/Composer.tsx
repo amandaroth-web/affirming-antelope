@@ -38,8 +38,12 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
   const reduce = useReduceMotion();
   const [h, setH] = useState(MIN_H);
   const [focused, setFocused] = useState(false);
-  const [lifted, setLifted] = useState(false);
-  useEffect(() => setLifted(false), [value]);
+  // The text that was just sent, hidden while its bubble lifts off. Derived during
+  // render (not reset in an effect on every keystroke): an effect that sets state
+  // after each keystroke's commit tripped React's nested-update limit while typing
+  // ("Maximum update depth exceeded"), which dropped characters on the web.
+  const [liftedText, setLiftedText] = useState<string | null>(null);
+  const lifted = liftedText !== null && liftedText === value;
   const ready = value.trim().length > 0 && !busy;
   const live = useSharedValue(ready ? 1 : 0);
   const pop = useSharedValue(1);
@@ -85,7 +89,7 @@ export const Composer = forwardRef<TextInput, ComposerProps>(function Composer(
     node.measureInWindow((x, y, width, height) => {
       if (width > 0) launchPad = { x, y, width, height, at: Date.now() };
       // the words have left the field: hide them so they aren't on screen twice while the bubble lifts off
-      setLifted(true);
+      setLiftedText(value);
       go();
     });
     setTimeout(go, 40);
