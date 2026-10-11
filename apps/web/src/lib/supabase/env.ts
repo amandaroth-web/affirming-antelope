@@ -1,6 +1,7 @@
 /**
  * Public Supabase settings. Both values are safe in the browser: every query runs
- * through RLS as the signed-in user. The web app never uses the service-role key.
+ * through RLS as the signed-in user. The secret (service-role) key is separate and
+ * server only: see ./admin.ts.
  */
 export function supabaseEnv(): { url: string; key: string } | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
