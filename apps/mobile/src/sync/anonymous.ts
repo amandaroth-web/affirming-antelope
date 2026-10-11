@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { currentSession, supabase, supabaseConfigured } from '@/lib/supabase';
+import { currentSession, setCurrentSession, supabase, supabaseConfigured } from '@/lib/supabase';
 
 /**
  * Guests are Supabase anonymous users (docs/anonymous-auth.md). Every install gets one
@@ -27,10 +27,16 @@ export function ensureSession(): Promise<Session | null> {
     try {
       // a stored session the listener hasn't reported yet
       const stored = (await supabase.auth.getSession()).data.session;
-      if (stored) return stored;
+      if (stored) {
+        setCurrentSession(stored);
+        return stored;
+      }
       const { data, error } = await supabase.auth.signInAnonymously();
       if (error || !data.session) throw error ?? new Error('no session');
       failures = 0;
+      // Record it now, not when the auth listener fires: `creating` clears below, and a
+      // call landing in between would otherwise create a second anonymous user.
+      setCurrentSession(data.session);
       return data.session;
     } catch {
       failures += 1;
