@@ -10,8 +10,9 @@ export const METHOD_LEAD = {
   role: "Principal, Psychotherapy Clinical Quality",
   photo: { src: "/team/amanda-roth.jpg", width: 500, height: 500 },
   alt: "Portrait of Amanda Roth, LCSW",
-  // TODO: Amanda to write or approve. The quote renders only when this is non-empty.
-  quote: "",
+  // Drafted for Amanda: she approves the wording before this merges. Renders only when non-empty.
+  quote:
+    "Workshops teach the skill in an afternoon. The hard part comes the week after, when someone pushes back and you hear yourself starting to lecture. I wanted something for that week.",
 };
 
 /**
