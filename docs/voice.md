@@ -71,3 +71,17 @@ gets one; voices should differ across the cast.
 - Analytics (ids/enums only): `voice_turn_recorded {scenario_id, duration_ms}`,
   `voice_transcribe_failed {reason}`, `practice_started` gains `mode: 'text' | 'voice'`.
 - Trainer review shows "Voice" as the mode (field already exists).
+
+## Server implementation notes (as built)
+
+- Models (`VOICE_MODELS` in `packages/core`, env override `AI_VOICE_STT_MODEL` / `AI_VOICE_TTS_MODEL`):
+  `gpt-transcribe` (about $0.0045/min) and `gpt-4o-mini-tts` (about $0.015/min of speech).
+- Error bodies are `{ error, code }`. `transcribe`: 422 `no_speech`, 413 `audio_too_large` or
+  `audio_too_long`, 415 `unsupported_audio` (container detected from the bytes: webm, mp4/m4a,
+  wav; the declared type is ignored), 400 bad fields. Either route: 503 `voice_unavailable`
+  (no OpenAI key in production, or OpenAI out of credits) means switch to Type; 429
+  `quota_exceeded` and 503 `ai_resting` match the other AI routes.
+- Quotas per UTC day / per minute: anonymous stt 60 / 8, tts 200 / 30; permanent stt 300 / 15,
+  tts 1000 / 60; global ceilings 5000 stt and 25000 tts. The legacy shared-token tier is
+  refused (401): voice needs a Supabase user.
+- `speak` sends `Cache-Control: private, no-store` and no Content-Length (chunked stream).

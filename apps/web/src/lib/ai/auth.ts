@@ -22,7 +22,7 @@ export type Caller =
   | { kind: "legacy"; ipHash: string }
   | { kind: "dev" };
 
-export type QuotaBucket = "turn" | "debrief" | "drill";
+export type QuotaBucket = "turn" | "debrief" | "drill" | "stt" | "tts";
 
 type QuotaResult = {
   allowed: boolean;
@@ -109,7 +109,7 @@ export async function authenticate(req: Request): Promise<Caller> {
 }
 
 // Dev-only in-memory limits (per minute), the old guest numbers.
-const DEV_PER_MINUTE: Record<QuotaBucket, number> = { turn: 40, debrief: 8, drill: 30 };
+const DEV_PER_MINUTE: Record<QuotaBucket, number> = { turn: 40, debrief: 8, drill: 30, stt: 10, tts: 60 };
 
 function deniedError(bucket: QuotaBucket, caller: Caller, q: QuotaResult): ApiError {
   const retry = Math.max(1, Math.round(q.retry_after || 60));
@@ -122,7 +122,14 @@ function deniedError(bucket: QuotaBucket, caller: Caller, q: QuotaResult): ApiEr
     });
   }
   let message: string;
-  if (q.reason === "burst") {
+  if (bucket === "stt" || bucket === "tts") {
+    message =
+      q.reason === "burst"
+        ? "That's a lot of talking in a short time. Take a breath and try again in a moment."
+        : caller.kind === "user" && caller.isAnonymous
+          ? "You've used today's free voice practice. You can keep going by typing, sign in with your email for more, or come back tomorrow."
+          : "You've used today's voice practice. You can keep going by typing; voice resets tomorrow.";
+  } else if (q.reason === "burst") {
     message = "That's a lot of practice in a short time. Take a breath and try again in a moment.";
   } else if (caller.kind === "user" && caller.isAnonymous) {
     message =

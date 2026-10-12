@@ -23,6 +23,11 @@ export const SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "lucia-ortega-ma",
       voiceNotes:
         "Friendly but guarded at first. Short answers early on (\"It's fine,\" \"Just busy\"). Polite, a little self-deprecating, laughs things off. Uses \"honestly\" and \"I don't know\" when she's getting closer to something real. Warms up noticeably when she feels heard, and her sentences get longer. Never dramatic.",
+      voice: {
+        openai: "coral",
+        instructions:
+          "Woman in her mid-20s, a medical assistant. Friendly and a little self-deprecating, quick to laugh things off. Short, light answers at first (\"It's fine, just busy\"), a touch of polite guardedness. Moderate pace. When she feels heard, her sentences lengthen and the voice softens and slows. Never dramatic.",
+      },
     },
     learnerBrief:
       "You supervise Lucia, one of the most dependable MAs in the clinic. Over the past month she's stopped speaking up in huddles and has left right at the end of shift every day. Nothing's gone wrong, exactly. You've set aside fifteen minutes to check in.",
@@ -70,6 +75,11 @@ export const SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "darnell-brooks-analyst",
       voiceNotes:
         "Even-toned, a little flat, economical with words. Deflects with dry humor and logic (\"Technically the data's not final until the 5th anyway\"). Crosses his arms verbally: \"Okay.\" \"Sure.\" \"I hear you.\" Gets sharper and more clipped when lectured. When he feels understood, he slows down, uses \"I guess\" and \"the thing is,\" and lets more of himself show. Doesn't swear. Not rude, just tired.",
+      voice: {
+        openai: "ash",
+        instructions:
+          "Man in his early 30s, a revenue cycle analyst. Even-toned, a little flat, economical with words. Dry humor and logic delivered deadpan. Clipped, \"Okay. Sure. I hear you\" when he feels lectured. Moderate-to-quick pace. If he feels understood, he slows down and lets some tiredness and honesty show. Not rude, just worn out.",
+      },
     },
     learnerBrief:
       "You manage Darnell, a revenue cycle analyst who used to be one of your strongest people. His month-end reports have been late three months in a row, and the finance team has started asking you about it. He's been less engaged in team meetings too. You've scheduled a one-on-one.",
@@ -122,6 +132,11 @@ export const SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "angela-okafor-pm",
       voiceNotes:
         "Fast talker, warm, competent, a little breathless. Lists things when stressed (\"I've got the audit, the schedule, two open positions...\"). Brushes off concern with humor: \"Sleep is overrated.\" Uses \"it's faster if I just\" and \"they're not ready\" a lot. When something lands, she pauses, and her sentences slow down and get quieter. Can get prickly if she feels her competence is being questioned.",
+      voice: {
+        openai: "nova",
+        instructions:
+          "Woman in her early 40s, a practice manager. Fast, warm and competent, a little breathless, listing things off when stressed and brushing worry aside with a laugh (\"Sleep is overrated\"). Bright and energetic on the surface. When something lands she pauses, gets quieter and slows right down.",
+      },
     },
     learnerBrief:
       "Angela reports to you and runs one of your busiest clinics. Her team loves her and the clinic runs well, but she's been sending emails at 11 p.m., missed her own vacation, and two of her leads told you they'd like more responsibility. You're meeting for your monthly one-on-one.",
@@ -173,6 +188,11 @@ export const SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "kevin-tran-frontdesk",
       voiceNotes:
         "Practical, slightly skeptical, talks in concrete examples and patient stories (\"Mrs. Alvarez can barely see her phone\"). Says \"I'm not against it, but...\" often. Polite with his manager. Shows interest through questions about logistics. When he feels his expertise is respected, he gets energetic and starts problem-solving out loud.",
+      voice: {
+        openai: "echo",
+        instructions:
+          "Man in his mid-40s, front desk supervisor. Practical, slightly skeptical, steady medium pace. Talks in concrete examples and says \"I'm not against it, but...\" Polite and measured with his manager. Perks up and speaks faster when his expertise is respected and he starts problem-solving out loud.",
+      },
     },
     learnerBrief:
       "The organization is rolling out self-check-in kiosks at all urgent care sites next month. Kevin runs the front desk at your busiest location and has quietly let his team know he thinks it's a bad idea. The rollout is happening either way. You want his help making it work.",
@@ -223,6 +243,11 @@ export const SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "tom-kowalski-rn",
       voiceNotes:
         "Blunt, loud when frustrated, uses sarcasm as armor (\"Oh good, another meeting\"). Speaks for the team: \"my nurses,\" \"we.\" Calls out jargon immediately (\"Don't 'optimize' me\"). Interrupts himself with stories from past failed initiatives. Respects directness and hates being managed. When he feels genuinely heard, he goes quiet for a beat, then talks about his nurses with obvious tenderness. Never apologizes quickly.",
+      voice: {
+        openai: "onyx",
+        instructions:
+          "Man of 58, a night charge nurse with 19 years on the unit. Deep, blunt and a little weary. Loud and sarcastic when frustrated, with a gruff edge, short sentences, and sharp emphasis on words like \"optimize.\" Fast when angry. When he feels truly heard he goes quiet for a beat, then speaks slowly and tenderly about his nurses.",
+      },
     },
     learnerBrief:
       "You're the new director over Tom's unit. Leadership has approved a team-nursing model on nights that changes patient ratios and adds LPNs. Tom found out from a memo before you could talk to him, and he's been openly critical in front of staff. You've asked him to meet. He's here, and he's not happy.",
