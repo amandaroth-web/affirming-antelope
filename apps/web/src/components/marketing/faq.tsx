@@ -1,4 +1,5 @@
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
+import type { ReactNode } from "react";
 
 type FaqProps = {
   items: { q: string; a: string }[];
@@ -6,21 +7,30 @@ type FaqProps = {
   id?: string;
   /** Heading level of the section title; questions sit one level below. */
   level?: 2 | 3;
+  /** Shown under the heading; on wide screens the heading column sits beside the list. */
+  aside?: ReactNode;
 };
 
 /** FAQ accordion. Pair it with `faqPageLd` for FAQPage structured data. */
-export function Faq({ items, heading = "Questions people ask", id = "faq", level = 2 }: FaqProps) {
+export function Faq({ items, heading = "Questions people ask", id = "faq", level = 2, aside }: FaqProps) {
   const H = level === 2 ? "h2" : "h3";
   const Q = level === 2 ? "h3" : "h4";
   return (
-    <section aria-labelledby={`${id}-heading`} className="scroll-mt-20" id={id}>
+    <section
+      aria-labelledby={`${id}-heading`}
+      className={`scroll-mt-20 ${aside ? "grid gap-8 lg:grid-cols-12 lg:gap-12" : ""}`}
+      id={id}
+    >
+      <div className={aside ? "lg:sticky lg:top-24 lg:col-span-4 lg:self-start" : undefined}>
       <H
         id={`${id}-heading`}
         className="pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
       >
         {heading}
       </H>
-      <div className="mt-8 space-y-3">
+      {aside}
+      </div>
+      <div className={aside ? "space-y-3 lg:col-span-8" : "mt-8 space-y-3"}>
         {items.map((item, i) => (
           <details
             key={item.q}

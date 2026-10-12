@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { appHref, ctaTrack, TRAINER_PATH, type Audience } from "@/lib/site";
+import { appHref, ctaTrack, pilotLink, TRAINER_PATH, type Audience } from "@/lib/site";
 
 type Size = "sm" | "md" | "lg";
 
@@ -99,5 +99,32 @@ export function TrainerCta({
     >
       {children}
     </Link>
+  );
+}
+
+type PilotCtaProps = {
+  location: string;
+  size?: Size;
+  variant?: Variant;
+  className?: string;
+  children?: ReactNode;
+};
+
+/** Book a pilot call (Calendly, new tab). Tracked as `target: pilot`. */
+export function PilotCta({
+  location,
+  size = "md",
+  variant = "primary",
+  className = "",
+  children = "Book a 30-minute call",
+}: PilotCtaProps) {
+  return (
+    <a
+      {...pilotLink(location)}
+      className={`${buttonBase} ${focus} ${sizes[size]} ${variants[variant][size]} ${className}`}
+    >
+      {children}
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
   );
 }

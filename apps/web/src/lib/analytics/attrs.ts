@@ -1,4 +1,4 @@
-import type { AudienceId, CtaLocation } from "@antelope/core";
+import type { AudienceId, CtaLocation, CtaTarget } from "@antelope/core";
 
 /**
  * Data attributes the delegated click listener (dom.ts) turns into events. Spread them on
@@ -10,7 +10,7 @@ import type { AudienceId, CtaLocation } from "@antelope/core";
  * A link to https://app.affirmingantelope.com also gets ph_did / ph_sid / src appended
  * on click so the app continues the same anonymous identity.
  */
-export function ctaTrack(location: CtaLocation, target: "app" | "trainer", audience?: AudienceId) {
+export function ctaTrack(location: CtaLocation, target: CtaTarget, audience?: AudienceId) {
   return {
     "data-track": "cta_clicked",
     "data-track-location": location,

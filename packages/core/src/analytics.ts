@@ -22,8 +22,14 @@ export type CtaLocation =
   | "nav"
   | "download_band"
   | "footer"
+  | "trainer_pilot"
+  | "faq"
   | `audience_${string}`
   | `guide_${string}`;
+
+/** Where a CTA goes: the learner app, the trainer dashboard, or the pilot booking page. */
+export type CtaTarget = "app" | "trainer" | "pilot";
+export const CTA_TARGETS: readonly CtaTarget[] = ["app", "trainer", "pilot"];
 
 export type PracticeKind = "drill" | "roleplay" | "lesson";
 export type PracticeSource =
@@ -55,7 +61,7 @@ export type ReviewRating = "emerging" | "developing" | "proficient" | "strong";
 
 export interface AnalyticsEvents {
   // Website
-  cta_clicked: { location: CtaLocation; target: "app" | "trainer"; audience?: AudienceId };
+  cta_clicked: { location: CtaLocation; target: CtaTarget; audience?: AudienceId };
   guide_drill_clicked: { slug: string; drill_id: string };
 
   // Learner app

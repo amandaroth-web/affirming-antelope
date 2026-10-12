@@ -11,7 +11,13 @@ export const SITE_DESCRIPTION =
   "Free Motivational Interviewing practice for healthcare leaders: five-minute drills and live AI role-plays with realistic employees for performance, change, and burnout conversations, plus opt-in trainer review. Clinicians have their own pathway. Works in your browser.";
 
 export type Audience = "clinicians" | "leaders" | "trainers";
-export type CtaTarget = "app" | "trainer";
+export type CtaTarget = "app" | "trainer" | "pilot";
+
+/** Trainer and team pilots: a 30-minute call with Blake. Opens in a new tab. */
+export const PILOT_URL = "https://calendly.com/blake-bigleaphealth/30min";
+
+/** The one pricing line, used wherever price comes up. No numbers until pilots set them. */
+export const PRICING_LINE = "Free for learners. Cohort pilots for trainers and teams: book a 30-minute call.";
 
 /** Learner app link that carries the CTA location as `?src=`. */
 export function appHref(location: string, path = "/") {
@@ -26,6 +32,16 @@ export function drillHref(drillId: string, slug: string) {
 }
 
 export const TRAINER_PATH = "/trainer";
+
+/** Props for a link to the pilot booking page, tracked as `target: pilot`. */
+export function pilotLink(location: string) {
+  return {
+    href: PILOT_URL,
+    target: "_blank",
+    rel: "noopener",
+    ...ctaTrack(location, "pilot"),
+  } as const;
+}
 
 /** `data-track` attributes for a primary CTA (see docs/tracking-plan.md). */
 export function ctaTrack(location: string, target: CtaTarget, audience?: Audience) {
