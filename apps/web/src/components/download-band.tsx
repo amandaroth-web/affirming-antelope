@@ -3,6 +3,7 @@ import { MI_FOR_CLINICIANS } from "@antelope/core";
 import { PRICING_LINE } from "@/lib/site";
 import { CtaNote, GetTheApp, PilotCta, TrainerCta } from "./get-the-app";
 import { Reveal } from "./reveal";
+import { Mascot } from "./mascot";
 import { StreakCard } from "./streak-card";
 
 type DownloadBandProps = {
@@ -17,6 +18,8 @@ type DownloadBandProps = {
   alsoClinicians?: boolean;
   /** Home page: offer the pilot call beside the app CTA, with the pricing line. */
   pilot?: boolean;
+  /** Show the waving, animated antelope instead of the streak card. */
+  mascot?: boolean;
 };
 
 export function DownloadBand({
@@ -27,6 +30,7 @@ export function DownloadBand({
   trainer = false,
   alsoClinicians = false,
   pilot = false,
+  mascot = false,
 }: DownloadBandProps) {
   return (
     <section
@@ -85,7 +89,23 @@ export function DownloadBand({
             )}
           </Reveal>
           <div className="md:col-span-5">
-            <StreakCard />
+            {mascot ? (
+              <div className="relative mx-auto flex max-w-sm flex-col items-center">
+                <p className="relative z-10 self-start rounded-2xl border-2 border-line bg-white px-4 py-2.5 font-extrabold text-ink shadow-[0_4px_0_var(--shadow)]">
+                  Ready when you are.
+                </p>
+                <Mascot
+                  alt="Affirming Antelope waving hello"
+                  width={674}
+                  height={978}
+                  whenVisible
+                  sizes="(min-width: 768px) 260px, 220px"
+                  className="mx-auto -mt-2 h-[17rem] w-auto max-w-full md:h-[20rem]"
+                />
+              </div>
+            ) : (
+              <StreakCard />
+            )}
           </div>
         </div>
       </div>
