@@ -102,7 +102,8 @@ async function onboard(page: Page) {
 async function openTalk(page: Page) {
   await onboard(page);
   await page.goto(ROLEPLAY);
-  // Talk is the default where the browser can record
+  // Talk is opt-in for now: pick it on the brief
+  await page.getByRole('radio', { name: /^talk/i }).tap();
   await expect(page.getByRole('radio', { name: /^talk/i })).toBeChecked();
   await page.getByRole('button', { name: /start conversation/i }).tap();
   return page.getByRole('button', { name: /hold to talk/i });

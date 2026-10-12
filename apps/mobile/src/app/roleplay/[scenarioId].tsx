@@ -78,11 +78,12 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   // when this conversation started (the brief's START), for the session's duration
   const startedAt = useRef(new Date().toISOString());
   const inflight = useRef<ReturnType<typeof withTimeout> | null>(null);
-  // Talk or Type: the learner's last pick, else Talk wherever voice works
+  // Talk or Type: the learner's last pick, else Type. Talk is opt-in until voice
+  // capture is verified on real iPhones (the simulator's mic records silence).
   const setSetting = useLearner((s) => s.setSetting);
   const [mode, setMode] = useState<ReplyMode>(() => {
     const saved = useLearner.getState().settings.roleplayMode;
-    return voiceAvailable() && saved !== 'type' ? 'talk' : 'type';
+    return voiceAvailable() && saved === 'talk' ? 'talk' : 'type';
   });
   const [fallback, setFallback] = useState<string | null>(null);
   /** Spoken turns in this conversation: any at all and the session is saved as `voice`. */
