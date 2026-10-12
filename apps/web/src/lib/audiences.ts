@@ -3,32 +3,26 @@ import {
   MI_FOR_CLINICIANS,
   MI_FOR_LEADERS,
   SCENARIOS,
-  drillsForSetting,
-  scenariosForSetting,
   type Pathway,
   type Setting,
 } from "@antelope/core";
-import type { Audience } from "@/lib/site";
+import { PRICING_LINE, type Audience } from "@/lib/site";
 
-export type AudienceIcon =
-  | "target"
-  | "chat"
-  | "chart"
-  | "path"
-  | "review"
-  | "users"
-  | "clock"
-  | "lock"
-  | "assign"
-  | "browser";
-
+/**
+ * Shared copy for the three audience pages. Each page's middle sections (the scene, the
+ * product shot, the role-plays) live in `src/components/audience/*`, so no two pages
+ * share a skeleton.
+ */
 export type AudiencePage = {
   slug: Audience;
   /** Short name for nav, breadcrumbs, and the OG image. */
   name: string;
+  /** Link text from the other audience pages. */
+  linkLabel: string;
   metaTitle: string;
   metaDescription: string;
   keywords: string[];
+  /** The one orientation label on the page, above the h1. */
   eyebrow: string;
   h1: string;
   lede: string;
@@ -36,42 +30,142 @@ export type AudiencePage = {
   showcase: "drill" | "pathway" | "cohort";
   /** Which role-plays to list; omitted shows every setting. */
   setting?: Setting;
-  /** A pathway to feature in its own section below the features (clinicians). */
-  pathway?: Pathway;
-  /** Copy for the pathway section. */
-  pathwaySection?: { heading: string; body: string };
-  pains: { title: string; body: string }[];
-  painsHeading: string;
-  steps: { title: string; body: string }[];
-  stepsHeading: string;
-  features: { title: string; body: string; icon: AudienceIcon }[];
-  featuresHeading: string;
+  faqHeading: string;
   faq: { q: string; a: string }[];
+  guidesHeading: string;
+  /** Guide slugs for the aside, in order. */
+  guides: string[];
   closingHeading: string;
   closingBody: string;
   /** schema.org audienceType for SoftwareApplication. */
   audienceType: string;
 };
 
-const drillCount = DRILLS.length;
-const scenarioCount = SCENARIOS.length;
-const clinicalDrills = drillsForSetting("clinical").length;
-const clinicalScenarios = scenariosForSetting("clinical").length;
-const workplaceDrills = drillsForSetting("workplace").length;
-const workplaceScenarios = scenariosForSetting("workplace").length;
+export const drillCount = DRILLS.length;
+export const scenarioCount = SCENARIOS.length;
 
-/** Weeks and the shortest and longest week in minutes, for one pathway. */
-function pathwayStats(pathway: Pathway) {
-  const minutes = pathway.units.map((u) => u.activities.reduce((sum, a) => sum + a.minutes, 0));
-  return { weeks: pathway.units.length, min: Math.min(...minutes), max: Math.max(...minutes) };
+/** Weeks, the shortest and longest week, and the range for each kind of activity, in minutes. */
+export function pathwayStats(pathway: Pathway) {
+  const weekMinutes = pathway.units.map((u) => u.activities.reduce((sum, a) => sum + a.minutes, 0));
+  const all = pathway.units.flatMap((u) => u.activities);
+  const range = (kind: string) => {
+    const m = all.filter((a) => a.kind === kind).map((a) => a.minutes);
+    return { min: Math.min(...m), max: Math.max(...m) };
+  };
+  const firstRoleplayWeek = pathway.units.find((u) => u.activities.some((a) => a.kind === "roleplay"))?.week ?? 1;
+  return {
+    weeks: pathway.units.length,
+    min: Math.min(...weekMinutes),
+    max: Math.max(...weekMinutes),
+    drill: range("drill"),
+    roleplay: range("roleplay"),
+    firstRoleplayWeek,
+  };
 }
-const leaders = pathwayStats(MI_FOR_LEADERS);
-const clinicians = pathwayStats(MI_FOR_CLINICIANS);
+export const leaders = pathwayStats(MI_FOR_LEADERS);
+export const clinicians = pathwayStats(MI_FOR_CLINICIANS);
 
+// Leaders first: the order here is the order of every list of pathways on the site.
 export const AUDIENCES: Record<Audience, AudiencePage> = {
+  leaders: {
+    slug: "leaders",
+    name: "Healthcare leaders",
+    linkLabel: "MI for healthcare leaders",
+    metaTitle: "Motivational interviewing for healthcare leaders",
+    metaDescription: `Practice MI for performance conversations with AI role-plays of realistic employees. A free ${leaders.weeks}-week MI for Leaders pathway for healthcare managers and supervisors.`,
+    keywords: [
+      "motivational interviewing for leaders",
+      "motivational interviewing for managers",
+      "motivational interviewing performance management",
+      "difficult conversations practice healthcare",
+    ],
+    eyebrow: "For healthcare managers and charge nurses",
+    h1: "Practice the one-on-one you've been putting off",
+    lede: "Darnell's reports are late again, and Lucia has stopped speaking up in huddles. Talk it through with them here first. Each AI employee has reasons you'll have to draw out.",
+    showcase: "pathway",
+    setting: "workplace",
+    faqHeading: "Questions from managers",
+    faq: [
+      {
+        q: "Isn't motivational interviewing for patients?",
+        a: "It started in addiction treatment and spread through healthcare from there. The same skills help when you need someone to change and can't make them: you reflect what you hear and draw out their own reasons. If you want to practice patient visits, MI for Clinicians has its own drills and role-plays.",
+      },
+      {
+        q: "How much time does it take?",
+        a: `A drill takes ${leaders.drill.min} to ${leaders.drill.max} minutes and a role-play ${leaders.roleplay.min} to ${leaders.roleplay.max}. You can do a drill before a shift and save the role-play for a quieter half hour.`,
+      },
+      {
+        q: "Will my boss or my team see my practice?",
+        a: "Your role-plays stay in your account. If you join a trainer's cohort, the trainer sees what you've completed and reads only the role-plays you send.",
+      },
+      {
+        q: "Can my managers practice together?",
+        a: "Yes. A trainer or team lead sets up a cohort, assigns practice with due dates, and reviews the role-plays people send. Book a 30-minute call to set up a pilot.",
+      },
+      {
+        q: "What does it cost?",
+        a: PRICING_LINE,
+      },
+    ],
+    guidesHeading: "Guides for managers",
+    guides: ["motivational-interviewing-for-managers", "what-is-motivational-interviewing", "responding-to-sustain-talk"],
+    closingHeading: "Practice the next one-on-one first",
+    closingBody: "Start with week one, or open Darnell's role-play and see how far you get.",
+    audienceType: "Healthcare managers, supervisors, and team leads",
+  },
+
+  trainers: {
+    slug: "trainers",
+    name: "MI trainers",
+    linkLabel: "For MI trainers and team leads",
+    metaTitle: "Motivational interviewing practice for MI trainers",
+    metaDescription:
+      "Give your MI cohort practice between sessions. Assign drills and role-plays, see who's practicing, and review the role-plays learners send you. Free for learners. Cohort pilots start with a 30-minute call.",
+    keywords: [
+      "motivational interviewing training tools",
+      "MI trainer practice platform",
+      "motivational interviewing coaching feedback",
+      "motivational interviewing cohort",
+    ],
+    eyebrow: "For MI trainers and team leads",
+    h1: "Give your cohort practice between sessions",
+    lede: "Assign role-plays after each session. When a learner sends one back, you coach it with the transcript and their note in front of you.",
+    showcase: "cohort",
+    faqHeading: "Before you book a call",
+    faq: [
+      {
+        q: "How do I get trainer access?",
+        a: "Trainer accounts are in early access, so you need a trainer code. Codes come from your program lead or from us. Book a 30-minute call if you don't have one, then sign in to the dashboard with your email and enter it.",
+      },
+      {
+        q: "What do learners need?",
+        a: "A browser. They sign in to the app and enter your cohort's join code. Your assignments and feedback show up there.",
+      },
+      {
+        q: "Can I see every conversation my learners have?",
+        a: "No. You see assigned and completed work for everyone. A transcript reaches you only when a learner sends a role-play for review, and they can withdraw it.",
+      },
+      {
+        q: "Can I write my own scenarios?",
+        a: "Not yet. Assignments come from the built-in library, filtered to your cohort's pathway. Every scenario is fictional.",
+      },
+      {
+        q: "What does it cost?",
+        a: PRICING_LINE,
+      },
+    ],
+    guidesHeading: "Guides to share with a cohort",
+    guides: ["how-to-practice-motivational-interviewing", "oars-motivational-interviewing", "change-talk-vs-sustain-talk"],
+    closingHeading: "Plan your next cohort's practice",
+    closingBody:
+      "Talk it through with Blake in a 30-minute call. If you already have a trainer code, open the dashboard and create the cohort yourself.",
+    audienceType: "Motivational Interviewing trainers and training programs",
+  },
+
   clinicians: {
     slug: "clinicians",
     name: "Clinicians",
+    linkLabel: "MI for clinicians",
     metaTitle: "Motivational interviewing practice for clinicians",
     metaDescription: `Free MI practice for physicians, nurses, therapists, and health coaches. Five-minute drills and AI role-plays with realistic patients, plus the ${clinicians.weeks}-week MI for Clinicians pathway.`,
     keywords: [
@@ -82,295 +176,39 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
       "OARS practice",
       "reflective listening practice",
     ],
-    eyebrow: "For physicians, nurses, therapists, and coaches",
-    h1: "Keep your MI sharp between trainings.",
-    lede: "You learned OARS in a workshop. Then the clinic got busy and the closed questions crept back. Practice with patients who have their own reasons, five minutes at a time.",
+    eyebrow: "For clinicians and health coaches",
+    h1: "Keep your MI sharp between trainings",
+    lede: "You learned OARS in a workshop. A few busy clinic weeks later, you're asking three closed questions in a row again. Practice with fictional patients, five minutes at a time.",
     showcase: "drill",
     setting: "clinical",
-    pathway: MI_FOR_CLINICIANS,
-    pathwaySection: {
-      heading: `${clinicians.weeks} weeks that fit a clinic day`,
-      body: `${MI_FOR_CLINICIANS.tagline} Lessons, drills, and a role-play most weeks, in order. A week takes ${clinicians.min} to ${clinicians.max} minutes in total.`,
-    },
-    painsHeading: "The workshop was good. Then Monday happened.",
-    pains: [
-      {
-        title: "The skill fades fast",
-        body: "A two-day training gives you the ideas. Without practice and feedback, skills drift back toward old habits within months.",
-      },
-      {
-        title: "Nobody hears you do it",
-        body: "Getting a real visit coded takes a recording and a trained coder. Most people never get feedback at all.",
-      },
-      {
-        title: "The fix comes out first",
-        body: "You know the righting reflex. With fifteen minutes and a full list, it still wins, because it's the habit you've rehearsed most.",
-      },
-    ],
-    stepsHeading: "Practice, notice, use it.",
-    steps: [
-      {
-        title: "One short drill",
-        body: "Read what the patient said, then answer with the move the drill asks for: an open question, a complex reflection, an affirmation.",
-      },
-      {
-        title: "See what you did",
-        body: "Feedback names the move you actually made and whether it hit the target, with an example of one that does.",
-      },
-      {
-        title: "Have the whole visit",
-        body: "When you're ready, run a role-play with a patient who has their own reasons for staying stuck, then read the debrief.",
-      },
-    ],
-    featuresHeading: "What you'll practice",
-    features: [
-      {
-        icon: "target",
-        title: `${clinicalDrills} patient drills`,
-        body: "Medication, smoking, drinking, diabetes, and sleep, across OARS, engaging, focusing, evoking, change talk, sustain talk, discord, and planning.",
-      },
-      {
-        icon: "chat",
-        title: `${clinicalScenarios} patient role-plays`,
-        body: "Each patient has a backstory you don't see. Reflect well and they open up. Correct them, and they dig in, like people do.",
-      },
-      {
-        icon: "chart",
-        title: "A debrief you can act on",
-        body: "A count of your open and closed questions and simple and complex reflections, the key moments, and one thing to try next.",
-      },
-      {
-        icon: "browser",
-        title: "Nothing to install",
-        body: "It runs in your phone's browser, so it fits between patients. Start as a guest and sign in later to keep your streak.",
-      },
-    ],
+    faqHeading: "Clinical questions",
     faq: [
       {
-        q: "Are the role-plays patient conversations?",
-        a: `Yes. The MI for Clinicians track has ${clinicalScenarios} role-plays set in visits: a new patient with a list of concerns, a man who stopped his blood pressure medication, a lawyer whose screening form flagged her drinking, a rising A1c, and a smoker who has heard it all. You play the clinician.`,
-      },
-      {
         q: "Does it give medical advice?",
-        a: "No. It coaches the conversation, not the medicine. Feedback is about how you asked, reflected, and shared information, not whether a dose or guideline was right.",
+        a: "No. It coaches the conversation. Feedback covers how you asked, reflected, and shared information, and leaves doses and guidelines to you.",
       },
       {
         q: "Has the clinical content been reviewed?",
-        a: "Draft content pending clinical review. The patient drills and role-plays are written to practice the conversation, and they are still waiting on review by an MI trainer. Treat them as practice material, not clinical guidance.",
-      },
-      {
-        q: "Is it really free?",
-        a: `Yes. The drills, the role-plays, and the ${clinicians.weeks}-week MI for Clinicians pathway are free, and you don't need a card. You can start as a guest without an account.`,
+        a: "Not yet. The patient drills and role-plays are drafts waiting on review by an MI trainer. Use them as practice material, and keep using your own clinical guidance.",
       },
       {
         q: "Does it count toward CE or CME credit?",
-        a: "No. Affirming Antelope isn't an accredited course and doesn't award credit. Use it to keep practicing between the trainings that do.",
+        a: "No. Affirming Antelope isn't an accredited course. Use it to keep practicing between the trainings that award credit.",
       },
       {
         q: "Should I type in real patient details?",
-        a: "No. Every scenario is fictional, and your replies are processed by an AI model to play the patient and write feedback. Keep real patient and colleague information out of it.",
-      },
-      {
-        q: "Is there a phone app?",
-        a: "The learner app works in any browser, on your phone or laptop, at app.affirmingantelope.com. An iOS app is coming.",
-      },
-    ],
-    closingHeading: "Five minutes before clinic.",
-    closingBody: "Open it in your browser and do one drill. If it helps, do another tomorrow.",
-    audienceType: "Clinicians, nurses, therapists, and health coaches",
-  },
-
-  leaders: {
-    slug: "leaders",
-    name: "Healthcare leaders",
-    metaTitle: "Motivational interviewing for healthcare leaders",
-    metaDescription:
-      `Practice MI for performance conversations with AI role-plays of realistic employees. A free ${leaders.weeks}-week MI for Leaders pathway for healthcare managers and supervisors.`,
-    keywords: [
-      "motivational interviewing for leaders",
-      "motivational interviewing for managers",
-      "motivational interviewing performance management",
-      "difficult conversations practice healthcare",
-    ],
-    eyebrow: "For managers, supervisors, and charge nurses",
-    h1: "Rehearse the hard conversation before you have it.",
-    lede: "Late reports, a quiet team member, a change nobody asked for. Practice with an AI employee who has their own reasons, so the real conversation isn't your first try.",
-    showcase: "pathway",
-    setting: "workplace",
-    painsHeading: "You can't practice on your team.",
-    pains: [
-      {
-        title: "Telling doesn't stick",
-        body: "You've explained the expectation twice. It still isn't happening, and a third explanation won't change that.",
-      },
-      {
-        title: "The stakes are real",
-        body: "A performance conversation that goes sideways costs trust you don't get back quickly. It's a bad place to learn.",
-      },
-      {
-        title: "Training is a one-off",
-        body: "Leadership workshops happen once a year. The conversations happen every week.",
-      },
-    ],
-    stepsHeading: "Practice, notice, use it.",
-    steps: [
-      {
-        title: "Read the brief",
-        body: "Who they are, what's been happening, and your goal for the conversation. Their first line is waiting.",
-      },
-      {
-        title: "Have the conversation",
-        body: "They answer the way people do. Reflect what you hear and they start to talk about change. Push, and they push back.",
-      },
-      {
-        title: "Read the debrief",
-        body: "See where they moved toward change, where they dug in, and the moments that turned it. Then try again or go harder.",
-      },
-    ],
-    featuresHeading: "Built for the conversations you actually have",
-    features: [
-      {
-        icon: "chat",
-        title: "Realistic employees",
-        body: `${workplaceScenarios} role-plays drawn from healthcare work: missed deadlines, a reliable MA gone quiet, a new process nobody wanted, a charge nurse who found out by memo.`,
-      },
-      {
-        icon: "path",
-        title: `The ${leaders.weeks}-week MI for Leaders pathway`,
-        body: `Short lessons, drills, and role-plays in order, from foundations to advanced practice. Most weeks take ${leaders.min} to ${leaders.max} minutes in total.`,
-      },
-      {
-        icon: "users",
-        title: "Expectations and autonomy together",
-        body: "Leadership drills practice holding a clear standard while leaving the how up to them, without sliding into a lecture.",
-      },
-      {
-        icon: "review",
-        title: "Feedback from a trainer, if you want it",
-        body: "Join a trainer's cohort and choose which role-plays to send for review. Nothing is shared unless you send it.",
-      },
-    ],
-    faq: [
-      {
-        q: "Isn't motivational interviewing for patients?",
-        a: "It started in addiction treatment and is used widely in healthcare. The same skills help any time you need someone to change and can't make them: open questions, reflections, and drawing out their own reasons. If you want to practice patient visits, the MI for Clinicians track has its own drills and role-plays.",
-      },
-      {
-        q: `What's in the ${leaders.weeks}-week pathway?`,
-        a: "Foundations, the spirit of MI, engaging, focusing, evoking, planning, integration, self-coding, leadership and MI, and two weeks of advanced practice. Each week mixes short lessons and drills, with a role-play every week from week three on.",
-      },
-      {
-        q: "How much time does it take?",
-        a: `Each activity takes three to ten minutes. A pathway week is ${leaders.min} to ${leaders.max} minutes in total, and you can split it across days.`,
-      },
-      {
-        q: "Can my managers practice together?",
-        a: "Yes. A trainer can set up a cohort, assign practice with due dates, and review the role-plays people submit. See the page for trainers.",
-      },
-      {
-        q: "Is it free?",
-        a: "Yes. The practice app is free and runs in your browser. No card, no download.",
-      },
-    ],
-    closingHeading: "Practice the next one-on-one first.",
-    closingBody: "Start with the week one lessons, or jump straight into a role-play.",
-    audienceType: "Healthcare managers, supervisors, and team leads",
-  },
-
-  trainers: {
-    slug: "trainers",
-    name: "MI trainers",
-    metaTitle: "Motivational interviewing practice for MI trainers",
-    metaDescription:
-      "Give your MI cohort practice between sessions. Assign drills and role-plays, track who's practicing, and review the role-plays learners submit. Free to start.",
-    keywords: [
-      "motivational interviewing training tools",
-      "MI trainer practice platform",
-      "motivational interviewing coaching feedback",
-      "motivational interviewing cohort",
-    ],
-    eyebrow: "For MI trainers and training programs",
-    h1: "Give your cohort practice between sessions.",
-    lede: "Your workshop teaches the skill. What happens in the weeks after decides whether it sticks. Assign practice, see who's doing it, and coach the role-plays learners send you.",
-    showcase: "cohort",
-    painsHeading: "Most practice happens where you can't see it.",
-    pains: [
-      {
-        title: "Homework disappears",
-        body: "You suggest practicing reflections with a partner. A few people do. You don't find out who until the next session.",
-      },
-      {
-        title: "Coding is slow",
-        body: "Reviewing a recorded session properly takes time you don't have for every learner, every week.",
-      },
-      {
-        title: "Feedback arrives late",
-        body: "By the time notes come back, the learner has forgotten the conversation they're about.",
-      },
-    ],
-    stepsHeading: "Run a cohort in three steps.",
-    steps: [
-      {
-        title: "Create a cohort",
-        body: "Choose MI for Clinicians or MI for Leaders and get a join code. Learners enter it in the app and show up on your participants list.",
-      },
-      {
-        title: "Assign practice",
-        body: "Pick drills on a skill, a specific drill, a role-play scenario, or a pathway lesson, and set a due date.",
-      },
-      {
-        title: "Review what they send",
-        body: "Learners choose which role-plays to submit. Read the transcript, rate it, and leave written or recorded feedback.",
-      },
-    ],
-    featuresHeading: "What the trainer dashboard does",
-    features: [
-      {
-        icon: "users",
-        title: "Who's practicing",
-        body: "Each participant's assigned and completed work, what needs review, and when they were last active.",
-      },
-      {
-        icon: "assign",
-        title: "Assignments from the library",
-        body: `${drillCount} drills, ${scenarioCount} role-plays, and the lessons from both pathways. A cohort draws on its own pathway's content: patient conversations for clinicians, workplace ones for leaders. Learners see your instructions and due date in the app.`,
-      },
-      {
-        icon: "review",
-        title: "Review with your voice",
-        body: "Rate a role-play, write or record feedback, recommend what to practice next, and ask for another try.",
-      },
-      {
-        icon: "lock",
-        title: "Opt-in by design",
-        body: "You see practice counts for your cohort. You only see a conversation when the learner chooses to send it.",
-      },
-    ],
-    faq: [
-      {
-        q: "How do I get trainer access?",
-        a: "Sign in to the trainer dashboard with your email and enter a trainer code. Trainer access is in early access, so codes come from your program lead or from us directly.",
-      },
-      {
-        q: "What do learners need?",
-        a: "Just a browser. They open the app, sign in, and enter your cohort's join code. Assignments and your feedback show up in the app.",
-      },
-      {
-        q: "Can I see every conversation my learners have?",
-        a: "No. You see progress for the work you assign. Transcripts reach you only when a learner submits a role-play for review, and they can withdraw it.",
-      },
-      {
-        q: "Can I write my own scenarios?",
-        a: "Not yet. Assignments come from the built-in library of drills, role-plays, and pathway lessons, filtered to your cohort's pathway. Every scenario is fictional.",
+        a: "No. Every scenario is fictional, and an AI model reads your replies to play the patient and write feedback. Keep real patient and colleague information out of it.",
       },
       {
         q: "What does it cost?",
-        a: "There's no charge today for trainers or learners.",
+        a: `${PRICING_LINE} You can start as a guest, with no card.`,
       },
     ],
-    closingHeading: "Set up your first cohort.",
-    closingBody: "Sign in, create a cohort, and share the join code at your next session.",
-    audienceType: "Motivational Interviewing trainers and training programs",
+    guidesHeading: "Guides for clinic visits",
+    guides: ["reflective-listening-examples", "open-ended-questions-examples", "change-talk-vs-sustain-talk"],
+    closingHeading: "One drill before clinic",
+    closingBody: "Open it in your browser and do one drill. If it helps, do another tomorrow.",
+    audienceType: "Clinicians, nurses, therapists, and health coaches",
   },
 };
 

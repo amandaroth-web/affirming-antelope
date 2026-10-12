@@ -67,7 +67,7 @@ export function GetTheApp({
 export function CtaNote({ className = "" }: { className?: string }) {
   return (
     <p className={`text-sm font-bold text-muted ${className}`}>
-      Free · Works in your browser · iOS coming soon
+      Free for learners · Runs in your browser
     </p>
   );
 }

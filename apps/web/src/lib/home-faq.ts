@@ -5,7 +5,7 @@ import { PRICING_LINE } from "./site";
 export const HOME_FAQ: { q: string; a: string }[] = [
   {
     q: "Is what I say private?",
-    a: "The scenarios are fictional, so leave out real names and identifying details. What you type or say becomes a transcript in your account. Voice audio isn't stored. Your trainer only sees the sessions you choose to share.",
+    a: "The scenarios are fictional, so leave out real names and identifying details. What you type or say becomes a transcript in your account, and the app doesn't store voice audio. If you join a cohort, your trainer sees what you've completed and reads only the sessions you choose to share.",
   },
   {
     q: "Do I need MI training first?",
@@ -13,11 +13,11 @@ export const HOME_FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How is this different from asking ChatGPT to role-play?",
-    a: "You get a structured path instead of a blank chat. Each employee is written from a scenario spec and responds to your MI skill: more defensive when lectured, more open when reflected. Feedback points to specific MI moves, never a score. And your trainer can be in the loop.",
+    a: `You get a ${MI_FOR_LEADERS.units.length}-week path, with a role-play each week from week 3. Each employee is written from a scenario spec, so Darnell gets more defensive when you lecture and more open when you reflect. Feedback names the MI moves you made. If you're in a cohort, your trainer can read the sessions you send.`,
   },
   {
     q: "Can I say it out loud?",
-    a: "Yes. On any role-play, hold to talk and say your reply. The employee answers in their own voice. You can type instead whenever you like.",
+    a: "Yes. On any role-play, hold to talk and say your reply. The employee answers in their own voice, and you can switch to typing at any point.",
   },
   {
     q: "What does it cost?",

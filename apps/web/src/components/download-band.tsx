@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { MI_FOR_CLINICIANS } from "@antelope/core";
 import { PRICING_LINE } from "@/lib/site";
 import { CtaNote, GetTheApp, PilotCta, TrainerCta } from "./get-the-app";
@@ -12,14 +13,20 @@ type DownloadBandProps = {
   audience?: "clinicians" | "leaders" | "trainers";
   heading?: string;
   body?: string;
-  /** Lead with the trainer dashboard instead of the learner app. */
+  /** Trainers: lead with the pilot call, then the dashboard. */
   trainer?: boolean;
+  /** CTA location for the pilot call (trainers), e.g. `trainers_closing`. */
+  pilotLocation?: string;
   /** Home page only: a quiet pointer to the clinician pathway. */
   alsoClinicians?: boolean;
   /** Home page: offer the pilot call beside the app CTA, with the pricing line. */
   pilot?: boolean;
   /** Show the waving, animated antelope instead of the streak card. */
   mascot?: boolean;
+  /** The mascot's speech bubble; pass null for none. */
+  mascotLine?: string | null;
+  /** Replaces the streak card with something from the page. */
+  aside?: ReactNode;
 };
 
 export function DownloadBand({
@@ -28,9 +35,12 @@ export function DownloadBand({
   heading = "Start a streak today.",
   body = "Open it in your browser, on your phone or your laptop. No download, no card. Your first drill, a one-on-one with an employee, takes five minutes.",
   trainer = false,
+  pilotLocation,
   alsoClinicians = false,
   pilot = false,
   mascot = false,
+  mascotLine = "Ready when you are.",
+  aside,
 }: DownloadBandProps) {
   return (
     <section
@@ -51,10 +61,8 @@ export function DownloadBand({
             <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
               {trainer ? (
                 <>
-                  <TrainerCta location={location} size="lg" variant="primary" />
-                  <GetTheApp location={location} audience={audience} size="lg" variant="secondary">
-                    Try the learner app
-                  </GetTheApp>
+                  <PilotCta location={pilotLocation ?? location} size="lg" />
+                  <TrainerCta location={location} size="lg" />
                 </>
               ) : (
                 <>
@@ -64,7 +72,7 @@ export function DownloadBand({
               )}
             </div>
             {!trainer && !pilot && <CtaNote className="mt-4" />}
-            {!trainer && pilot && <p className="mt-4 text-sm font-bold text-muted">{PRICING_LINE}</p>}
+            {pilot && <p className="mt-4 text-sm font-bold text-muted">{PRICING_LINE}</p>}
             {!trainer && !pilot && (
               <p className="mt-6 border-t-2 border-soft pt-5 font-semibold text-muted">
                 Running a cohort?{" "}
@@ -82,18 +90,22 @@ export function DownloadBand({
                   href="/for/clinicians"
                   className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
-                  Also for clinicians →
+                  MI for clinicians
                 </Link>{" "}
-                An {MI_FOR_CLINICIANS.units.length}-week pathway for patient conversations.
+                has its own {MI_FOR_CLINICIANS.units.length}-week pathway for patient visits.
               </p>
             )}
           </Reveal>
           <div className="md:col-span-5">
-            {mascot ? (
+            {aside ? (
+              aside
+            ) : mascot ? (
               <div className="relative mx-auto flex max-w-sm flex-col items-center">
-                <p className="relative z-10 self-start rounded-2xl border-2 border-line bg-white px-4 py-2.5 font-extrabold text-ink shadow-[0_4px_0_var(--shadow)]">
-                  Ready when you are.
-                </p>
+                {mascotLine && (
+                  <p className="relative z-10 self-start rounded-2xl border-2 border-line bg-white px-4 py-2.5 font-extrabold text-ink shadow-[0_4px_0_var(--shadow)]">
+                    {mascotLine}
+                  </p>
+                )}
                 <Mascot
                   alt="Affirming Antelope waving hello"
                   width={674}
