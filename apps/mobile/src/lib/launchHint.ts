@@ -10,7 +10,8 @@ import { pathwayForSetting } from '@/data/pathways';
  * accepted too), and guides deep-link one drill (`/drill/<id>?src=guide_<slug>`), whose
  * own setting tells us the track. Read once at launch, before the router can normalise
  * the URL; works whether or not analytics is on. A hint only preselects: the learner
- * still sees the choice.
+ * still sees the choice. With no hint (or a leaders one) the welcome preselects MI for
+ * Leaders, the default track; a clinical hint is the only thing that moves it to Patients.
  */
 
 function fromUrl(raw: string | null | undefined): PathwayId | null {
@@ -36,6 +37,9 @@ function fromUrl(raw: string | null | undefined): PathwayId | null {
 }
 
 const webHref = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.href : null;
+
+/** The hinted track for this launch, known synchronously on web (null on native, which reads it async below). */
+export const launchPathwayHintNow: PathwayId | null = fromUrl(webHref);
 
 /** Resolves once: the hinted track for this launch, or null. */
 export const launchPathwayHint: Promise<PathwayId | null> =

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   type ActivityKind,
+  DEFAULT_PATHWAY_ID,
   type DemoSkillProgress,
   type DemoTrainerAssignment,
   type Debrief,
@@ -183,9 +184,9 @@ const LOCAL_DEFAULTS = (): Pick<LearnerState, 'practiceLog' | 'sessions' | 'sett
   lastGreetedDay: null,
 });
 
-/** A new install: a fresh learner who picks a track in the welcome (MI for Leaders until then). */
+/** A new install: a fresh learner who picks a track in the welcome (MI for Leaders, the default, until then or if they skip it). */
 function seed(): LearnerState {
-  return { ...freshSeed('mi-for-leaders', null), ...LOCAL_DEFAULTS() };
+  return { ...freshSeed(DEFAULT_PATHWAY_ID, null), ...LOCAL_DEFAULTS() };
 }
 
 function bumpSkill(p: DemoSkillProgress | undefined, minutes: number): DemoSkillProgress {
@@ -376,7 +377,7 @@ export const useLearner = create<LearnerState & LearnerActions>()(
         if (from < 3) {
           const up = upgradeDoc(s);
           const untouched = up.pathwayChosenAt === null;
-          const fresh = freshSeed('mi-for-leaders', null);
+          const fresh = freshSeed(DEFAULT_PATHWAY_ID, null);
           const next: LearnerState = {
             ...fresh,
             ...up,

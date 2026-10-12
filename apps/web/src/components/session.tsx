@@ -9,12 +9,12 @@ const beats = [
   },
   {
     title: "See the habit",
-    body: "Closed questions. Advice too early. Skipping the affirmation.",
+    body: "Telling instead of asking. Fixing too early. Skipping the affirmation.",
     icon: Fire,
   },
   {
     title: "Back to the room",
-    body: "Close the app. Sit down with a real person. That is the test.",
+    body: "Close the app. Walk into the one-on-one. That is the test.",
     icon: Door,
   },
 ];

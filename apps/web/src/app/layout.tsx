@@ -18,25 +18,25 @@ const fredoka = Fredoka({
 export const metadata: Metadata = {
   metadataBase: new URL("https://affirmingantelope.com"),
   title: {
-    default: "Affirming Antelope: Motivational Interviewing practice",
+    default: "Affirming Antelope: MI practice for healthcare leaders",
     template: "%s · Affirming Antelope",
   },
   applicationName: "Affirming Antelope",
   description:
-    "Free Motivational Interviewing practice for clinicians and leaders: five-minute OARS drills, live AI role-plays with realistic patients and employees, and opt-in trainer review. Works in your browser.",
+    "Free Motivational Interviewing practice for healthcare leaders: five-minute drills and live AI role-plays with realistic employees for performance, change, and burnout conversations, plus opt-in trainer review. Clinicians have their own pathway. Works in your browser.",
   openGraph: {
     type: "website",
     siteName: "Affirming Antelope",
     locale: "en_US",
-    title: "Affirming Antelope: Motivational Interviewing practice",
+    title: "Affirming Antelope: MI practice for healthcare leaders",
     description:
-      "Five-minute OARS drills and live role-plays that help Motivational Interviewing skills stick. Free, in your browser.",
+      "Five-minute drills and live role-plays for managers and team leads: rehearse performance, change, and burnout conversations before you have them. Free, in your browser.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Affirming Antelope: Motivational Interviewing practice",
+    title: "Affirming Antelope: MI practice for healthcare leaders",
     description:
-      "Five-minute OARS drills and live role-plays that help Motivational Interviewing skills stick. Free, in your browser.",
+      "Five-minute drills and live role-plays for managers and team leads: rehearse performance, change, and burnout conversations before you have them. Free, in your browser.",
   },
   formatDetection: { telephone: false },
 };

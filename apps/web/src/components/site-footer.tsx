@@ -9,9 +9,9 @@ const columns = [
   {
     heading: "Who it's for",
     links: [
-      { href: "/for/clinicians", label: "Clinicians" },
       { href: "/for/leaders", label: "Healthcare leaders" },
       { href: "/for/trainers", label: "MI trainers" },
+      { href: "/for/clinicians", label: "Clinicians" },
     ],
   },
   {

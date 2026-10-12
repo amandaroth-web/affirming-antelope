@@ -1,4 +1,4 @@
-import type { PathwayId } from '@antelope/core';
+import { DEFAULT_PATHWAY_ID, type PathwayId } from '@antelope/core';
 import { router, useIsFocused } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -25,7 +25,7 @@ import { PATHWAY_IDS } from '@/data/pathways';
 import { track } from '@/lib/analytics';
 import { onFlowClosed } from '@/lib/flowEvents';
 import { supabaseConfigured } from '@/lib/supabase';
-import { launchPathwayHint } from '@/lib/launchHint';
+import { launchPathwayHint, launchPathwayHintNow } from '@/lib/launchHint';
 import { Enter, useForwardSwap } from '@/motion';
 import { useAccount } from '@/state/account';
 import { useLearner } from '@/state/store';
@@ -34,9 +34,10 @@ import { useLearner } from '@/state/store';
  * First launch: two steps.
  *
  *   intro  what the app does; try it as a guest (everything works on the device) or sign in.
- *   track  "What conversations do you want to practice?": Patients (MI for Clinicians) or
- *          Your team (MI for Leaders). Never skipped; a website CTA's `src` (or a guide's
- *          deep-linked drill) only preselects. CONTINUE picks the track and hands over to Home.
+ *   track  "What conversations do you want to practice?": Your team (MI for Leaders,
+ *          preselected) or Patients (MI for Clinicians). Never skipped; a website CTA's
+ *          clinician `src` (or a clinical guide drill) preselects Patients instead.
+ *          CONTINUE picks the track and hands over to Home.
  *
  * Existing installs that still need a track (an untouched demo seed reset to fresh) start
  * at the track step, as does anyone already signed in. Sign-in returns here, and the
@@ -172,32 +173,42 @@ function Intro({ onTry }: { onTry: () => void }) {
 }
 
 /**
- * The track step. Two big radio cards; the first pick makes the coach hop, a change of
- * mind gets a nod. CONTINUE is disabled until a track is picked (a hint preselects one).
+ * The track step. Two big radio cards, Your team (MI for Leaders) first; the first pick
+ * makes the coach hop, a change of mind gets a nod. MI for Leaders is preselected, so
+ * CONTINUE is always ready; a website CTA's `src` for clinicians (or a clinical guide
+ * drill) preselects Patients instead, unless the learner has already tapped a card.
  */
 function TrackStep({ onBack }: { onBack?: () => void }) {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
   const coach = useRef<MascotHandle>(null);
   const picked = useRef(false);
-  const [choice, setChoice] = useState<PathwayId | null>(() => {
+  // signed in to an account that already picked a track: that one wins over any hint
+  const [alreadyChose] = useState(() => Boolean(useLearner.getState().pathwayChosenAt));
+  const [choice, setChoice] = useState<PathwayId>(() => {
     const s = useLearner.getState();
-    // signed in to an account that already picked one
-    return s.pathwayChosenAt ? s.activePathwayId : null;
+    return s.pathwayChosenAt ? s.activePathwayId : (launchPathwayHintNow ?? DEFAULT_PATHWAY_ID);
   });
 
   useEffect(() => {
+    if (alreadyChose) return;
     let live = true;
     void launchPathwayHint.then((hint) => {
-      if (live && hint) setChoice((c) => c ?? hint);
+      // native reads the launch URL async; never override a card the learner already tapped
+      if (live && hint && !picked.current) setChoice(hint);
     });
     return () => {
       live = false;
     };
-  }, []);
+  }, [alreadyChose]);
 
   const select = (id: PathwayId) => {
-    if (id === choice) return;
+    if (id === choice) {
+      // confirming the preselected card still counts as picking: a late hint must not move it
+      if (!picked.current) coach.current?.hop();
+      picked.current = true;
+      return;
+    }
     setChoice(id);
     if (!picked.current) coach.current?.hop();
     else coach.current?.nod();
@@ -205,7 +216,6 @@ function TrackStep({ onBack }: { onBack?: () => void }) {
   };
 
   const go = () => {
-    if (!choice) return;
     haptic.success();
     useLearner.getState().choosePathway(choice, 'onboarding');
     useAccount.getState().set({ onboarded: true });
@@ -224,7 +234,7 @@ function TrackStep({ onBack }: { onBack?: () => void }) {
             <Mascot
               ref={coach}
               pose="head"
-              mood={choice ? 'idle' : 'listening'}
+              mood="idle"
               size={84}
               paused={!focused}
               accessibilityLabel="The antelope coach"
@@ -250,7 +260,7 @@ function TrackStep({ onBack }: { onBack?: () => void }) {
 
       <Enter index={4}>
         <Dock rule={false}>
-          <Button label="Continue" fullWidth disabled={!choice} onPress={go} accessibilityHint="Starts your first week on this track." />
+          <Button label="Continue" fullWidth onPress={go} accessibilityHint="Starts your first week on this track." />
           <Text variant="caption" color={color.muted} align="center" style={styles.foot}>
             You can switch tracks any time in Me. Progress on each one is kept.
           </Text>

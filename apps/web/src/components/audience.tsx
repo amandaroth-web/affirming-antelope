@@ -1,25 +1,19 @@
-import { ArrowRight, ChalkboardTeacher, Stethoscope, UsersThree } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, ChalkboardTeacher, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { MI_FOR_CLINICIANS, MI_FOR_LEADERS } from "@antelope/core";
+import { MI_FOR_LEADERS } from "@antelope/core";
 import { Reveal } from "./reveal";
 
 const people = [
   {
-    href: "/for/clinicians",
-    who: "Clinicians",
-    line: `MI for Clinicians: patient drills and role-plays for physicians, nurses, therapists, and coaches. An ${MI_FOR_CLINICIANS.units.length}-week track that fits a clinic day.`,
-    icon: Stethoscope,
-  },
-  {
     href: "/for/leaders",
     who: "Healthcare leaders",
-    line: `MI for Leaders: managers and supervisors rehearse the performance conversation before they have it for real. A ${MI_FOR_LEADERS.units.length}-week track.`,
+    line: `MI for Leaders: managers and team leads rehearse the performance, change, and burnout conversations before they have them for real. A ${MI_FOR_LEADERS.units.length}-week track.`,
     icon: UsersThree,
   },
   {
     href: "/for/trainers",
     who: "MI trainers",
-    line: "Run a cohort, assign practice, and review the role-plays learners choose to send you.",
+    line: "Run a cohort of leaders, assign practice, and review the role-plays learners choose to send you.",
     icon: ChalkboardTeacher,
   },
 ];
@@ -34,17 +28,17 @@ export function Audience() {
           </p>
           <h2
             id="audience-heading"
-            className="mt-2 max-w-[18ch] pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
+            className="mt-2 max-w-[20ch] pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
           >
-            If you already sit with people, start here.
+            Built for people who lead healthcare teams.
           </h2>
           <p className="mt-3 max-w-[42ch] text-lg font-semibold text-muted">
-            Amanda built this for the folks she trains. You already know the
-            spirit. This gets the skill in the room.
+            Amanda built this for the people she trains. You already know the
+            spirit of MI. This gets the skill into the one-on-one.
           </p>
         </Reveal>
 
-        <ul className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <ul className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
           {people.map((person, i) => {
             const Icon = person.icon;
             return (

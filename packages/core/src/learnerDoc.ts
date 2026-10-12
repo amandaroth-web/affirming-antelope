@@ -1,5 +1,5 @@
 import { DEMO_LEARNER, freshLearnerState, type DemoLearnerState, type DemoSkillProgress } from "./demo";
-import { getPathway } from "./pathway";
+import { DEFAULT_PATHWAY_ID, getPathway } from "./pathway";
 import type { PathwayId, SkillId } from "./types";
 
 /**
@@ -81,7 +81,7 @@ export function progressFrom(d: DemoLearnerState): PathwayProgress {
 }
 
 /** A brand-new learner's synced document on a track. `chosenAt` is null until they pick one. */
-export function freshSyncedDoc(pathwayId: PathwayId, chosenAt: string | null): SyncedDoc {
+export function freshSyncedDoc(pathwayId: PathwayId = DEFAULT_PATHWAY_ID, chosenAt: string | null = null): SyncedDoc {
   const d = freshLearnerState(pathwayId);
   return {
     firstName: "",

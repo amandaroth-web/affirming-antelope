@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MI_FOR_CLINICIANS } from "@antelope/core";
 import { CtaNote, GetTheApp, TrainerCta } from "./get-the-app";
 import { Reveal } from "./reveal";
 import { StreakCard } from "./streak-card";
@@ -11,14 +12,17 @@ type DownloadBandProps = {
   body?: string;
   /** Lead with the trainer dashboard instead of the learner app. */
   trainer?: boolean;
+  /** Home page only: a quiet pointer to the clinician pathway. */
+  alsoClinicians?: boolean;
 };
 
 export function DownloadBand({
   location = "download_band",
   audience,
   heading = "Start a streak today.",
-  body = "Open it in your browser, on your phone or your laptop. No download, no card. Your first drill takes five minutes.",
+  body = "Open it in your browser, on your phone or your laptop. No download, no card. Your first drill, a one-on-one with an employee, takes five minutes.",
   trainer = false,
+  alsoClinicians = false,
 }: DownloadBandProps) {
   return (
     <section
@@ -57,6 +61,17 @@ export function DownloadBand({
                   className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   See how trainer review works
+                </Link>
+              </p>
+            )}
+            {!trainer && alsoClinicians && (
+              <p className="mt-3 font-semibold text-muted">
+                Also for clinicians: an {MI_FOR_CLINICIANS.units.length}-week pathway for patient conversations.{" "}
+                <Link
+                  href="/for/clinicians"
+                  className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  See the clinician pathway
                 </Link>
               </p>
             )}
