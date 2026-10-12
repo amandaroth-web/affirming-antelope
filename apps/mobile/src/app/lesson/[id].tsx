@@ -36,7 +36,7 @@ function LessonSession() {
 
   useEffect(() => {
     if (!lesson) return;
-    track('practice_started', { kind: 'lesson', ref_id: lesson.id, ...(unit?.skills[0] ? { skill: unit.skills[0] } : {}), source: practiceSource(source), pathway_id: activePathwayId() });
+    track('practice_started', { kind: 'lesson', ref_id: lesson.id, ...(unit?.skills[0] ? { skill: unit.skills[0] } : {}), source: practiceSource(source), pathway_id: activePathwayId(), mode: 'text' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

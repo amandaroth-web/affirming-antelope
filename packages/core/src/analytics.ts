@@ -41,6 +41,10 @@ export type AppEntry = "direct" | "website_cta" | "guide" | "deep_link";
 export type NextStepFrom = "drill" | "debrief" | "lesson";
 export type NextStepChoice = "try_again" | "same_skill" | "harder" | "new_scenario" | "one_more" | "done";
 export type AiEndpoint = "turn" | "debrief" | "drill";
+/** How the learner answered: typed, or spoken (role-play Talk mode, docs/voice.md). */
+export type PracticeMode = "text" | "voice";
+/** Why a spoken turn didn't become a transcript. */
+export type VoiceFailReason = "no_speech" | "permission" | "unavailable" | "rate_limited" | "too_large" | "offline" | "server";
 /** Self-reported feeling after a role-play: an enum from the reflection step, never text. */
 export type ReflectionFeeling = string;
 export type ReviewRating = "emerging" | "developing" | "proficient" | "strong";
@@ -68,6 +72,7 @@ export interface AnalyticsEvents {
     source: PracticeSource;
     /** The learner's active track when it happened. */
     pathway_id: PathwayId;
+    mode: PracticeMode;
   };
   drill_answered: {
     drill_id: string;
@@ -78,6 +83,9 @@ export interface AnalyticsEvents {
   };
   drill_feedback_received: { drill_id: string; latency_ms: number; move: string; hit_target: boolean };
   roleplay_turn_sent: { scenario_id: string; turn_index: number };
+  /** A spoken turn was sent for transcription (never the audio or the words). */
+  voice_turn_recorded: { scenario_id: string; duration_ms: number };
+  voice_transcribe_failed: { reason: VoiceFailReason };
   roleplay_ended: { scenario_id: string; learner_turns: number; ended_early: boolean };
   reflection_submitted: { scenario_id: string; feeling: ReflectionFeeling };
   debrief_viewed: { scenario_id: string; latency_ms: number; suggested_next_step: string; pathway_id: PathwayId };

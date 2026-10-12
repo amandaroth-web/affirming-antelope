@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { fetch as expoFetch } from 'expo/fetch';
+import { Platform } from 'react-native';
 import type { AiEndpoint } from '@antelope/core';
 import { track } from './analytics';
 import { sessionWithin } from '@/sync/anonymous';
@@ -107,7 +108,15 @@ async function failure(res: { status: number; text(): Promise<string> }, path?: 
 
 /** POST with the bearer token; on a 401, refresh the session once and try again. */
 async function send(doFetch: typeof fetch, path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
-  const init = (headers: Record<string, string>) => ({ method: 'POST', headers, body: JSON.stringify(body), signal });
+  return sendRaw(doFetch, path, JSON.stringify(body), true, signal);
+}
+
+/** `send` for any body. JSON bodies get the JSON content type; multipart sets its own boundary. */
+async function sendRaw(doFetch: typeof fetch, path: string, body: BodyInit, json: boolean, signal?: AbortSignal): Promise<Response> {
+  const init = (headers: Record<string, string>) => {
+    if (!json) delete headers['Content-Type'];
+    return { method: 'POST', headers, body, signal };
+  };
   let res: Response;
   try {
     res = await doFetch(apiUrl(path), init(await apiHeaders()));
@@ -126,6 +135,27 @@ export async function postJson<T>(path: string, body: unknown, signal?: AbortSig
   const res = await send(fetch, path, body, signal);
   if (!res.ok) throw await failure(res, path);
   return (await res.json()) as T;
+}
+
+/**
+ * POST `multipart/form-data` (voice turns: the recorded audio plus ids) and read JSON back.
+ * Uses the platform `fetch`: React Native's understands `{ uri, name, type }` file parts.
+ */
+export async function postForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+  const res = await sendRaw(fetch, path, form, false, signal);
+  if (!res.ok) throw await failure(res, path);
+  return (await res.json()) as T;
+}
+
+/**
+ * POST JSON and return the successful response itself, for binary bodies (spoken replies,
+ * `audio/mpeg`). Native uses `expo/fetch`, whose responses support `arrayBuffer()`.
+ */
+export async function postForResponse(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const doFetch = Platform.OS === 'web' ? fetch : ((expoFetch as unknown as typeof fetch) ?? fetch);
+  const res = await send(doFetch, path, body, signal);
+  if (!res.ok) throw await failure(res, path);
+  return res;
 }
 
 /**

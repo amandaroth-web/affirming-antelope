@@ -6,11 +6,29 @@ import { Dock, SessionHeader, sessionStyles } from '@/components/practice-loop/S
 import { HeroTarget, useSession } from '@/components/practice-loop/SessionSurface';
 import { ArrowRightIcon, Avatar, Button, ChatCircleDotsIcon, Chip, FlagPennantIcon, Raised, TargetIcon, Text, UserIcon, color, personaAvatar, space } from '@/design';
 import { Enter } from '@/motion';
+import { primeSpeech } from './voice/speechPlayer';
+import { ModeChoice, type ReplyMode } from './voice/VoiceBits';
 
 export const DIFFICULTY: Record<ScenarioSpec['difficulty'], string> = { intro: 'Intro', intermediate: 'Intermediate', advanced: 'Advanced' };
 
 /** Before the conversation: who, what's going on, your goal, and how it works. One action: start. */
-export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; onStart: (avatar: View | null) => void; onClose: () => void }) {
+export function Brief({
+  scenario,
+  onStart,
+  onClose,
+  mode,
+  onMode,
+  talkNote,
+}: {
+  scenario: ScenarioSpec;
+  onStart: (avatar: View | null) => void;
+  onClose: () => void;
+  /** Talk or Type (remembered). */
+  mode: ReplyMode;
+  onMode: (m: ReplyMode) => void;
+  /** Why Talk can't be picked here ("Not in this browser"). Unset: it can. */
+  talkNote?: string;
+}) {
   const p = scenario.persona;
   const avatar = useRef<View>(null);
   const heroTitle = useSession()?.title;
@@ -90,7 +108,10 @@ export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; 
             <Text variant="subheading" style={styles.howTitle}>
               How it works
             </Text>
-            <Step icon={<UserIcon size={18} weight="bold" color={color.primary} />} text="Respond the way you would in real life. Short is fine." />
+            <Step
+              icon={<UserIcon size={18} weight="bold" color={color.primary} />}
+              text={mode === 'talk' ? 'Hold the mic and say it the way you would in real life. Short is fine.' : 'Respond the way you would in real life. Short is fine.'}
+            />
             <Step
               icon={<ChatCircleDotsIcon size={18} weight="bold" color={color.primary} />}
               text={`${first} reacts like a real person would, opening up or closing off depending on how you listen.`}
@@ -100,8 +121,18 @@ export function Brief({ scenario, onStart, onClose }: { scenario: ScenarioSpec; 
         </View>
       </ScrollView>
       <Dock>
+        <ModeChoice mode={mode} onMode={onMode} talkNote={talkNote} />
         <HeroTarget name="cta">
-          <Button label="Start conversation" fullWidth onPress={() => onStart(avatar.current)} icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />} />
+          <Button
+            label="Start conversation"
+            fullWidth
+            onPress={() => {
+              // web: this tap is a user gesture, so it unlocks the voice the reply will play in (iOS Safari)
+              if (mode === 'talk') primeSpeech();
+              onStart(avatar.current);
+            }}
+            icon={<ArrowRightIcon size={20} weight="bold" color={color.white} />}
+          />
         </HeroTarget>
       </Dock>
     </View>

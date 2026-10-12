@@ -56,6 +56,10 @@ export {
   CloudArrowUpIcon,
   HourglassIcon,
   MicrophoneIcon,
+  MicrophoneSlashIcon,
+  KeyboardIcon,
+  SpeakerHighIcon,
+  SpeakerSlashIcon,
   ArrowUUpLeftIcon,
   ChatTeardropTextIcon,
 } from 'phosphor-react-native';
