@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { pilotLink } from "@/lib/site";
 import { GetTheApp } from "./get-the-app";
 
 const links = [
@@ -29,7 +30,7 @@ export function SiteNav() {
             className="h-8 w-auto shrink-0 object-contain sm:h-9"
           />
         </Link>
-        <nav className="flex items-center gap-5" aria-label="Primary">
+        <nav className="flex items-center gap-4 sm:gap-5" aria-label="Primary">
           <ul className="hidden items-center gap-5 lg:flex">
             {links.map((link) => (
               <li key={link.href}>
@@ -42,6 +43,10 @@ export function SiteNav() {
           <Link href="/guides" className={`${linkClass} hidden md:inline lg:hidden`}>
             Guides
           </Link>
+          <a {...pilotLink("nav")} className={`${linkClass} whitespace-nowrap`}>
+            Book a call
+            <span className="sr-only"> about a pilot (opens in a new tab)</span>
+          </a>
           <GetTheApp location="nav" size="sm">
             <span className="sm:hidden">Start free</span>
             <span className="hidden sm:inline">Start practicing free</span>

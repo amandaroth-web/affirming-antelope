@@ -48,7 +48,7 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 | event | properties | when |
 |---|---|---|
 | `$pageview` | (auto, incl. UTM + referrer) | every page |
-| `cta_clicked` | `location` (`hero`, `nav`, `download_band`, `audience_<x>`, `guide_<slug>`, `guide_index`, `footer`), `target` (`app`, `trainer`), `audience?` (`clinicians`, `leaders`, `trainers`) | any primary CTA, via `data-track` attributes |
+| `cta_clicked` | `location` (`hero`, `nav`, `download_band`, `trainer_pilot`, `faq`, `audience_<x>`, `guide_<slug>`, `guide_index`, `footer`), `target` (`app`, `trainer`, `pilot`: the 30-minute pilot booking call on Calendly), `audience?` (`clinicians`, `leaders`, `trainers`) | any primary CTA, via `data-track` attributes |
 | `guide_drill_clicked` | `slug`, `drill_id` | "Try this drill" inside a guide |
 
 ## Learner app events

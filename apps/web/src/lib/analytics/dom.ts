@@ -1,6 +1,6 @@
 "use client";
 
-import { ANALYTICS_BRIDGE_PARAMS, APP_ORIGIN, type AudienceId, type CtaLocation } from "@antelope/core";
+import { ANALYTICS_BRIDGE_PARAMS, APP_ORIGIN, CTA_TARGETS, type AudienceId, type CtaLocation, type CtaTarget } from "@antelope/core";
 import { bridgeIds, track } from "./client";
 
 /**
@@ -12,7 +12,7 @@ import { bridgeIds, track } from "./client";
  */
 
 const AUDIENCES: AudienceId[] = ["clinicians", "leaders", "trainers"];
-const LOCATION = /^(hero|nav|download_band|footer|audience_[a-z0-9_-]+|guide_[a-z0-9_-]+)$/i;
+const LOCATION = /^(hero|nav|download_band|footer|trainer_pilot|faq|audience_[a-z0-9_-]+|guide_[a-z0-9_-]+)$/i;
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 function appLink(el: Element | null): HTMLAnchorElement | null {
@@ -53,9 +53,9 @@ function onClick(e: Event) {
     case "cta_clicked": {
       const location = ds.trackLocation;
       const dest = ds.trackTarget;
-      if (!location || !LOCATION.test(location) || (dest !== "app" && dest !== "trainer")) return;
+      if (!location || !LOCATION.test(location) || !CTA_TARGETS.includes(dest as CtaTarget)) return;
       const audience = AUDIENCES.find((a) => a === ds.trackAudience);
-      track("cta_clicked", { location: location as CtaLocation, target: dest, ...(audience ? { audience } : {}) });
+      track("cta_clicked", { location: location as CtaLocation, target: dest as CtaTarget, ...(audience ? { audience } : {}) });
       break;
     }
     case "guide_drill_clicked": {

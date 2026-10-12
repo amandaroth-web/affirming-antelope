@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { appHref, ctaTrack, TRAINER_PATH } from "@/lib/site";
+import { appHref, ctaTrack, pilotLink, TRAINER_PATH } from "@/lib/site";
 
 const linkClass =
   "font-bold text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded";
@@ -36,8 +36,8 @@ export function SiteFooter() {
             className="h-8 w-auto"
           />
           <p className="mt-4 max-w-[34ch] font-semibold text-muted">
-            Amanda&apos;s daily practice for Motivational Interviewing. Free, in
-            your browser.
+            Daily Motivational Interviewing practice for healthcare leaders and
+            the trainers who coach them. Free, in your browser.
           </p>
         </div>
         {columns.map((col) => (
@@ -66,6 +66,12 @@ export function SiteFooter() {
               <Link href={TRAINER_PATH} prefetch={false} {...ctaTrack("footer", "trainer", "trainers")} className={linkClass}>
                 Trainer dashboard
               </Link>
+            </li>
+            <li>
+              <a {...pilotLink("footer")} className={linkClass}>
+                Book a 30-minute call
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
             </li>
           </ul>
         </nav>

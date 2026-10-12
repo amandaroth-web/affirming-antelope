@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MI_FOR_CLINICIANS } from "@antelope/core";
-import { CtaNote, GetTheApp, TrainerCta } from "./get-the-app";
+import { PRICING_LINE } from "@/lib/site";
+import { CtaNote, GetTheApp, PilotCta, TrainerCta } from "./get-the-app";
 import { Reveal } from "./reveal";
 import { StreakCard } from "./streak-card";
 
@@ -14,6 +15,8 @@ type DownloadBandProps = {
   trainer?: boolean;
   /** Home page only: a quiet pointer to the clinician pathway. */
   alsoClinicians?: boolean;
+  /** Home page: offer the pilot call beside the app CTA, with the pricing line. */
+  pilot?: boolean;
 };
 
 export function DownloadBand({
@@ -23,6 +26,7 @@ export function DownloadBand({
   body = "Open it in your browser, on your phone or your laptop. No download, no card. Your first drill, a one-on-one with an employee, takes five minutes.",
   trainer = false,
   alsoClinicians = false,
+  pilot = false,
 }: DownloadBandProps) {
   return (
     <section
@@ -35,7 +39,7 @@ export function DownloadBand({
           <Reveal className="md:col-span-7">
             <h2
               id={`start-heading-${location}`}
-              className="max-w-[14ch] pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
+              className="max-w-[20ch] pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-4xl"
             >
               {heading}
             </h2>
@@ -49,11 +53,15 @@ export function DownloadBand({
                   </GetTheApp>
                 </>
               ) : (
-                <GetTheApp location={location} audience={audience} size="lg" />
+                <>
+                  <GetTheApp location={location} audience={audience} size="lg" />
+                  {pilot && <PilotCta location={location} size="lg" variant="secondary" />}
+                </>
               )}
             </div>
-            {!trainer && <CtaNote className="mt-4" />}
-            {!trainer && (
+            {!trainer && !pilot && <CtaNote className="mt-4" />}
+            {!trainer && pilot && <p className="mt-4 text-sm font-bold text-muted">{PRICING_LINE}</p>}
+            {!trainer && !pilot && (
               <p className="mt-6 border-t-2 border-soft pt-5 font-semibold text-muted">
                 Running a cohort?{" "}
                 <Link
@@ -65,14 +73,14 @@ export function DownloadBand({
               </p>
             )}
             {!trainer && alsoClinicians && (
-              <p className="mt-3 font-semibold text-muted">
-                Also for clinicians: an {MI_FOR_CLINICIANS.units.length}-week pathway for patient conversations.{" "}
+              <p className={`font-semibold text-muted ${pilot ? "mt-6 border-t-2 border-soft pt-5" : "mt-3"}`}>
                 <Link
                   href="/for/clinicians"
                   className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
-                  See the clinician pathway
-                </Link>
+                  Also for clinicians →
+                </Link>{" "}
+                An {MI_FOR_CLINICIANS.units.length}-week pathway for patient conversations.
               </p>
             )}
           </Reveal>
