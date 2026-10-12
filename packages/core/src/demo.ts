@@ -3,7 +3,7 @@
 // learners. All people are fictional.
 
 import { dailyDrillOrder, getDrill } from "./drills";
-import { getPathway } from "./pathway";
+import { DEFAULT_PATHWAY_ID, getPathway } from "./pathway";
 import { SKILLS } from "./skills";
 import type { ActivityKind, PathwayId, SkillId, SkillLevelNumber } from "./types";
 
@@ -115,13 +115,13 @@ export const DEMO_LEARNER: DemoLearnerState & { trainerAssignment: DemoTrainerAs
 };
 
 /**
- * A brand-new learner on a pathway: week 1, no streak, no progress, a weekly
+ * A brand-new learner on a pathway (MI for Leaders unless told otherwise): week 1, no streak, no progress, a weekly
  * goal of 0/3, no trainer assignment, and the pathway's first daily drill as
  * today's practice. Skills in the first unit start in progress; the rest are
  * locked. Pass `user` to fill in who they are.
  */
 export function freshLearnerState(
-  pathwayId: PathwayId,
+  pathwayId: PathwayId = DEFAULT_PATHWAY_ID,
   user: Partial<DemoLearnerState["user"]> = {},
 ): DemoLearnerState {
   const pathway = getPathway(pathwayId);

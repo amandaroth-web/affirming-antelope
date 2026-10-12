@@ -21,7 +21,8 @@ import {
 
 export { dailyDrillOrder, drillsForSetting, freshLearnerState, scenariosForSetting, SETTING_LABELS, counterpartLabel };
 
-export const PATHWAY_IDS: PathwayId[] = ['mi-for-clinicians', 'mi-for-leaders'];
+/** Display order: MI for Leaders ("Your team") leads; MI for Clinicians ("Patients") stays one tap away. */
+export const PATHWAY_IDS: PathwayId[] = ['mi-for-leaders', 'mi-for-clinicians'];
 
 export function isPathwayId(v: unknown): v is PathwayId {
   return v === 'mi-for-leaders' || v === 'mi-for-clinicians';
