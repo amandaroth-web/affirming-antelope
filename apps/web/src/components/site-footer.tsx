@@ -37,7 +37,7 @@ export function SiteFooter() {
           />
           <p className="mt-4 max-w-[34ch] font-semibold text-muted">
             Daily Motivational Interviewing practice for healthcare leaders and
-            the trainers who coach them. Free, in your browser.
+            the trainers who coach them. Free for learners, in your browser.
           </p>
         </div>
         {columns.map((col) => (

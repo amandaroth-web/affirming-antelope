@@ -35,13 +35,13 @@ export function Problem() {
             id="problem-heading"
             className="pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-[2.6rem]"
           >
-            Hard conversations go sideways in familiar ways.
+            Three ways a one-on-one goes sideways
           </h2>
           <p className="mt-4 text-lg font-semibold leading-relaxed text-ink/80">
-            In a performance, change or burnout conversation, you mean to help.
-            So you explain, fix and push a little. The other person hears
-            pressure and defends themselves. MI calls it the
-            righting reflex. Knowing about it doesn&apos;t stop it. Reps do.
+            You mean to help, so you explain and push a little. Darnell hears
+            pressure and defends himself. MI calls your half of that the
+            righting reflex, and you catch it sooner after you&apos;ve rehearsed
+            the other move a few times.
           </p>
         </Reveal>
 

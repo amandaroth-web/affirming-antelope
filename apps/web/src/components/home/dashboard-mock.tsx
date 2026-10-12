@@ -33,7 +33,7 @@ export function DashboardMock() {
       <div aria-hidden className="overflow-hidden rounded-[1.5rem] border-2 border-line bg-white text-ink shadow-[0_6px_0_var(--shadow)]">
         {/* Cohort header and tabs */}
         <div className="border-b-2 border-line px-5 pt-4">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-muted">Cohort</p>
+          <p className="text-[11px] font-extrabold text-muted">Cohort</p>
           <p className="font-display text-lg font-bold leading-tight">MI for Leaders, fall pilot</p>
           <div className="mt-3 flex gap-5 text-[13px] font-extrabold">
             <span className="pb-2 text-muted">Participants</span>
@@ -55,7 +55,7 @@ export function DashboardMock() {
             </div>
             <p className="font-display text-base font-bold leading-tight">The reports are late again</p>
             <div className="rounded-xl border-2 border-primary-tint bg-soft px-3 py-2.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-primary-shadow">Jordan&apos;s note to you</p>
+              <p className="text-[11px] font-extrabold text-primary-shadow">Jordan&apos;s note to you</p>
               <p className="mt-1 text-[13px] font-bold leading-snug">
                 &ldquo;I lost him around the time-blocking question. How would you have handled
                 that moment?&rdquo;

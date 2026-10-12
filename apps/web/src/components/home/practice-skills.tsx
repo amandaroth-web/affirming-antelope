@@ -6,13 +6,13 @@ const skills = [
   {
     letter: "O",
     name: "Open questions",
-    plain: "Ask so they tell you what's going on, not just yes or no.",
+    plain: "Ask questions that invite the story behind the yes or no.",
     example: "What's changed for you over the last few months?",
   },
   {
     letter: "A",
     name: "Affirmations",
-    plain: "Name a real strength you've seen. Specific, not cheerleading.",
+    plain: "Name a strength you've seen, with the detail that shows you noticed.",
     example: "For four years, finance has counted on your numbers.",
   },
   {
@@ -38,12 +38,12 @@ export function PracticeSkills() {
             id="skills-heading"
             className="pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-[2.6rem]"
           >
-            Four moves that keep people talking.
+            Four moves that keep people talking
           </h2>
           <p className="mt-4 text-lg font-semibold leading-relaxed text-muted">
             MI calls them OARS. The {MI_FOR_LEADERS.units.length}-week MI for
-            Leaders path drills them one at a time, a few minutes a day, then
-            puts them together in role-plays.
+            Leaders path drills them one at a time, then has you use them
+            together in role-plays.
           </p>
         </Reveal>
 

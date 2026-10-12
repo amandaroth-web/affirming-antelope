@@ -1,4 +1,5 @@
 import { Keyboard, Microphone, Quotes } from "@phosphor-icons/react/dist/ssr";
+import { MI_FOR_LEADERS } from "@antelope/core";
 import { Hoofprint } from "../hoofprint";
 import { Reveal } from "../reveal";
 
@@ -17,10 +18,13 @@ function StepNumber({ n, inverse = false }: { n: number; inverse?: boolean }) {
   );
 }
 
-const today = [
-  { kind: "Drill", title: "Reflections, set 3", time: "4 min" },
-  { kind: "Role-play", title: "The reports are late again", time: "10 min" },
-];
+// Week 3 of MI for Leaders, as the app lists it: a drill, then the first role-play.
+const week3 = MI_FOR_LEADERS.units[2];
+const kindLabel = { learn: "Lesson", drill: "Drill", roleplay: "Role-play" } as const;
+const today = week3.activities
+  .filter((a) => a.kind !== "learn")
+  .slice(-2)
+  .map((a) => ({ kind: `Week ${week3.week} · ${kindLabel[a.kind]}`, title: a.title, time: `${a.minutes} min` }));
 
 /** Today's practice, then the app's hold-to-talk control. */
 function HoldToTalk() {
@@ -60,7 +64,7 @@ const xs = [24, 70, 116, 162, 208, 254, 300];
 const ys = [124, 122, 90, 74, 34, 66, 28];
 const line = xs.map((x, i) => `${i ? "L" : "M"}${x} ${ys[i]}`).join(" ");
 
-function ReplayChart() {
+export function ReplayChart({ who = "employee" }: { who?: "employee" | "patient" }) {
   return (
     <figure className="mt-6 rounded-2xl border-2 border-line bg-white p-4">
       <figcaption className="flex items-baseline justify-between gap-3">
@@ -77,7 +81,7 @@ function ReplayChart() {
           viewBox={`0 0 ${W} ${H}`}
           className="h-auto w-full overflow-visible"
           role="img"
-          aria-label="Sample chart: the employee starts holding on, moves to mixed after reflections, and ends open to change."
+          aria-label={`Sample chart: the ${who} starts holding on, moves to mixed after reflections, and ends open to change.`}
         >
           <rect x="0" y="0" width={W} height="46" rx="10" fill="var(--zone-change)" />
           <rect x="0" y="104" width={W} height="46" rx="10" fill="var(--zone-hold)" />
@@ -127,10 +131,10 @@ export function HowItWorks() {
             id="how-heading"
             className="pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight md:text-[2.6rem]"
           >
-            Practice, notice, use it.
+            How a practice session goes
           </h2>
           <p className="mt-3 max-w-[44ch] text-lg font-semibold text-[color:var(--on-primary-body)]">
-            Five minutes before work, then the real conversation.
+            A drill before work, a role-play when you have ten minutes, then the real conversation.
           </p>
         </Reveal>
 
@@ -142,9 +146,8 @@ export function HowItWorks() {
                 <h3 className="font-display text-2xl font-bold">Practice</h3>
               </div>
               <p className="mt-4 text-[17px] font-semibold leading-relaxed text-muted">
-                Pick a five-minute drill or a role-play. Type your reply, or hold
-                to talk and say it out loud. The employee answers in their own
-                voice.
+                Pick a drill or a role-play. Type your reply, or hold to talk and
+                say it out loud. The employee answers in their own voice.
               </p>
               <div className="mt-auto">
                 <HoldToTalk />
@@ -162,9 +165,9 @@ export function HowItWorks() {
                 <h3 className="font-display text-2xl font-bold">Notice</h3>
               </div>
               <p className="mt-4 max-w-[52ch] text-[17px] font-semibold leading-relaxed text-muted">
-                The debrief replays how the conversation moved. The coach points
-                to the moments that mattered and offers one possible
-                MI-consistent response. Never a score.
+                The debrief replays how the conversation moved. The coach marks
+                the moments where the employee opened up or dug in, and offers
+                one possible MI-consistent response.
               </p>
               <ReplayChart />
             </Reveal>
@@ -181,7 +184,7 @@ export function HowItWorks() {
                   <h3 className="font-display text-2xl font-bold">Use it</h3>
                   <p className="mt-1 max-w-[50ch] text-[17px] font-semibold leading-relaxed text-[color:var(--on-primary-body)]">
                     Close the app and walk into the one-on-one. Come back tomorrow
-                    for the next rep, and watch the streak grow.
+                    for the next drill and keep your streak going.
                   </p>
                 </div>
               </div>

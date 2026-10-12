@@ -56,6 +56,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-5 py-16 md:px-8 md:py-24">
           <Faq
             items={HOME_FAQ}
+            heading="Before you start"
             aside={
               <p className="mt-4 max-w-[34ch] font-semibold leading-relaxed text-muted">
                 Planning a cohort?{" "}
@@ -72,8 +73,8 @@ export default function Home() {
           />
         </div>
         <DownloadBand
-          heading="Try it before your next one-on-one."
-          body="It runs in your browser on your phone or laptop. No download, no card. Your first role-play takes about five minutes."
+          heading="Try it before your next one-on-one"
+          body="It runs in the browser on your phone or laptop, with no download and no card. A drill takes about five minutes, a role-play about ten."
           alsoClinicians
           pilot
           mascot

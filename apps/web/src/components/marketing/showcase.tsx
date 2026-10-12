@@ -18,9 +18,7 @@ export function DrillShowcase({ drill }: { drill: Drill }) {
 
   return (
     <div className={card}>
-      <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-primary-shadow">
-        Sample drill · OARS
-      </p>
+      <p className="text-sm font-extrabold text-primary-shadow">Sample drill · OARS</p>
       <p className="mt-1 text-sm font-bold text-muted">{drill.context}</p>
       <motion.blockquote
         className="mt-4 rounded-2xl rounded-tl-md border-2 border-line bg-soft px-4 py-3 font-bold leading-snug text-ink shadow-[0_3px_0_var(--shadow)]"
@@ -85,9 +83,7 @@ export function PathwayShowcase({ title, units, total }: { title: string; units:
   return (
     <div className={card}>
       <div className="flex items-baseline justify-between">
-        <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-primary-shadow">
-          {title}
-        </p>
+        <p className="text-sm font-extrabold text-primary-shadow">{title}</p>
         <p className="text-sm font-extrabold text-muted">{total} weeks</p>
       </div>
       <ol className="mt-4 space-y-2.5">
@@ -158,7 +154,7 @@ export function CohortShowcase() {
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-primary-shadow">Cohort</p>
+          <p className="text-sm font-extrabold text-primary-shadow">Cohort</p>
           <p className="font-display text-xl font-bold text-ink">Spring MI cohort</p>
         </div>
         <span className="rounded-xl border-2 border-dashed border-primary-tint bg-soft px-3 py-1.5 font-display text-lg font-bold tracking-[0.12em] text-primary-shadow">

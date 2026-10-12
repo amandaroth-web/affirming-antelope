@@ -10,9 +10,44 @@ export const METHOD_LEAD = {
   role: "Principal, Psychotherapy Clinical Quality",
   photo: { src: "/team/amanda-roth.jpg", width: 500, height: 500 },
   alt: "Portrait of Amanda Roth, LCSW",
-  // TODO: Amanda to write or approve. The quote renders only when this is non-empty.
-  quote: "",
+  // Drafted for Amanda: she approves the wording before this merges. Renders only when non-empty.
+  quote:
+    "Workshops teach the skill in an afternoon. The hard part comes the week after, when someone pushes back and you hear yourself starting to lecture. I wanted something for that week.",
 };
+
+/**
+ * A short note from the founders, under the method. Renders only when `body` and
+ * `signedBy` are both filled. Blake wrote this text; Amanda reads it before it ships.
+ */
+export const WHY_WE_BUILT: { heading: string; body: string[]; signedBy: string } = {
+  heading: "Why we built this",
+  body: [
+    "Amanda has coached a lot of healthcare leaders through the conversations they dread: the late reports, the quiet team member, the change nobody asked for. The leaders she works with get better at them. But she can only sit in on so many one-on-ones.",
+    "So we built a place to put everything she teaches. The 12-week path follows her MI for Leaders program, and every role-play is written to respond the way her learners’ employees do. Now people can practice her approach between sessions, on their own time.",
+  ],
+  signedBy: "Blake Parkinson",
+};
+
+function WhyWeBuilt() {
+  const { heading, body, signedBy } = WHY_WE_BUILT;
+  const paragraphs = body.filter((p) => p.trim());
+  if (!paragraphs.length || !signedBy.trim()) return null;
+  return (
+    <Reveal className="lg:col-span-12">
+      <section aria-labelledby="why-heading" className="max-w-[60ch] border-t-2 border-line pt-10">
+        <h3 id="why-heading" className="font-display text-2xl font-bold text-ink">
+          {heading}
+        </h3>
+        {paragraphs.map((p) => (
+          <p key={p} className="mt-4 text-lg font-semibold leading-relaxed text-ink/80">
+            {p}
+          </p>
+        ))}
+        <p className="mt-5 font-display text-lg font-bold text-ink">{signedBy}</p>
+      </section>
+    </Reveal>
+  );
+}
 
 // From the PM-017 spec in packages/core/src/scenarios.ts (sustain and change triggers).
 const spec = {
@@ -39,7 +74,7 @@ export function Method() {
             id="method-heading"
             className="pb-1 font-display text-3xl font-bold leading-[1.05] tracking-tight text-ink md:text-[2.6rem]"
           >
-            The method behind it.
+            The method behind it
           </h2>
           <p className="mt-4 max-w-[46ch] text-lg font-semibold leading-relaxed text-ink/80">
             Designed from the MI for Leaders program Amanda Roth teaches. Every
@@ -106,6 +141,8 @@ export function Method() {
             </div>
           </figure>
         </Reveal>
+
+        <WhyWeBuilt />
       </div>
     </section>
   );
