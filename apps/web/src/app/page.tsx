@@ -76,6 +76,7 @@ export default function Home() {
           body="It runs in your browser on your phone or laptop. No download, no card. Your first role-play takes about five minutes."
           alsoClinicians
           pilot
+          mascot
         />
       </main>
       <SiteFooter />

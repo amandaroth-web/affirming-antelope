@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useReducedMotion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const MascotThree = dynamic(
   () => import("./mascot-three").then((mod) => mod.MascotThree),
@@ -19,7 +19,35 @@ type MascotProps = {
   preload?: boolean;
   /** Rendered width hint for the responsive srcset. */
   sizes?: string;
+  /** Below the fold: wait until it's about to scroll into view before loading WebGL. */
+  whenVisible?: boolean;
 };
+
+/** True once the element is within ~400px of the viewport (always true when not gated). */
+function useNearViewport(gated: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(!gated);
+  useEffect(() => {
+    if (!gated || near) return;
+    const el = ref.current;
+    if (!el || !("IntersectionObserver" in window)) {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "400px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [gated, near]);
+  return { ref, near };
+}
 
 /**
  * Mount the WebGL mascot only once the page has loaded and the main thread is
@@ -66,11 +94,13 @@ export function Mascot({
   height,
   preload = false,
   sizes = "(min-width: 768px) 300px, 270px",
+  whenVisible = false,
 }: MascotProps) {
   const reduce = useReducedMotion();
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
-  const mount3d = useIdleMount(!reduce);
+  const { ref, near } = useNearViewport(whenVisible);
+  const mount3d = useIdleMount(!reduce && near);
 
   if (reduce) {
     return (
@@ -89,6 +119,7 @@ export function Mascot({
 
   return (
     <div
+      ref={ref}
       className={`relative ${className}`}
       style={{ aspectRatio: `${width} / ${height}` }}
     >
