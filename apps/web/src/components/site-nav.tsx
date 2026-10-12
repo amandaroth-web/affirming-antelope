@@ -3,7 +3,6 @@ import Link from "next/link";
 import { GetTheApp } from "./get-the-app";
 
 const links = [
-  { href: "/for/clinicians", label: "Clinicians" },
   { href: "/for/leaders", label: "Leaders" },
   { href: "/for/trainers", label: "Trainers" },
   { href: "/guides", label: "Guides" },

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Plus, Stethoscope, UsersThree } from "@phosphor-icons/react";
-import { listPathways, type Pathway } from "@antelope/core";
+import { DEFAULT_PATHWAY_ID, listPathways, type Pathway } from "@antelope/core";
 import { createCohort } from "@/app/trainer/actions";
 import { track } from "@/lib/analytics/client";
 import { JoinCode } from "./join-code";
@@ -15,9 +15,10 @@ import { fieldClass, hintClass, labelClass } from "./fields";
 
 const PATHWAY_ICON = { clinical: Stethoscope, workplace: UsersThree } as const;
 
-/** Clinicians first: it is the shorter pathway and the one most trainers start with. */
+/** MI for Leaders first and preselected; MI for Clinicians stays one click away. */
 function pathwayChoices(): Pathway[] {
-  return [...listPathways()].sort((a, b) => (a.setting === b.setting ? 0 : a.setting === "clinical" ? -1 : 1));
+  const rank = (p: Pathway) => (p.id === DEFAULT_PATHWAY_ID ? 0 : 1);
+  return [...listPathways()].sort((a, b) => rank(a) - rank(b));
 }
 
 export function CreateCohortButton({ size = "md", label = "New cohort" }: { size?: "md" | "lg"; label?: string }) {
@@ -26,7 +27,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [startsOn, setStartsOn] = useState("");
-  const [pathwayId, setPathwayId] = useState<string | null>(null);
+  const [pathwayId, setPathwayId] = useState<string | null>(DEFAULT_PATHWAY_ID);
   const uid = useId();
   const choices = pathwayChoices();
   const chosen = choices.find((p) => p.id === pathwayId);
@@ -41,7 +42,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
       setCreated(null);
       setName("");
       setStartsOn("");
-      setPathwayId(null);
+      setPathwayId(DEFAULT_PATHWAY_ID);
       setError(null);
     }, 250);
   }
@@ -153,7 +154,7 @@ export function CreateCohortButton({ size = "md", label = "New cohort" }: { size
                   required
                   maxLength={120}
                   autoFocus
-                  placeholder={`${chosen?.title ?? "MI for Clinicians"} — Spring cohort`}
+                  placeholder={`${chosen?.title ?? "MI for Leaders"} — Spring cohort`}
                   className={fieldClass}
                 />
               </div>

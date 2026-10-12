@@ -12,15 +12,16 @@ export function Hero() {
       <div className="mx-auto grid max-w-6xl items-center gap-6 px-5 py-10 md:grid-cols-12 md:gap-8 md:px-8 md:py-14">
         <div className="md:col-span-6">
           <p className="mb-4 inline-flex rounded-xl bg-soft px-3 py-1.5 text-sm font-extrabold text-primary-shadow">
-            MI practice that sticks
+            MI practice for healthcare leaders
           </p>
-          <h1 className="max-w-[15ch] pb-1 font-display text-4xl font-bold leading-[1.04] tracking-tight text-ink md:text-5xl lg:text-[3.4rem]">
-            Practice better conversations.
+          <h1 className="max-w-[16ch] pb-1 font-display text-4xl font-bold leading-[1.04] tracking-tight text-ink md:text-5xl lg:text-[3.4rem]">
+            Practice the conversation before you have it.
           </h1>
-          <p className="mt-5 max-w-[38ch] text-lg font-semibold leading-snug text-muted">
-            Five-minute OARS drills and live role-plays with realistic patients
-            and employees, from Amanda. Practice out loud, build a streak, and
-            walk into your next conversation ready.
+          <p className="mt-5 max-w-[42ch] text-lg font-semibold leading-snug text-muted">
+            For managers and team leads in healthcare. Rehearse performance,
+            change, and burnout conversations with an AI employee who responds
+            the way people do. Five-minute Motivational Interviewing drills,
+            free in your browser.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
             <GetTheApp location="hero" size="lg" />

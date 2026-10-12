@@ -155,6 +155,10 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
         a: "No. It coaches the conversation, not the medicine. Feedback is about how you asked, reflected, and shared information, not whether a dose or guideline was right.",
       },
       {
+        q: "Has the clinical content been reviewed?",
+        a: "Draft content pending clinical review. The patient drills and role-plays are written to practice the conversation, and they are still waiting on review by an MI trainer. Treat them as practice material, not clinical guidance.",
+      },
+      {
         q: "Is it really free?",
         a: `Yes. The drills, the role-plays, and the ${clinicians.weeks}-week MI for Clinicians pathway are free, and you don't need a card. You can start as a guest without an account.`,
       },
