@@ -97,6 +97,9 @@ async function openDrill(page: Page) {
 async function openRoleplay(page: Page) {
   await onboard(page);
   await page.goto(ROLEPLAY);
+  // Type mode (Talk is the default where the browser can record; voice has its own spec)
+  await page.getByRole('radio', { name: /^type/i }).tap();
+  await expect(page.getByRole('radio', { name: /^type/i })).toBeChecked();
   await page.getByRole('button', { name: /start conversation/i }).tap();
   return page.getByRole('textbox', { name: /your reply to/i });
 }

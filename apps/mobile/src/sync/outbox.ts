@@ -138,7 +138,7 @@ export function sessionOp(s: PracticeSession): Op {
       kind: s.kind,
       ref_id: s.refId,
       skill: s.skill ?? null,
-      mode: 'text',
+      mode: s.mode ?? 'text',
       transcript: s.transcript as unknown as NonNullable<Json>,
       debrief: (s.debrief ?? null) as unknown as Json,
       self_reflection: (s.selfReflection ?? null) as unknown as Json,

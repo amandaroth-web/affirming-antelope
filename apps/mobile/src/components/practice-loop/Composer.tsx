@@ -8,7 +8,20 @@ import { useFocusWithoutScroll } from './webKeyboard';
 const MIN_H = 48;
 
 /** Where the last sent message left the composer (window coords), for the bubble's launch. */
-let launchPad: { x: number; y: number; width: number; height: number; at: number } | null = null;
+let launchPad: LaunchPad | null = null;
+export interface LaunchPad {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  at: number;
+  /** `center`: the bubble grows out of the middle of a small source (the Talk mode mic). Default: left and bottom edges aligned (the field). */
+  from?: 'field' | 'center';
+}
+/** Another source a learner bubble can launch from (the hold-to-talk mic). */
+export function setLaunchPad(pad: Omit<LaunchPad, 'at'>) {
+  launchPad = { ...pad, at: Date.now() };
+}
 export function takeLaunchPad() {
   const l = launchPad;
   launchPad = null;

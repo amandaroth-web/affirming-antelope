@@ -12,6 +12,13 @@ export interface PendingReply {
 
 const TICK = 33;
 
+/** Optional listener for the raw reply stream (Talk mode speaks it sentence by sentence). */
+export interface ReplyStreamSink {
+  push(chunk: string): void;
+  end(): void;
+  fail(): void;
+}
+
 /**
  * Streams the employee's reply with a believable rhythm. A short pause to
  * read (longer for longer messages), typing dots, then the text reveals at a
@@ -26,7 +33,7 @@ export function useEmployeeReply(scenarioId: string) {
   useEffect(() => () => live.current?.stop(), []);
 
   const request = useCallback(
-    (turns: Turn[], replyId: string, onDone: (text: string) => void) => {
+    (turns: Turn[], replyId: string, onDone: (text: string) => void, sink?: ReplyStreamSink) => {
       live.current?.stop();
       setError(null);
       const lastLearner = [...turns].reverse().find((t) => t.speaker === 'learner')?.text ?? '';
@@ -86,12 +93,22 @@ export function useEmployeeReply(scenarioId: string) {
       }
       live.current = { stop };
 
-      postStream('/api/roleplay/turn', { scenarioId, turns }, (chunk) => (buffer += chunk), req.signal)
+      postStream(
+        '/api/roleplay/turn',
+        { scenarioId, turns },
+        (chunk) => {
+          buffer += chunk;
+          sink?.push(chunk);
+        },
+        req.signal,
+      )
         .then((full) => {
           if (full && full.length >= buffer.length) buffer = full;
           streamDone = true;
+          sink?.end();
         })
         .catch((e) => {
+          sink?.fail();
           if (stopped) return;
           failure = e;
         });

@@ -58,7 +58,7 @@ function DrillSession() {
 
   useEffect(() => {
     const d = getDrill(id);
-    track('practice_started', { kind: 'drill', ref_id: id, ...(d ? { skill: d.skill, level: d.level } : {}), source: practiceSource(source), pathway_id: activePathwayId() });
+    track('practice_started', { kind: 'drill', ref_id: id, ...(d ? { skill: d.skill, level: d.level } : {}), source: practiceSource(source), pathway_id: activePathwayId(), mode: 'text' });
     // once per screen: "One more" reports its own start below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -89,7 +89,7 @@ function DrillSession() {
     const next = nextDrillId(drillId, done, activityId);
     track('next_step_chosen', { from: 'drill', choice: 'one_more' });
     const d = getDrill(next);
-    track('practice_started', { kind: 'drill', ref_id: next, ...(d ? { skill: d.skill, level: d.level } : {}), source: 'next_step', pathway_id: activePathwayId() });
+    track('practice_started', { kind: 'drill', ref_id: next, ...(d ? { skill: d.skill, level: d.level } : {}), source: 'next_step', pathway_id: activePathwayId(), mode: 'text' });
     setReps((n) => n + 1);
     setComplete(false);
     setDrillId(next);
