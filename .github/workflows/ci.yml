@@ -103,7 +103,7 @@ jobs:
         run: npx playwright install-deps webkit chromium
       - name: Build the web export
         run: npm run build:web -w mobile
-      - name: Run composer e2e (WebKit + Chromium, iPhone touch emulation)
+      - name: Run composer + voice e2e (WebKit + Chromium, iPhone touch emulation; voice is Chromium-only, fake mic)
         run: npm run e2e -w mobile
       - name: Upload traces and screenshots
         if: failure()

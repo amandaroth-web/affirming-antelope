@@ -104,6 +104,12 @@ export interface Persona {
   avatarSeed: string;
   /** How they talk: pace, vocabulary, tells. For the role-player only. */
   voiceNotes: string;
+  /**
+   * How the persona sounds when spoken aloud (docs/voice.md). `openai` is a built-in
+   * OpenAI voice id; `instructions` is style direction (age, pace, warmth, guardedness)
+   * for the speech model. Server-side only: the client never chooses the voice.
+   */
+  voice?: { openai: string; instructions: string };
 }
 
 export interface ScenarioSpec {

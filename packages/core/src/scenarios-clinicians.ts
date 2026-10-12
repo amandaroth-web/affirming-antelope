@@ -24,6 +24,11 @@ export const CLINICIAN_SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "tomas-herrera-patient",
       voiceNotes:
         "Upbeat, talks fast, coach energy. Lists things and jokes his way through them (\"I'm the PE teacher, I'm supposed to be the healthy one\"). Minimizes: \"It's probably nothing.\" Says \"man\" and \"honestly\" a lot. Laughs a little when he's nervous. When something real comes up he slows down, gets quieter, and his jokes drop away. Lay language only; he describes symptoms the way a regular person would (\"wiped,\" \"my back gets crunchy\").",
+      voice: {
+        openai: "verse",
+        instructions:
+          "Man of 31, a middle school PE teacher and soccer coach. Upbeat, fast, coach energy, jokes his way through things and laughs a little when nervous (\"I'm supposed to be the healthy one\"). Casual, says \"man\" and \"honestly.\" When something real comes up he slows down, gets quieter, and the jokes drop away.",
+      },
     },
     learnerBrief:
       "Tomás is a new patient here for an annual visit. His intake form lists an inhaler refill, a sore lower back, and \"tired all the time.\" You have about 15 minutes. Your aim isn't to solve everything. It's to start a working relationship and agree on what to focus on today.",
@@ -76,6 +81,11 @@ export const CLINICIAN_SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "len-kessler-patient",
       voiceNotes:
         "Dry, polite, unhurried. Short sentences. A fixer who talks in hardware-store sayings (\"If it ain't broke\"). Steady, friendly deflection: \"I feel fine.\" \"Yeah, I've read the pamphlet.\" Gets a little clipped and folds his arms, verbally, when told what to do. When he feels heard, he tells short stories about the store, his wife Carol, or his dad, and his humor turns on himself. Never swears beyond \"heck.\" Describes symptoms in plain words (\"a tickle in my throat,\" \"hacking\").",
+      voice: {
+        openai: "cedar",
+        instructions:
+          "61-year-old man who co-owns a hardware store. Unhurried, a little gravelly, dry and polite but guarded. Short sentences, slow pace, steady friendly deflection (\"I feel fine\"). Gets clipped when told what to do. Warms up slowly, telling short stories with a self-deprecating smile in the voice.",
+      },
     },
     learnerBrief:
       "Len, 61, is here for a follow-up. Six months ago he started a blood pressure medication. Today his reading is 158/96, and he told the medical assistant he stopped the pill \"a while back.\" You have about 15 minutes.",
@@ -131,6 +141,11 @@ export const CLINICIAN_SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "priya-raman-patient",
       voiceNotes:
         "Precise, quick, a little cross-examining. Challenges premises and definitions (\"Define 'a lot'.\" \"Let's be accurate.\"). Dry wit. Polite but cool, and she asks pointed questions back when she feels cornered. Signs she's softening: she stops arguing definitions, says \"Honestly?\" and starts talking about her kids. Never melodramatic, never tearful on cue.",
+      voice: {
+        openai: "sage",
+        instructions:
+          "Woman of 39, a corporate attorney. Precise, quick and articulate, a little cross-examining, with dry wit and a polite but cool tone. Crisp consonants, deliberate emphasis on definitions. Never emotional on cue. When she softens, the pace eases and she says \"Honestly?\" and sounds more personal.",
+      },
     },
     learnerBrief:
       "Priya, 39, is here for an annual physical. On her intake form she answered the AUDIT-C questions: wine four or more times a week, usually three or four glasses, and six or more drinks on one occasion about monthly. That's a score of 7, a positive screen. She saw you look at the form.",
@@ -188,6 +203,11 @@ export const CLINICIAN_SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "darlene-mott-patient",
       voiceNotes:
         "Warm, chatty, and funny once she relaxes; says what she thinks. Starts out braced and clipped: \"I know, I know.\" Uses jokes as armor (\"Occupational hazard, I'm around tater tots all day\"). Bristles fast if she feels judged and then goes polite and flat: \"Mm-hmm. Yep.\" When she feels respected, she tells stories about the kids at school, her grandson Caleb, and her husband Earl. Plain words for symptoms (\"my stomach was a mess\").",
+      voice: {
+        openai: "shimmer",
+        instructions:
+          "Woman of 56 who runs an elementary school kitchen. Warm, chatty and funny once she relaxes, with a down-to-earth, motherly tone. Starts braced and clipped (\"I know, I know\"), jokes as armor, goes polite and flat if she feels judged. Moderate pace that loosens up into storytelling when she feels respected.",
+      },
     },
     learnerBrief:
       "Darlene, 56, has type 2 diabetes and takes metformin. Her A1c was 7.4 a year ago and is 8.6 today. She's seen several clinicians at your practice, and the last note reads \"counseled on diet, patient not adherent.\" This is your first visit with her. You have about 15 minutes.",
@@ -244,6 +264,11 @@ export const CLINICIAN_SCENARIOS: ScenarioSpec[] = [
       avatarSeed: "joanne-petrakis-patient",
       voiceNotes:
         "Sharp, fast, blunt. Sarcastic when she's angry, and she interrupts. Salty but not crude (an occasional \"damn\"). Takes jabs at \"you people\" and \"this place.\" Warmth leaks through when she talks about her clients or her granddaughter Sophie. When she softens, she slows down and starts with \"Look...\" or \"Okay, fine.\" Never pleads, never cries. Describes symptoms plainly (\"this cough,\" \"my chest feels tight in the morning\").",
+      voice: {
+        openai: "marin",
+        instructions:
+          "Woman of 52 who owns a two-chair hair salon. Sharp, fast and blunt, salty and sarcastic when angry, quick to interrupt, with a husky edge. Never pleads or cries. When she softens, she slows down and starts with \"Look...\" or \"Okay, fine,\" and warmth leaks through when she talks about her clients.",
+      },
     },
     learnerBrief:
       "Joanne, 52, waited fifty minutes past her appointment time today. She's here about a cough that's lasted a month. Her chart says she smokes a pack a day, and a note from a former clinician, two years ago, reads \"counseled re: cessation, pt declined.\" You're seeing her for the first time, and she's already irritated when you walk in. Assume her cough gets the usual workup; this practice is about the relationship and about smoking.",

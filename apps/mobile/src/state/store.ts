@@ -73,6 +73,8 @@ export interface PracticeSession {
   startedAt: string;
   endedAt: string;
   durationSec: number;
+  /** Role-play: `voice` when the learner spoke at least one turn (Talk mode). Unset: typed. */
+  mode?: 'text' | 'voice';
   ownerId?: string;
 }
 
@@ -80,6 +82,10 @@ export interface Settings {
   /** 'system' follows the OS setting; 'reduce' forces cross-fades everywhere. */
   motion: 'system' | 'reduce';
   haptics: boolean;
+  /** Role-play: how this learner last chose to reply on the brief. Unset: Talk when voice works here. */
+  roleplayMode?: 'talk' | 'type';
+  /** Role-play Talk mode: captions only, no spoken replies. */
+  voiceMuted?: boolean;
 }
 
 /** One pathway's place in its course (shared with the server merge in @antelope/core). */

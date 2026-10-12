@@ -2,7 +2,7 @@ import type { ScenarioSpec, Turn } from '@antelope/core';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
-import { Composer } from '@/components/practice-loop/Composer';
+import { Composer, setLaunchPad } from '@/components/practice-loop/Composer';
 import { ConfirmSheet } from '@/components/practice-loop/ConfirmSheet';
 import { SaveProgressLink } from '@/components/practice-loop/ErrorBits';
 import { callName, conversationLabel } from '@/components/practice-loop/names';
@@ -11,6 +11,7 @@ import { EmployeeBubble, LearnerBubble, LiveEmployeeBubble, useBubbleEntrance, u
 import {
   ArrowCounterClockwiseIcon,
   Avatar,
+  MicrophoneSlashIcon,
   Button,
   CaretDownIcon,
   PressableSurface,
@@ -25,8 +26,12 @@ import {
   type AvatarIdentity,
 } from '@/design';
 import { track } from '@/lib/analytics';
+import { useLearner } from '@/state/store';
 import { FADE_MS, spring, useFades, useListLayout, useReduceMotion, useTickSwap } from '@/motion';
 import { useEmployeeReply } from './useEmployeeReply';
+import { TalkDock } from './voice/TalkDock';
+import { useVoiceTurn, type VoiceFallback } from './voice/useVoiceTurn';
+import { MuteToggle, SpeakingRing, type ReplyMode } from './voice/VoiceBits';
 
 const MIN_TURNS = 3;
 
@@ -45,6 +50,11 @@ export function Conversation({
   arriving,
   seatHidden,
   onSeat,
+  mode = 'type',
+  onMode,
+  onFallback,
+  fallbackNote,
+  onVoiceTurn,
 }: {
   scenario: ScenarioSpec;
   turns: Turn[];
@@ -57,6 +67,16 @@ export function Conversation({
   seatHidden?: boolean;
   /** Where the flying portrait should land. */
   onSeat?: (node: View | null) => void;
+  /** Talk (hold-to-talk mic) or Type (the composer). */
+  mode?: ReplyMode;
+  /** The learner switched mid-conversation ("Type instead"). */
+  onMode?: (m: ReplyMode) => void;
+  /** Talk can't carry on (mic denied, voice off on the server): switch to Type. */
+  onFallback?: (why: VoiceFallback) => void;
+  /** The one-line reason shown above the composer after a fallback. */
+  fallbackNote?: string | null;
+  /** A spoken turn was sent (so the session is saved as `voice`). */
+  onVoiceTurn?: () => void;
 }) {
   const seat = useRef<View>(null);
   const tick = useTickSwap();
@@ -66,6 +86,33 @@ export function Conversation({
   const avatar = personaAvatar(p, scenario.setting);
   const first = callName(p.name);
   const { pending, error, request, cut, clearError } = useEmployeeReply(scenario.id);
+  const talk = mode === 'talk';
+  const muted = useLearner((s) => s.settings.voiceMuted ?? false);
+  const setSetting = useLearner((s) => s.setSetting);
+  const mic = useRef<View>(null);
+  const voice = useVoiceTurn({
+    scenarioId: scenario.id,
+    enabled: talk,
+    muted,
+    onTranscript: (text) => {
+      // the bubble launches out of the mic, centre to centre
+      let sent = false;
+      const go = () => {
+        if (sent) return;
+        sent = true;
+        onVoiceTurn?.();
+        sendTurn(text, true);
+      };
+      const node = mic.current;
+      if (!node) return go();
+      node.measureInWindow((x, y, width, height) => {
+        if (width > 0) setLaunchPad({ x, y, width, height, from: 'center' });
+        go();
+      });
+      setTimeout(go, 40);
+    },
+    onFallback: (why) => onFallback?.(why),
+  });
   const [draft, setDraft] = useState('');
   const [confirm, setConfirm] = useState<'end' | 'leave' | null>(null);
   const [goalOpen, setGoalOpen] = useState(true);
@@ -79,7 +126,7 @@ export function Conversation({
 
   const learnerCount = turns.filter((t) => t.speaker === 'learner').length;
   const ready = learnerCount >= MIN_TURNS;
-  const status = pending?.typing ? 'typing…' : learnerCount ? `${learnerCount} ${learnerCount === 1 ? 'reply' : 'replies'} from you` : p.role;
+  const status = pending?.typing && voice.state !== 'speaking' ? 'typing…' : talk && voice.state === 'speaking' ? 'talking…' : learnerCount ? `${learnerCount} ${learnerCount === 1 ? 'reply' : 'replies'} from you` : p.role;
   // one list, so the pending reply and the turn it settles into are the same element (dots morph into words)
   const rows: Row[] = turns.map((t) => ({ id: t.id, speaker: t.speaker, text: t.text, live: false, typing: false }));
   if (pending) rows.push({ id: pending.id, speaker: 'employee', text: pending.text, live: true, typing: pending.typing || !pending.text });
@@ -87,25 +134,50 @@ export function Conversation({
   const send = () => {
     const text = draft.trim();
     if (!text || pending) return;
-    const next: Turn[] = [...turns, { id: `t${turns.length}`, speaker: 'learner', text }];
-    track('roleplay_turn_sent', { scenario_id: scenario.id, turn_index: learnerCount }); // a count, never the text
-    onTurns(next);
+    sendTurn(text, false);
     setDraft('');
+  };
+
+  /** Typed or spoken, a reply takes the same path: the turn, analytics, the employee's answer. */
+  const sendTurn = (text: string, spoken: boolean) => {
+    let base = turnsRef.current;
+    if (spoken && pending) {
+      // they cut in while the reply was still arriving: keep what had been said
+      const partial = pending.typing ? (cut(), '') : cut();
+      if (partial) {
+        streamed.current.add(`t${base.length}`);
+        base = [...base, { id: `t${base.length}`, speaker: 'employee', text: partial }];
+      }
+    }
+    const said = base.filter((t) => t.speaker === 'learner').length;
+    const next: Turn[] = [...base, { id: `t${base.length}`, speaker: 'learner', text }];
+    track('roleplay_turn_sent', { scenario_id: scenario.id, turn_index: said }); // a count, never the text
+    turnsRef.current = next;
+    onTurns(next);
     atBottom.current = true;
-    if (goalOpen && learnerCount === 0) setGoalOpen(false);
+    if (goalOpen && said === 0) setGoalOpen(false);
     ask(next);
   };
 
   const ask = (history: Turn[]) => {
-    request(history, `t${history.length}`, (reply) => {
-      if (!reply) return;
-      const now = turnsRef.current;
-      streamed.current.add(`t${now.length}`);
-      onTurns([...now, { id: `t${now.length}`, speaker: 'employee', text: reply }]);
-    });
+    request(
+      history,
+      `t${history.length}`,
+      (reply) => {
+        if (!reply) return;
+        const now = turnsRef.current;
+        streamed.current.add(`t${now.length}`);
+        const nextTurns: Turn[] = [...now, { id: `t${now.length}`, speaker: 'employee', text: reply }];
+        turnsRef.current = nextTurns;
+        onTurns(nextTurns);
+      },
+      // Talk mode: the same stream is spoken, sentence by sentence
+      talk ? voice.beginReply() : undefined,
+    );
   };
 
   const end = () => {
+    voice.stopSpeaking();
     // keep whatever has been said so far, including a reply mid-sentence
     const partial = pending && !pending.typing ? cut() : (cut(), '');
     const final = partial ? [...turns, { id: `t${turns.length}`, speaker: 'employee' as const, text: partial }] : turns;
@@ -135,7 +207,9 @@ export function Conversation({
         center={
           <View style={styles.who}>
             <View ref={seat} collapsable={false} onLayout={() => onSeat?.(seat.current)} style={seatHidden ? styles.hidden : undefined}>
-              <Avatar {...avatar} size={36} />
+              <SpeakingRing active={talk && voice.state === 'speaking'} level={voice.speakLevel} size={36}>
+                <Avatar {...avatar} size={36} />
+              </SpeakingRing>
             </View>
             <View style={styles.whoCopy}>
               <Text variant="label" numberOfLines={1}>
@@ -150,7 +224,12 @@ export function Conversation({
             </View>
           </View>
         }
-        trailing={<EndButton ready={ready} disabled={learnerCount === 0} onPress={() => (ready ? end() : setConfirm('end'))} />}
+        trailing={
+          <View style={styles.trail}>
+            {talk ? <MuteToggle muted={muted} onToggle={() => setSetting('voiceMuted', !muted)} /> : null}
+            <EndButton ready={ready} disabled={learnerCount === 0} onPress={() => (ready ? end() : setConfirm('end'))} />
+          </View>
+        }
       />
       <GoalReminder goal={scenario.learnerGoal} open={goalOpen} onToggle={() => setGoalOpen((v) => !v)} />
 
@@ -223,14 +302,28 @@ export function Conversation({
           ) : null}
         </View>
         <Dock>
-          <Composer
-            value={draft}
-            onChangeText={setDraft}
-            onSend={send}
-            busy={!!pending || !!error}
-            placeholder={`Reply to ${first}…`}
-            accessibilityLabel={`Your reply to ${p.name}`}
-          />
+          {talk ? (
+            <TalkDock voice={voice} name={first} micRef={mic} disabled={!!error} onType={() => onMode?.('type')} />
+          ) : (
+            <>
+              {fallbackNote ? (
+                <Animated.View entering={fades.entering} style={styles.fallback}>
+                  <MicrophoneSlashIcon size={16} weight="bold" color={color.muted} />
+                  <Text variant="caption" color={color.muted} style={styles.flex}>
+                    {fallbackNote}
+                  </Text>
+                </Animated.View>
+              ) : null}
+              <Composer
+                value={draft}
+                onChangeText={setDraft}
+                onSend={send}
+                busy={!!pending || !!error}
+                placeholder={`Reply to ${first}…`}
+                accessibilityLabel={`Your reply to ${p.name}`}
+              />
+            </>
+          )}
         </Dock>
       </KeyboardColumn>
 
@@ -256,6 +349,7 @@ export function Conversation({
         onLeave={() => {
           setConfirm(null);
           cut();
+          voice.stopSpeaking();
           setTimeout(onLeave, 200);
         }}
       />
@@ -400,6 +494,8 @@ function NewReplyPill({ onPress }: { onPress: () => void }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   hidden: { opacity: 0 },
+  trail: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  fallback: { flexDirection: 'row', alignItems: 'center', gap: space[2], marginBottom: space[2] },
   center: { alignSelf: 'center' },
   who: { flexDirection: 'row', alignItems: 'center', gap: space[2], maxWidth: 230 },
   whoCopy: { flexShrink: 1 },

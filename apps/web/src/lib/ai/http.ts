@@ -75,7 +75,7 @@ export function toApiError(err: unknown): ApiError {
 // CORS
 // ---------------------------------------------------------------------------
 
-function corsHeaders(req: Request): Record<string, string> {
+export function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin");
   const base: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",

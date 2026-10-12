@@ -23,12 +23,16 @@ import { Brief } from '@/components/roleplay/Brief';
 import { Conversation } from '@/components/roleplay/Conversation';
 import { Debrief, type NextChoice } from '@/components/roleplay/Debrief';
 import { Reflection } from '@/components/roleplay/Reflection';
+import type { VoiceFallback } from '@/components/roleplay/voice/useVoiceTurn';
+import type { ReplyMode } from '@/components/roleplay/voice/VoiceBits';
+import { canRecordHere, markVoiceResting, voiceAvailable } from '@/components/roleplay/voice/voiceSupport';
 import { Avatar, Button, Raised, Text, color, haptic, layout, personaAvatar, space, type AvatarIdentity } from '@/design';
 import { scenariosForSetting } from '@/data/pathways';
 import { openDrill, openRoleplay, pickDrill } from '@/data/routes';
 import { postJson } from '@/lib/api';
 import { practiceSource, track } from '@/lib/analytics';
 import { FADE_MS, useReduceMotion } from '@/motion';
+import { Platform } from 'react-native';
 import type { Rect } from '@/motion/launch';
 import { activePathwayId, useLearner, type PracticeSession } from '@/state/store';
 
@@ -74,20 +78,41 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   // when this conversation started (the brief's START), for the session's duration
   const startedAt = useRef(new Date().toISOString());
   const inflight = useRef<ReturnType<typeof withTimeout> | null>(null);
+  // Talk or Type: the learner's last pick, else Type. Talk is opt-in until voice
+  // capture is verified on real iPhones (the simulator's mic records silence).
+  const setSetting = useLearner((s) => s.setSetting);
+  const [mode, setMode] = useState<ReplyMode>(() => {
+    const saved = useLearner.getState().settings.roleplayMode;
+    return voiceAvailable() && saved === 'talk' ? 'talk' : 'type';
+  });
+  const [fallback, setFallback] = useState<string | null>(null);
+  /** Spoken turns in this conversation: any at all and the session is saved as `voice`. */
+  const voiceTurns = useRef(0);
+  const [source] = useState(() => practiceSource(params.source));
 
   useEffect(() => () => inflight.current?.abort(), []);
 
-  // one start per role-play screen; "Try again" reports its own below
-  useEffect(() => {
-    track('practice_started', {
-      kind: 'roleplay',
-      ref_id: scenario.id,
-      skill: scenario.primaryChallenge,
-      source: practiceSource(params.source),
-      pathway_id: activePathwayId(),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const pickMode = (m: ReplyMode) => {
+    setMode(m);
+    setSetting('roleplayMode', m);
+    setFallback(null);
+  };
+
+  const onFallback = (why: VoiceFallback) => {
+    setMode('type');
+    if (why === 'permission') {
+      // keep asking for a mic they've said no to and Talk would fail every time; they can pick it again
+      setSetting('roleplayMode', 'type');
+      setFallback(
+        Platform.OS === 'web'
+          ? 'The browser didn’t share your mic, so let’s type. You can allow it in the site settings.'
+          : 'Your mic is off for this app, so let’s type. You can turn it on in Settings.',
+      );
+    } else {
+      markVoiceResting();
+      setFallback('Voice is taking a break, so let’s type for now.');
+    }
+  };
 
   const requestDebrief = async (r: SelfReflection, t: Turn[]) => {
     setPhase('thinking');
@@ -119,6 +144,7 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
           startedAt: startedAt.current,
           endedAt: ended.toISOString(),
           durationSec: Math.max(0, (ended.getTime() - new Date(startedAt.current).getTime()) / 1000),
+          mode: voiceTurns.current > 0 ? 'voice' : 'text',
         }),
       );
       recordPractice({
@@ -138,7 +164,15 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
   };
 
   const restart = () => {
-    track('practice_started', { kind: 'roleplay', ref_id: scenario.id, skill: scenario.primaryChallenge, source: 'next_step', pathway_id: activePathwayId() });
+    track('practice_started', {
+      kind: 'roleplay',
+      ref_id: scenario.id,
+      skill: scenario.primaryChallenge,
+      source: 'next_step',
+      pathway_id: activePathwayId(),
+      mode: mode === 'talk' ? 'voice' : 'text',
+    });
+    voiceTurns.current = 0;
     setTurns(opening);
     setReflection(null);
     setDebrief(null);
@@ -164,6 +198,15 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
 
   let body: ReactNode;
   const startChat = (avatar: View | null) => {
+    // one start per role-play screen, sent as the conversation begins (with how they'll reply); "Try again" reports its own
+    track('practice_started', {
+      kind: 'roleplay',
+      ref_id: scenario.id,
+      skill: scenario.primaryChallenge,
+      source,
+      pathway_id: activePathwayId(),
+      mode: mode === 'talk' ? 'voice' : 'text',
+    });
     setEntered(true);
     startedAt.current = new Date().toISOString();
     const node = root.current;
@@ -184,7 +227,17 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
     avatar.measureLayout(node, (x, y, width, height) => setFlight((f) => (f && !f.to ? { ...f, to: { x, y, width, height } } : f)), () => setFlight(null));
   }, []);
 
-  if (phase === 'brief') body = <Brief scenario={scenario} onStart={startChat} onClose={close} />;
+  if (phase === 'brief')
+    body = (
+      <Brief
+        scenario={scenario}
+        onStart={startChat}
+        onClose={close}
+        mode={mode}
+        onMode={pickMode}
+        talkNote={voiceAvailable() ? undefined : canRecordHere() ? 'Resting right now' : 'Not in this browser'}
+      />
+    );
   else if (phase === 'chat')
     body = (
       <Conversation
@@ -200,6 +253,13 @@ function RoleplayFlow({ scenario, params }: { scenario: ScenarioSpec; params: Pa
         arriving={entered && !!flight}
         seatHidden={!!flight}
         onSeat={onSeat}
+        mode={mode}
+        onMode={pickMode}
+        onFallback={onFallback}
+        fallbackNote={fallback}
+        onVoiceTurn={() => {
+          voiceTurns.current += 1;
+        }}
       />
     );
   else if (phase === 'reflect')

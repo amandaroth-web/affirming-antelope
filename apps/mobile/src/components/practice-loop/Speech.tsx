@@ -58,6 +58,7 @@ export function useComposerLaunch(skip = false) {
   const dy = useSharedValue(0);
   const p = useSharedValue(skip ? 1 : 0);
   const shown = useSharedValue(skip || !pad ? 1 : 0);
+  const s0 = useSharedValue(0.96);
   const fallback = useBubbleEntrance('right', 0, skip || !!pad);
   const measured = useRef(false);
 
@@ -70,8 +71,15 @@ export function useComposerLaunch(skip = false) {
       return;
     }
     ref.current?.measureInWindow((x, y, w, h) => {
-      dx.value = pad.x - x + (pad.width - w > 0 ? 0 : 0);
-      dy.value = pad.y + pad.height - (y + h);
+      if (pad.from === 'center') {
+        // out of the mic: centre to centre, starting small
+        dx.value = pad.x + pad.width / 2 - (x + w / 2);
+        dy.value = pad.y + pad.height / 2 - (y + h / 2);
+        s0.value = Math.min(0.9, Math.max(0.35, pad.width / Math.max(1, w)));
+      } else {
+        dx.value = pad.x - x + (pad.width - w > 0 ? 0 : 0);
+        dy.value = pad.y + pad.height - (y + h);
+      }
       shown.value = 1;
       p.value = withSpring(1, LAUNCH);
     });
@@ -82,7 +90,7 @@ export function useComposerLaunch(skip = false) {
     if (reduce) return { opacity: k };
     return {
       opacity: shown.value,
-      transform: [{ translateX: dx.value * (1 - k) }, { translateY: dy.value * (1 - k) }, { scale: 0.96 + 0.04 * k }],
+      transform: [{ translateX: dx.value * (1 - k) }, { translateY: dy.value * (1 - k) }, { scale: s0.value + (1 - s0.value) * k }],
     };
   });
 

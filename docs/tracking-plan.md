@@ -60,10 +60,12 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 | `sign_in_started` | `reason` (`welcome`, `cohort`, `review`, `me`, `quota`: a guest at today's free AI limit) |
 | `sign_in_completed` | `is_new_user`, `migrated_guest_data` (conversion: always the same uid; existing account: merge-anonymous moved rows) |
 | `signed_out` | — |
-| `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`), `pathway_id` |
+| `practice_started` | `kind` (`drill`, `roleplay`, `lesson`), `ref_id`, `skill?`, `level?`, `source` (`today`, `assignment`, `path`, `practice_tab`, `challenge`, `guide`, `review_recommendation`, `next_step`), `pathway_id`, `mode` (`text`, `voice`: role-play Talk mode; drills and lessons are `text`). Role-play sends it when the conversation starts (the brief's START), since that's where Talk or Type is picked |
 | `drill_answered` | `drill_id`, `skill`, `level`, `format` (`choice`, `text`), `hit_target` |
 | `drill_feedback_received` | `drill_id`, `latency_ms`, `move`, `hit_target` |
 | `roleplay_turn_sent` | `scenario_id`, `turn_index` |
+| `voice_turn_recorded` | `scenario_id`, `duration_ms` (a spoken turn sent for transcription; never the audio or the words) |
+| `voice_transcribe_failed` | `reason` (`no_speech`, `permission`, `unavailable`, `rate_limited`, `too_large`, `offline`, `server`) |
 | `roleplay_ended` | `scenario_id`, `learner_turns`, `ended_early` |
 | `reflection_submitted` | `scenario_id`, `feeling` |
 | `debrief_viewed` | `scenario_id`, `latency_ms`, `suggested_next_step`, `pathway_id` |
