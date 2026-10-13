@@ -1,53 +1,20 @@
 import Image from "next/image";
+import Link from "next/link";
+import { scenarioCount } from "@/lib/audiences";
+import { AMANDA, AMANDA_QUOTE } from "@/lib/people";
 import { Reveal } from "../reveal";
 
 /**
- * The person behind the method. Only facts Amanda has given us: name, credential, role,
- * and the program the app is designed from. No employer, memberships or years.
+ * The person behind the method. Facts come from lib/people.ts.
  */
 export const METHOD_LEAD = {
-  name: "Amanda Roth, LCSW",
-  role: "Principal, Psychotherapy Clinical Quality",
-  photo: { src: "/team/amanda-roth.jpg", width: 500, height: 500 },
-  alt: "Portrait of Amanda Roth, LCSW",
+  name: AMANDA.displayName,
+  role: AMANDA.jobTitle,
+  photo: AMANDA.photo!,
+  alt: AMANDA.photo!.alt,
   // Drafted for Amanda: she approves the wording before this merges. Renders only when non-empty.
-  quote:
-    "Workshops teach the skill in an afternoon. The hard part comes the week after, when someone pushes back and you hear yourself starting to lecture. I wanted something for that week.",
+  quote: AMANDA_QUOTE,
 };
-
-/**
- * A short note from the founders, under the method. Renders only when `body` and
- * `signedBy` are both filled. Blake wrote this text; Amanda reads it before it ships.
- */
-export const WHY_WE_BUILT: { heading: string; body: string[]; signedBy: string } = {
-  heading: "Why we built this",
-  body: [
-    "Amanda has coached a lot of healthcare leaders through the conversations they dread: the late reports, the quiet team member, the change nobody asked for. The leaders she works with get better at them. But she can only sit in on so many one-on-ones.",
-    "So we built a place to put everything she teaches. The 12-week path follows her MI for Leaders program, and every role-play is written to respond the way her learners’ employees do. Now people can practice her approach between sessions, on their own time.",
-  ],
-  signedBy: "Blake Parkinson",
-};
-
-function WhyWeBuilt() {
-  const { heading, body, signedBy } = WHY_WE_BUILT;
-  const paragraphs = body.filter((p) => p.trim());
-  if (!paragraphs.length || !signedBy.trim()) return null;
-  return (
-    <Reveal className="lg:col-span-12">
-      <section aria-labelledby="why-heading" className="max-w-[60ch] border-t-2 border-line pt-10">
-        <h3 id="why-heading" className="font-display text-2xl font-bold text-ink">
-          {heading}
-        </h3>
-        {paragraphs.map((p) => (
-          <p key={p} className="mt-4 text-lg font-semibold leading-relaxed text-ink/80">
-            {p}
-          </p>
-        ))}
-        <p className="mt-5 font-display text-lg font-bold text-ink">{signedBy}</p>
-      </section>
-    </Reveal>
-  );
-}
 
 // From the PM-017 spec in packages/core/src/scenarios.ts (sustain and change triggers).
 const spec = {
@@ -77,7 +44,14 @@ export function Method() {
             The method behind it
           </h2>
           <p className="mt-4 max-w-[46ch] text-lg font-semibold leading-relaxed text-ink/80">
-            Designed from the MI for Leaders program Amanda Roth teaches. Every
+            Designed from the MI for Leaders program{" "}
+            <Link
+              href={AMANDA.page!}
+              className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Amanda Roth
+            </Link>{" "}
+            teaches. Every
             employee is written from a scenario spec: who they are, what shuts
             them down, and what helps them open up.
           </p>
@@ -98,7 +72,15 @@ export function Method() {
               className="size-24 shrink-0 rounded-full border-4 border-white object-cover shadow-[0_4px_0_var(--shadow)]"
             />
             <div>
-              <p className="font-display text-xl font-bold text-ink">{METHOD_LEAD.name}</p>
+              <p className="font-display text-xl font-bold text-ink">
+                <Link
+                  href={AMANDA.page!}
+                  className="rounded hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {METHOD_LEAD.name}
+                </Link>
+              </p>
+              <p className="mt-0.5 text-sm font-extrabold leading-snug text-primary-shadow">{AMANDA.credentialLine}</p>
               <p className="mt-0.5 font-semibold leading-snug text-muted">{METHOD_LEAD.role}</p>
             </div>
           </div>
@@ -139,10 +121,29 @@ export function Method() {
                 </ul>
               </div>
             </div>
+            <p className="mt-6 border-t-2 border-soft pt-4 font-semibold text-muted">
+              <Link
+                href="/scenarios"
+                className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Browse all {scenarioCount} role-play scenarios
+              </Link>
+            </p>
           </figure>
         </Reveal>
 
-        <WhyWeBuilt />
+        <Reveal className="lg:col-span-12">
+          <p className="max-w-[60ch] border-t-2 border-line pt-8 text-lg font-semibold leading-relaxed text-ink/80">
+            Amanda and Blake wrote down why they built it.{" "}
+            <Link
+              href="/about"
+              className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Read why we built this
+            </Link>
+            .
+          </p>
+        </Reveal>
       </div>
     </section>
   );

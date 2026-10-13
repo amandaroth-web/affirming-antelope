@@ -18,23 +18,23 @@ const fredoka = Fredoka({
 export const metadata: Metadata = {
   metadataBase: new URL("https://affirmingantelope.com"),
   title: {
-    default: "Affirming Antelope: MI practice for healthcare leaders",
+    default: "Motivational Interviewing Practice for Healthcare Leaders",
     template: "%s · Affirming Antelope",
   },
   applicationName: "Affirming Antelope",
   description:
-    "Free Motivational Interviewing practice for healthcare leaders: five-minute drills and live AI role-plays with realistic employees for performance, change, and burnout conversations, plus opt-in trainer review. Clinicians have their own pathway. Works in your browser.",
+    "Free motivational interviewing practice for healthcare managers and team leads. Rehearse performance, change and burnout conversations with an AI employee.",
   openGraph: {
     type: "website",
     siteName: "Affirming Antelope",
     locale: "en_US",
-    title: "Affirming Antelope: MI practice for healthcare leaders",
+    title: "Motivational Interviewing Practice for Healthcare Leaders",
     description:
       "Five-minute drills and live role-plays for managers and team leads: rehearse performance, change, and burnout conversations before you have them. Free, in your browser.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Affirming Antelope: MI practice for healthcare leaders",
+    title: "Motivational Interviewing Practice for Healthcare Leaders",
     description:
       "Five-minute drills and live role-plays for managers and team leads: rehearse performance, change, and burnout conversations before you have them. Free, in your browser.",
   },

@@ -24,6 +24,10 @@ export type GuideFrontmatter = {
   drillId?: string;
   related: string[];
   faq: { q: string; a: string }[];
+  /** Slug of a person in lib/people.ts who reviewed the guide. Omit until they have. */
+  reviewedBy?: string;
+  /** ISO date (YYYY-MM-DD) of that review. */
+  reviewedOn?: string;
   draft: boolean;
 };
 
@@ -88,6 +92,8 @@ function readGuide(file: string): Guide {
     drillId: typeof data.drillId === "string" ? data.drillId : undefined,
     related: asStrings(data.related),
     faq,
+    reviewedBy: typeof data.reviewedBy === "string" && data.reviewedBy.trim() ? data.reviewedBy.trim() : undefined,
+    reviewedOn: data.reviewedOn ? toIsoDate(data.reviewedOn) : undefined,
     draft: data.draft === true,
   };
 }

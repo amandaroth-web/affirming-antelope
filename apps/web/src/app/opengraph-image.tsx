@@ -6,8 +6,8 @@ export const contentType = ogContentType;
 
 export default function Image() {
   return renderOg({
-    eyebrow: "MI practice for healthcare leaders",
+    eyebrow: "Motivational interviewing practice",
     title: "Rehearse the hard conversation.",
-    subtitle: "For managers and team leads in healthcare. Free, in your browser.",
+    subtitle: "For healthcare managers and team leads. Free, in your browser.",
   });
 }

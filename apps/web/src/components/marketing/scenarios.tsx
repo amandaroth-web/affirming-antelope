@@ -1,4 +1,5 @@
 import { SCENARIOS, scenariosForSetting, type Setting } from "@antelope/core";
+import Link from "next/link";
 import { Reveal } from "@/components/reveal";
 
 const difficultyLabel = { intro: "Intro", intermediate: "Intermediate", advanced: "Advanced" } as const;
@@ -28,6 +29,14 @@ export function Scenarios({ heading, body, setting, variant = "cards", exclude =
             {heading}
           </h2>
           <p className="mt-3 max-w-[48ch] text-lg font-semibold text-ink/80">{body}</p>
+          <p className="mt-3">
+            <Link
+              href="/scenarios"
+              className="font-extrabold text-ink underline decoration-primary decoration-2 underline-offset-4 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Browse every role-play scenario
+            </Link>
+          </p>
         </Reveal>
 
         {variant === "list" ? (

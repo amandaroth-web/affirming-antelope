@@ -16,8 +16,15 @@ related: [change-talk-vs-sustain-talk] # other guide slugs
 faq:                                   # 3–5, rendered as an FAQ section + FAQPage JSON-LD
   - q: "What does OARS stand for?"
     a: "Open questions, affirmations, reflections, and summaries…"
+reviewedBy: amanda-roth                # optional: a person's slug from src/lib/people.ts
+reviewedOn: 2026-10-12                 # optional: date of that review
 draft: false                           # true = not listed, noindex
 ---
+
+`reviewedBy` and `reviewedOn` are optional and stay off until the person has actually reviewed the guide.
+With `reviewedBy` set, the guide header shows "Reviewed by Amanda Roth, LCSW" (linked to her page, with the
+date when `reviewedOn` is set) and the Article JSON-LD names her as reviewer and contributor. With it unset,
+nothing renders. An unknown slug renders nothing too.
 
 Markdown body. Use `##` / `###` headings (no `#`; the title is the H1).
 

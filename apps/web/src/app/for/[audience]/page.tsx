@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: PageProps<"/for/[audience]">)
   if (!page) return {};
   return pageMetadata({
     title: page.metaTitle,
+    absoluteTitle: true,
     description: page.metaDescription,
     path: `/for/${page.slug}`,
     keywords: page.keywords,
