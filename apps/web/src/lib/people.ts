@@ -21,7 +21,7 @@ export type Person = {
   /** Name as shown on the page, e.g. "Amanda Roth, LCSW". */
   displayName: string;
   jobTitle?: string;
-  /** One line under the name, e.g. "LCSW · Member, ..." */
+  /** One line under the name (the name already carries "LCSW"), e.g. "Member, ..." */
   credentialLine?: string;
   /** Professional bodies, as schema.org `memberOf`. */
   memberOf?: Org[];
@@ -39,7 +39,7 @@ export const AMANDA: Person = {
   credential: "LCSW",
   displayName: "Amanda Roth, LCSW",
   jobTitle: "Principal, Psychotherapy Clinical Quality",
-  credentialLine: "LCSW · Member, Motivational Interviewing Network of Trainers (MINT)",
+  credentialLine: "Member, Motivational Interviewing Network of Trainers (MINT)",
   memberOf: [
     { name: "Motivational Interviewing Network of Trainers", url: "https://motivationalinterviewing.org" },
     { name: "Association for Talent Development", url: "https://www.td.org" },

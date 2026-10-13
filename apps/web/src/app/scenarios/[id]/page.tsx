@@ -321,6 +321,8 @@ export default async function ScenarioPage({ params }: PageProps<"/scenarios/[id
           location={location}
           audience={audience.slug}
           appLink={href}
+          appLabel="Try this role-play"
+          mascot
           heading={`Talk with ${s.persona.name.split(" ")[0]} yourself`}
           body="The role-play opens in your browser. Type your replies or say them out loud, and finish with feedback on the moves you made."
         />

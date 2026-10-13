@@ -143,6 +143,7 @@ export default function ScenariosIndex() {
 
         <DownloadBand
           location="scenarios"
+          mascot
           heading="Start with the one that worries you most"
           body="Open any role-play in your browser, with no download and no card. Type your replies or say them out loud."
         />
