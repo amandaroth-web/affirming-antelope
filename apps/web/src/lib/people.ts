@@ -80,7 +80,7 @@ export function amandaBio(): string[] {
 }
 
 /**
- * Written for Amanda; she approves the wording. Renders only when non-empty.
+ * Drafted for Amanda and approved by her (2026-10-13). Renders only when non-empty.
  * Shared by the home method block and her page.
  */
 export const AMANDA_QUOTE =
