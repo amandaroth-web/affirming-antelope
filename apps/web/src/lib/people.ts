@@ -68,19 +68,14 @@ export function personId(p: Person) {
 }
 
 /**
- * Amanda's bio, as she gave it. The sentence naming her employer is gated by
- * `showCurrentEmployer`; Amanda must approve the bio and the employer mention before merge.
+ * Amanda's bio in her own words, as she supplied it (only a comma-for-period
+ * typo fixed). Don't rewrite it: changes go back to her.
  */
 export function amandaBio(): string[] {
-  const employer = showCurrentEmployer && AMANDA.employer ? AMANDA.employer.name : undefined;
   return [
-    "Amanda Roth is a licensed clinical social worker and a member of the Motivational Interviewing Network of Trainers (MINT) and the Association for Talent Development (ATD). She has spent more than ten years in clinical operations, quality improvement, and learning and development.",
-    `${
-      employer
-        ? `She is Principal, Psychotherapy Clinical Quality at ${employer}. Before that she was Head of Quality at Two Chairs`
-        : "She was Head of Quality at Two Chairs"
-    }, where she led clinical learning, development and quality assurance. She has also held senior roles at Calm, Vida Health and Vital Decisions, building onboarding programs, performance metrics and quality improvement work.`,
-    "Across those roles she has designed and scaled Motivational Interviewing training for clinicians, coaches and leaders. The MI for Leaders program behind Affirming Antelope comes from that work.",
+    "Amanda Roth is a seasoned strategic leader with over a decade of experience in clinical operations, quality improvement, and learning and development. She specializes in building efficient, scalable, and high-performing organizational processes. As a Licensed Clinical Social Worker and proud member of both the Motivational Interviewing Network of Trainers (MINT) and the Association for Talent Development (ATD), Amanda blends evidence-based coaching methodologies with instructional design expertise to drive workforce excellence and engagement.",
+    "Recently, Amanda joined Headway as Principal, Psychotherapy Clinical Quality. Formerly, serving as Head of Quality at Two Chairs, Amanda oversees clinical learning, development, and quality assurance initiatives, leading a cross-functional team in implementing innovative training programs, auditing systems, and organizational improvement strategies. Prior to Two Chairs, Amanda held senior leadership roles at Calm and Vida Health, where they developed large-scale onboarding programs, designed key performance metrics, and led company-wide quality improvement efforts that elevated care outcomes and operational efficiency.",
+    "Across roles at Vital Decisions, Vida Health, and Calm, Amanda has built a reputation for fostering a culture of learning and continuous improvement\u2014empowering clinicians, coaches, and leaders to achieve their highest potential. A recognized expert in Motivational Interviewing, Amanda has designed and scaled training programs that enhance provider communication, engagement, and performance organization-wide.",
   ];
 }
 
