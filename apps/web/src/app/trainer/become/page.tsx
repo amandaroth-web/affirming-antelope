@@ -22,7 +22,7 @@ function Pending({ request, email }: { request: AccessRequest; email: string | n
         <div className="min-w-0">
           <p className="font-display text-[19px] font-bold leading-snug text-ink">Request sent</p>
           <p className="mt-1 text-[15px] font-semibold leading-relaxed text-ink/80">
-            Thanks, {request.name}. Blake will review it shortly.
+            Thanks, {request.name}. We'll review it shortly.
             {email ? (
               <>
                 {" "}
