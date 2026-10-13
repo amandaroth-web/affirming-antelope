@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Tailwind v4 dropped the pointer cursor on buttons (browser default is the
+   arrow). Every clickable control here gets the hand, so buttons and the
+   links styled like them feel the same; disabled ones keep the arrow. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+
 :root {
   color-scheme: light;
   --background: #ffffff;
