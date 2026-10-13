@@ -84,8 +84,7 @@ export function amandaBio(): string[] {
  * Shared by the home method block and her page.
  */
 export const AMANDA_QUOTE =
-  "Workshops teach the skill in an afternoon. The hard part comes the week after, when someone pushes back and you hear yourself starting to lecture. I wanted something for that week.";
-
+  "A workshop can teach you what motivational interviewing is. Practice is what makes you do it. You get there by rehearsing the hard moments over and over, until reflecting comes before reacting.";
 /**
  * A short note from the founders. Blake wrote this text; Amanda reads it before it ships.
  * Lives on /about.
