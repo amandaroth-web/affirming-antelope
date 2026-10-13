@@ -39,6 +39,8 @@ type GetTheAppProps = {
   variant?: Variant;
   className?: string;
   children?: ReactNode;
+  /** Overrides the link, for a deep link into the app (it must still carry `?src=`). */
+  href?: string;
 };
 
 /** The primary CTA: opens the learner app in the browser. */
@@ -49,10 +51,11 @@ export function GetTheApp({
   variant = "primary",
   className = "",
   children = "Start practicing free",
+  href,
 }: GetTheAppProps) {
   return (
     <a
-      href={appHref(location)}
+      href={href ?? appHref(location)}
       {...ctaTrack(location, "app", audience)}
       data-mascot-watch
       data-mascot-celebrate

@@ -7,7 +7,7 @@ export function Hero() {
       <div className="mx-auto grid max-w-6xl items-center gap-x-10 gap-y-14 px-5 pt-8 pb-16 md:px-8 md:pt-14 lg:grid-cols-12 lg:pt-16 lg:pb-24">
         <div className="lg:col-span-6">
           <p className="mb-4 inline-flex rounded-xl bg-soft px-3 py-1.5 text-sm font-extrabold text-primary-shadow">
-            MI practice for healthcare leaders
+            Motivational interviewing practice for healthcare leaders
           </p>
           <h1 className="max-w-[15ch] pb-1 font-display text-[2.6rem] font-bold leading-[1.02] tracking-tight text-ink sm:text-5xl lg:text-[3.6rem]">
             Practice the conversation before you have it.

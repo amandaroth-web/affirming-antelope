@@ -16,10 +16,10 @@ import { pageMetadata } from "@/lib/seo/metadata";
 import { pilotLink, SITE_URL } from "@/lib/site";
 
 const HOME_DESCRIPTION =
-  "Free MI practice for healthcare managers and team leads. Rehearse performance, change and burnout conversations with an AI employee, typed or out loud.";
+  "Free motivational interviewing practice for healthcare managers and team leads. Rehearse performance, change and burnout conversations with an AI employee.";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Affirming Antelope: MI practice for healthcare leaders",
+  title: "Motivational Interviewing Practice for Healthcare Leaders",
   absoluteTitle: true,
   description: HOME_DESCRIPTION,
   path: "/",
@@ -27,6 +27,7 @@ export const metadata: Metadata = pageMetadata({
     "motivational interviewing for healthcare leaders",
     "motivational interviewing for managers",
     "motivational interviewing practice",
+    "motivational interviewing role play",
     "difficult conversations practice healthcare",
     "OARS motivational interviewing",
     "MI role play",

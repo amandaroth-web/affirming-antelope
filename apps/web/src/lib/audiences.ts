@@ -71,8 +71,8 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     slug: "leaders",
     name: "Healthcare leaders",
     linkLabel: "MI for healthcare leaders",
-    metaTitle: "Motivational interviewing for healthcare leaders",
-    metaDescription: `Practice MI for performance conversations with AI role-plays of realistic employees. A free ${leaders.weeks}-week MI for Leaders pathway for healthcare managers and supervisors.`,
+    metaTitle: "Motivational interviewing training for healthcare leaders",
+    metaDescription: `Practice motivational interviewing for performance conversations with AI employees. A free ${leaders.weeks}-week pathway for healthcare managers and supervisors.`,
     keywords: [
       "motivational interviewing for leaders",
       "motivational interviewing for managers",
@@ -118,9 +118,9 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     slug: "trainers",
     name: "MI trainers",
     linkLabel: "For MI trainers and team leads",
-    metaTitle: "Motivational interviewing practice for MI trainers",
+    metaTitle: "Motivational interviewing training tools for trainers",
     metaDescription:
-      "Give your MI cohort practice between sessions. Assign drills and role-plays, see who's practicing, and review the role-plays learners send you. Free for learners. Cohort pilots start with a 30-minute call.",
+      "Give your motivational interviewing cohort practice between sessions. Assign drills and role-plays, see who's practicing, and review what learners send.",
     keywords: [
       "motivational interviewing training tools",
       "MI trainer practice platform",
@@ -167,7 +167,7 @@ export const AUDIENCES: Record<Audience, AudiencePage> = {
     name: "Clinicians",
     linkLabel: "MI for clinicians",
     metaTitle: "Motivational interviewing practice for clinicians",
-    metaDescription: `Free MI practice for physicians, nurses, therapists, and health coaches. Five-minute drills and AI role-plays with realistic patients, plus the ${clinicians.weeks}-week MI for Clinicians pathway.`,
+    metaDescription: `Free motivational interviewing practice for physicians, nurses, therapists, and health coaches. Five-minute drills and AI role-plays with realistic patients.`,
     keywords: [
       "motivational interviewing practice for clinicians",
       "motivational interviewing for nurses",

@@ -18,7 +18,15 @@ const columns = [
     heading: "Learn",
     links: [
       { href: "/guides", label: "MI guides" },
+      { href: "/scenarios", label: "Role-play scenarios" },
       { href: "/#how-it-works", label: "How it works" },
+    ],
+  },
+  {
+    heading: "About",
+    links: [
+      { href: "/about", label: "About us" },
+      { href: "/about/amanda-roth", label: "Amanda Roth" },
     ],
   },
 ];
@@ -27,7 +35,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t-2 border-line">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 md:grid-cols-12 md:px-8">
-        <div className="md:col-span-5">
+        <div className="md:col-span-4">
           <Image
             src="/brand-lockup-horizontal-deep.svg"
             alt="Affirming Antelope"
@@ -54,7 +62,7 @@ export function SiteFooter() {
             </ul>
           </nav>
         ))}
-        <nav aria-label="Get started" className="md:col-span-3">
+        <nav aria-label="Get started" className="md:col-span-2">
           <p className="font-display font-bold text-ink">Get started</p>
           <ul className="mt-3 space-y-2">
             <li>

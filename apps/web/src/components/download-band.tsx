@@ -27,6 +27,8 @@ type DownloadBandProps = {
   mascotLine?: string | null;
   /** Replaces the streak card with something from the page. */
   aside?: ReactNode;
+  /** A deep link into the app for the primary CTA, instead of its home screen. */
+  appLink?: string;
 };
 
 export function DownloadBand({
@@ -41,6 +43,7 @@ export function DownloadBand({
   mascot = false,
   mascotLine = "Ready when you are.",
   aside,
+  appLink,
 }: DownloadBandProps) {
   return (
     <section
@@ -66,7 +69,7 @@ export function DownloadBand({
                 </>
               ) : (
                 <>
-                  <GetTheApp location={location} audience={audience} size="lg" />
+                  <GetTheApp location={location} audience={audience} size="lg" href={appLink} />
                   {pilot && <PilotCta location={location} size="lg" variant="secondary" />}
                 </>
               )}

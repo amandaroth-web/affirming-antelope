@@ -1,4 +1,5 @@
-import { APP_URL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { AMANDA, BLAKE, personId, showCurrentEmployer, type Person } from "@/lib/people";
+import { APP_URL, PILOT_URL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 type Json = Record<string, unknown>;
 
@@ -16,6 +17,35 @@ const ORG_ID = `${SITE_URL}/#organization`;
 const SITE_ID = `${SITE_URL}/#website`;
 const APP_ID = `${SITE_URL}/#app`;
 
+/** A Person node. Only the facts in lib/people.ts; `worksFor` follows `showCurrentEmployer`. */
+export function personLd(p: Person): Json {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": personId(p),
+    name: p.name,
+    ...(p.credential ? { honorificSuffix: p.credential } : {}),
+    ...(p.jobTitle ? { jobTitle: p.jobTitle } : {}),
+    ...(p.page ? { url: `${SITE_URL}${p.page}` } : {}),
+    ...(p.photo ? { image: `${SITE_URL}${p.photo.src}` } : {}),
+    ...(p.memberOf?.length
+      ? { memberOf: p.memberOf.map((o) => ({ "@type": "Organization", name: o.name, ...(o.url ? { url: o.url } : {}) })) }
+      : {}),
+    ...(showCurrentEmployer && p.employer ? { worksFor: { "@type": "Organization", name: p.employer.name } } : {}),
+    ...(p.sameAs.length ? { sameAs: p.sameAs } : {}),
+  };
+}
+
+/** A short reference to a Person, for use inside another node. */
+function personRef(p: Person): Json {
+  return {
+    "@type": "Person",
+    "@id": personId(p),
+    name: p.name,
+    ...(p.page ? { url: `${SITE_URL}${p.page}` } : {}),
+  };
+}
+
 export function organizationLd(): Json {
   return {
     "@context": "https://schema.org",
@@ -25,6 +55,14 @@ export function organizationLd(): Json {
     url: SITE_URL,
     logo: `${SITE_URL}/brand-logo.png`,
     description: SITE_DESCRIPTION,
+    founder: [personRef(AMANDA), personRef(BLAKE)],
+    member: [personRef(AMANDA), personRef(BLAKE)],
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "sales",
+      url: PILOT_URL,
+      availableLanguage: "English",
+    },
   };
 }
 
@@ -92,6 +130,8 @@ export function articleLd(a: {
   updated: string;
   published?: string;
   keywords?: string[];
+  /** Set only when the guide has been reviewed. */
+  reviewer?: Person;
 }): Json {
   const url = new URL(a.path, SITE_URL).toString();
   return {
@@ -107,11 +147,43 @@ export function articleLd(a: {
     inLanguage: "en",
     ...(a.keywords?.length ? { keywords: a.keywords.join(", ") } : {}),
     author: { "@id": ORG_ID, "@type": "Organization", name: SITE_NAME },
+    ...(a.reviewer
+      ? { reviewedBy: personRef(a.reviewer), contributor: personRef(a.reviewer) }
+      : {}),
     publisher: {
       "@type": "Organization",
       "@id": ORG_ID,
       name: SITE_NAME,
       logo: { "@type": "ImageObject", url: `${SITE_URL}/brand-logo.png` },
     },
+  };
+}
+
+export function learningResourceLd(r: {
+  name: string;
+  description: string;
+  path: string;
+  difficulty: string;
+  teaches: string[];
+  audienceType: string;
+}): Json {
+  const url = new URL(r.path, SITE_URL).toString();
+  return {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    "@id": `${url}#resource`,
+    name: r.name,
+    description: r.description,
+    url,
+    image: `${url}/opengraph-image`,
+    inLanguage: "en",
+    learningResourceType: "Role-play simulation",
+    interactivityType: "active",
+    educationalLevel: r.difficulty,
+    teaches: r.teaches,
+    isAccessibleForFree: true,
+    audience: { "@type": "Audience", audienceType: r.audienceType },
+    isPartOf: { "@type": "CollectionPage", name: "Role-play scenarios", url: `${SITE_URL}/scenarios` },
+    provider: { "@type": "Organization", "@id": ORG_ID, name: SITE_NAME },
   };
 }

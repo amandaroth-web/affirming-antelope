@@ -31,6 +31,11 @@ export function drillHref(drillId: string, slug: string) {
   return appHref(`guide_${slug}`, `/drill/${encodeURIComponent(drillId)}`);
 }
 
+/** Deep link into one role-play, from its scenario page. The app route is /roleplay/[scenarioId]. */
+export function roleplayHref(scenarioId: string) {
+  return appHref(`scenario_${scenarioId}`, `/roleplay/${encodeURIComponent(scenarioId)}`);
+}
+
 export const TRAINER_PATH = "/trainer";
 
 /** Props for a link to the pilot booking page, tracked as `target: pilot`. */

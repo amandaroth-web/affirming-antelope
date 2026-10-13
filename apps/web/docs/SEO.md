@@ -12,9 +12,11 @@ crawlers. The trainer dashboard (`/trainer`) is noindexed and crawlable for the 
 |---|---|
 | `metadataBase`, title template (`%s · Affirming Antelope`), default description | `src/app/layout.tsx` |
 | Per-page title, description, canonical, Open Graph, Twitter | `src/lib/seo/metadata.ts` (`pageMetadata`) |
-| OG images (1200×630, Fredoka/Nunito, mascot) | `src/lib/og.tsx` + `opengraph-image.tsx` in `/`, `/for/[audience]`, `/guides`, `/guides/[slug]` |
-| JSON-LD | `src/lib/seo/json-ld.tsx`. Home: Organization, WebSite, SoftwareApplication. Audience pages: SoftwareApplication, FAQPage. `/guides`: BreadcrumbList, ItemList. Guides: Article, BreadcrumbList, FAQPage |
-| Sitemap | `src/app/sitemap.ts`: home, audience pages, `/guides`, non-draft guides (`lastModified` = `updated`) |
+| OG images (1200×630, Fredoka/Nunito, mascot) | `src/lib/og.tsx` + `opengraph-image.tsx` in `/`, `/for/[audience]`, `/guides`, `/guides/[slug]`, `/scenarios`, `/scenarios/[id]` |
+| JSON-LD | `src/lib/seo/json-ld.tsx`. Home: Organization, WebSite, SoftwareApplication. Audience pages: SoftwareApplication, FAQPage. `/guides`: BreadcrumbList, ItemList. Guides: Article (with `reviewedBy` and `contributor` once a guide has `reviewedBy`), BreadcrumbList, FAQPage. Organization carries `founder`, `member` and a `contactPoint`. `/about`: AboutPage. `/about/amanda-roth`: Person. `/scenarios`: CollectionPage, ItemList. `/scenarios/[id]`: LearningResource, BreadcrumbList |
+| Sitemap | `src/app/sitemap.ts`: home, audience pages, `/guides`, `/scenarios` and every `/scenarios/[id]`, `/about`, `/about/amanda-roth`, non-draft guides (`lastModified` = `updated`) |
+| Scenario pages | `src/lib/scenarios.ts` holds the search phrase and title for each scenario (`SCENARIO_SEO`). Add an entry when you add a scenario in `@antelope/core`. Pages only receive a `PublicScenario`, which has no `hiddenBackstory` |
+| People | `src/lib/people.ts`. Guide `reviewedBy` takes a slug from there |
 | robots.txt | `src/app/robots.ts`: allow `/`, disallow `/api`, `/ingest` |
 | www → apex | 308 on the Vercel project domain (`www.affirmingantelope.com` → `affirmingantelope.com`), plus a host-based fallback in `next.config.ts` |
 | Drafts | `draft: true` guides render at their URL with `noindex` but are left out of `/guides`, related guides, and the sitemap |
@@ -31,6 +33,8 @@ informational queries; audience pages target "practice/training/tool" queries.
 | `/for/leaders` | motivational interviewing training for healthcare leaders | MI for managers (product intent), difficult conversations practice healthcare |
 | `/for/trainers` | motivational interviewing training tools | MI coaching feedback, MI cohort practice, MITI practice between sessions |
 | `/guides` | motivational interviewing examples | motivational interviewing guide |
+| `/scenarios` | motivational interviewing role play | motivational interviewing scenarios |
+| `/scenarios/[id]` | one long-tail phrase per scenario, e.g. "talking to an employee who keeps missing deadlines" | motivational interviewing role play |
 | `/guides/what-is-motivational-interviewing` | what is motivational interviewing | MI definition, spirit of MI, four processes |
 | `/guides/oars-motivational-interviewing` | OARS motivational interviewing | OARS examples, affirmations in MI |
 | `/guides/open-ended-questions-examples` | open ended questions motivational interviewing | open vs closed questions, evocative questions |
@@ -70,8 +74,8 @@ also feeds DuckDuckGo, Yahoo, and ChatGPT search.
 
 ## Submit the sitemap
 
-- GSC: **Sitemaps** → enter `sitemap.xml` → **Submit**. Should report 13 URLs today (home,
-  three audience pages, `/guides`, eight guides).
+- GSC: **Sitemaps** → enter `sitemap.xml` → **Submit**. Should report 13 URLs plus the scenario, about and guide pages (home,
+  three audience pages, `/guides`, `/scenarios` and each scenario, `/about`, `/about/amanda-roth`, every published guide).
 - Bing: **Sitemaps → Submit sitemap** → `https://affirmingantelope.com/sitemap.xml`.
 - After launch, use **URL Inspection → Request indexing** on `/`, the three `/for/*` pages,
   and the two strongest guides to skip the queue.

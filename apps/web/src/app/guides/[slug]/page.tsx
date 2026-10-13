@@ -14,6 +14,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { getAudience } from "@/lib/audiences";
 import { formatDate, getAllGuides, getGuide, getHeadings, getRelatedGuides } from "@/lib/guides";
+import { getPerson } from "@/lib/people";
 import { articleLd, breadcrumbLd, faqPageLd, JsonLd } from "@/lib/seo/json-ld";
 import { pageMetadata } from "@/lib/seo/metadata";
 import { SITE_URL } from "@/lib/site";
@@ -57,6 +58,7 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
     : true;
   const location = `guide_${guide.slug}`;
   const audience = guide.audience !== "all" ? getAudience(guide.audience) : undefined;
+  const reviewer = guide.reviewedBy ? getPerson(guide.reviewedBy) : undefined;
 
   const ld = [
     articleLd({
@@ -65,6 +67,7 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
       path,
       updated: guide.updated,
       keywords: guide.keywords,
+      reviewer,
     }),
     breadcrumbLd([
       { name: "Home", path: "/" },
@@ -117,6 +120,30 @@ export default async function GuidePage({ params }: PageProps<"/guides/[slug]">)
                   </span>
                   <span aria-hidden>·</span>
                   <span>{guide.readingMinutes} min read</span>
+                  {reviewer && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>
+                        Reviewed by{" "}
+                        {reviewer.page ? (
+                          <Link
+                            href={reviewer.page}
+                            className="underline decoration-primary decoration-2 underline-offset-4 hover:text-primary"
+                          >
+                            {reviewer.displayName}
+                          </Link>
+                        ) : (
+                          reviewer.displayName
+                        )}
+                        {guide.reviewedOn && (
+                          <>
+                            {" "}
+                            on <time dateTime={guide.reviewedOn}>{formatDate(guide.reviewedOn)}</time>
+                          </>
+                        )}
+                      </span>
+                    </>
+                  )}
                   {guide.draft && (
                     <span className="rounded-lg bg-gold-tint px-2 py-0.5 text-gold-ink">Draft, not indexed</span>
                   )}

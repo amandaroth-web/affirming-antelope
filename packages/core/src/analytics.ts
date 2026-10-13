@@ -24,6 +24,9 @@ export type CtaLocation =
   | "footer"
   | "trainer_pilot"
   | "faq"
+  | "about"
+  | "scenarios"
+  | `scenario_${string}`
   | `audience_${string}`
   | `guide_${string}`;
 

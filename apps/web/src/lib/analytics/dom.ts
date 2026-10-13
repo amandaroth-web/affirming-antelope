@@ -12,7 +12,7 @@ import { bridgeIds, track } from "./client";
  */
 
 const AUDIENCES: AudienceId[] = ["clinicians", "leaders", "trainers"];
-const LOCATION = /^(hero|nav|download_band|footer|trainer_pilot|faq|audience_[a-z0-9_-]+|guide_[a-z0-9_-]+)$/i;
+const LOCATION = /^(hero|nav|download_band|footer|trainer_pilot|faq|about|scenarios|scenario_[a-z0-9_-]+|audience_[a-z0-9_-]+|guide_[a-z0-9_-]+)$/i;
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 function appLink(el: Element | null): HTMLAnchorElement | null {
