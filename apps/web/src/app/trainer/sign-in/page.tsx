@@ -13,7 +13,9 @@ function safeNext(v: string | string[] | undefined): string {
 
 export default async function SignInPage({ searchParams }: PageProps<"/trainer/sign-in">) {
   const next = safeNext((await searchParams).next);
-  if (await getViewer()) redirect(next);
+  // Guests (anonymous sessions) see the form: signing in replaces their session.
+  const viewer = await getViewer();
+  if (viewer && !viewer.isAnonymous) redirect(next);
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">

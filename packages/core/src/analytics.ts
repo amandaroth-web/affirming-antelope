@@ -54,6 +54,8 @@ export type VoiceFailReason = "no_speech" | "permission" | "unavailable" | "rate
 /** Self-reported feeling after a role-play: an enum from the reflection step, never text. */
 export type ReflectionFeeling = string;
 export type ReviewRating = "emerging" | "developing" | "proficient" | "strong";
+/** "About how many learners" on the trainer access request (a bucket, never a count typed in). */
+export type TrainerLearnerCount = "1-10" | "11-30" | "31-100" | "100+";
 
 // ---------------------------------------------------------------------------
 // Event map: name -> properties
@@ -118,6 +120,10 @@ export interface AnalyticsEvents {
   // Trainer dashboard
   trainer_signed_in: { is_new_user: boolean };
   trainer_access_claimed: undefined;
+  /** Sent a "Request trainer access" form. Never the name, organization or note. */
+  trainer_access_requested: { request_id: string; learner_count: TrainerLearnerCount };
+  /** An admin approved a request at /trainer/admin. */
+  trainer_access_approved: { request_id: string };
   cohort_created: undefined;
   join_code_copied: undefined;
   assignment_created: { item_count: number; kinds: string[]; due_in_days?: number };

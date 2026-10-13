@@ -64,7 +64,7 @@ select plan(17);
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'),
-  10, 'public has the 10 spec tables');
+  11, 'public has the 11 spec tables');
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace

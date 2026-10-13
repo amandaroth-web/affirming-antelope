@@ -39,9 +39,14 @@ Test data only for now (no PHI, no BAA). Keep personal data to name + email anyw
   guest's rows into the account (`merge_anonymous_user`) and deletes the guest.
 - Installs from before anonymous auth still do the one-time upload of local
   `learner_state`, completions, and sessions (deduped by `client_id`).
-- **Trainers:** `profiles.can_train` gates cohort creation. Set it via
-  `claim_trainer(code)` (security definer) which checks a code in a private table
-  `app_private.trainer_codes`, or manually by an admin.
+- **Trainers:** `profiles.can_train` gates cohort creation. Two ways in:
+  - **Request access** (the default): a permanent user files a `trainer_access_requests`
+    row from `/trainer/become`; an admin approves it at `/trainer/admin`
+    (`admin_decide_trainer_request`, which sets `can_train` in the same transaction).
+  - **Trainer code** (bulk invites): `claim_trainer(code)` (security definer) checks a
+    code in the private table `app_private.trainer_codes`.
+  Admins are the confirmed emails in the web server's `ADMIN_EMAILS`; there's no admin
+  flag in the database. Admin reads and writes run with the secret key, server side.
 
 ## Tables (schema `public`)
 
@@ -56,6 +61,7 @@ Test data only for now (no PHI, no BAA). Keep personal data to name + email anyw
 | `submissions` | `id uuid pk`, `session_id uuid unique → practice_sessions`, `user_id`, `cohort_id → cohorts`, `note_to_trainer text`, `status text check in ('submitted','reviewed','withdrawn')`, `submitted_at`, `reviewed_at` | Learner inserts for own session + a cohort they belong to; can withdraw while `submitted`. Cohort trainer reads; status moves to `reviewed` when a review is saved (trigger). |
 | `reviews` | `id uuid pk`, `submission_id → submissions`, `trainer_id`, `feedback text`, `audio_path text null` (Storage), `rating text null check in ('emerging','developing','proficient','strong')`, `recommended_kind text null`, `recommended_ref text null`, `try_again bool default false`, `created_at`, `updated_at`, `learner_seen_at timestamptz null` | Cohort trainer inserts/updates own reviews. Learner reads reviews on own submissions and may set `learner_seen_at` only. |
 | `assignments` | `id uuid pk`, `cohort_id`, `title text`, `instructions text`, `due_at timestamptz`, `created_by`, `created_at`, `archived_at` | Cohort trainer CRUD. Members read. |
+| `trainer_access_requests` | `id uuid pk`, `user_id → profiles`, `name`, `organization`, `learner_count text check in ('1-10','11-30','31-100','100+')`, `note text null (≤500)`, `status text check in ('pending','approved','declined')`, `created_at`, `decided_at`, `decided_by → profiles` | Permanent users insert and read their own (no update/delete, so no self-approval). One pending per user (partial unique index). After a decline, a new request only 7 days after `decided_at` (trigger, `PT429` hint `declined_recently`); existing trainers get `PT409` hint `already_trainer`; anonymous users `42501` hint `account_required`. |
 | `assignment_items` | `id uuid pk`, `assignment_id`, `kind text check in ('drill','roleplay','learn','any-drill','any-roleplay')`, `ref_id text null`, `skill text null`, `quantity int default 1`, `position int` | `any-*` + `skill` = "2 short practices on Evoking". Same access as parent. |
 
 ## Functions (RPC)
@@ -70,7 +76,9 @@ Test data only for now (no PHI, no BAA). Keep personal data to name + email anyw
 - `consume_legacy_ai_quota(ip_hash text, bucket text) → jsonb` — service role only; per-IP quota for the legacy `x-antelope-key` path. Remove after 2026-10-25.
 - `merge_anonymous_user(anonymous_id uuid, permanent_id uuid, merged_state jsonb, account_version int) → jsonb {learner_state, completions_moved, sessions_moved}` — service role only. When both users have `learner_state`, stores `merged_state` (merged by the API with the app's own rules, `packages/core/src/learnerDoc.ts`) if the account is still at `account_version`, else `PT409` hint `state_changed`; when only the guest has one, moves it. Moves completions/sessions not already in the account (by `client_id`), carries a chosen display name and AI usage. The caller then deletes the anonymous auth user.
 
-`join_cohort`, `claim_trainer` and `create_cohort` refuse anonymous callers.
+- `admin_pending_trainer_requests()`, `admin_decide_trainer_request(request_id uuid, approve bool, admin_id uuid) → jsonb {id, user_id, status, name, email}`, `admin_trainers()`, `admin_trainer_codes()`, `admin_create_trainer_code(new_code text, use_limit int, valid_until timestamptz, label text)` — service role only, for `/trainer/admin`. Deciding is atomic (row lock; `PT409` if already decided) and approving sets `can_train`. Codes must match `^TRAIN-[A-Z0-9]{3,20}$` (`22023`), unique (`23505`).
+
+`join_cohort`, `claim_trainer` and `create_cohort` refuse anonymous callers, and so does inserting a trainer access request.
 
 All security-definer functions: `set search_path = ''`, explicit schema-qualified names,
 check `auth.uid()` membership/ownership before returning anything.
@@ -113,6 +121,8 @@ check `auth.uid()` membership/ownership before returning anything.
 - Hosted: one Supabase project; `supabase link` + `supabase db push`. Env:
   `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (mobile),
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
-  (or legacy `SUPABASE_SERVICE_ROLE_KEY`; web, server only — used only by merge-anonymous
-  and the legacy quota), `ALLOW_LEGACY_APP_TOKEN` (until 2026-10-25).
+  (or legacy `SUPABASE_SERVICE_ROLE_KEY`; web, server only — used by merge-anonymous,
+  the legacy quota and `/trainer/admin`), `ALLOW_LEGACY_APP_TOKEN` (until 2026-10-25),
+  `ADMIN_EMAILS` (web, server only), `RESEND_API_KEY` (web, server only; `EMAIL_MODE=log`
+  prints emails instead of sending).
 - Generated types: `supabase gen types typescript --local > packages/core/src/db.types.ts`.

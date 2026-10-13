@@ -9,10 +9,13 @@ import { Avatar, buttonClass, focusRing } from "./ui";
 export function TrainerShell({
   viewer,
   cohorts,
+  isAdmin = false,
   children,
 }: {
   viewer: { name: string; email: string };
   cohorts: RailCohort[];
+  /** Shows the Admin link. Display only: /trainer/admin checks again on every request. */
+  isAdmin?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -32,7 +35,7 @@ export function TrainerShell({
           </Link>
           <p className="mt-2 pl-0.5 text-[12px] font-extrabold uppercase tracking-[0.1em] text-muted">Trainer</p>
         </div>
-        <RailNav cohorts={cohorts} />
+        <RailNav cohorts={cohorts} isAdmin={isAdmin} />
         <div className="mt-auto border-t-2 border-line px-4 py-4">
           <div className="flex items-center gap-3 rounded-2xl px-2 py-1.5">
             <Avatar name={viewer.name} size={38} />
@@ -61,6 +64,11 @@ export function TrainerShell({
           <Link href="/trainer" className={buttonClass("ghost", "sm")}>
             Cohorts
           </Link>
+          {isAdmin ? (
+            <Link href="/trainer/admin" className={buttonClass("ghost", "sm")}>
+              Admin
+            </Link>
+          ) : null}
           <SignOutForm>
             <button type="submit" className={buttonClass("ghost", "sm")}>
               Sign out
