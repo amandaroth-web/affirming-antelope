@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { SquaresFour } from "@phosphor-icons/react";
+import { ShieldCheck, SquaresFour } from "@phosphor-icons/react";
 
 export interface RailCohort {
   id: string;
@@ -14,10 +14,11 @@ export interface RailCohort {
 const item =
   "relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[14px] font-extrabold transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/40";
 
-export function RailNav({ cohorts }: { cohorts: RailCohort[] }) {
+export function RailNav({ cohorts, isAdmin = false }: { cohorts: RailCohort[]; isAdmin?: boolean }) {
   const path = usePathname();
   const reduce = useReducedMotion();
   const homeActive = path === "/trainer";
+  const adminActive = path.startsWith("/trainer/admin");
 
   const pill = (
     <motion.span
@@ -37,6 +38,19 @@ export function RailNav({ cohorts }: { cohorts: RailCohort[] }) {
             All cohorts
           </Link>
         </li>
+        {isAdmin ? (
+          <li>
+            <Link
+              href="/trainer/admin"
+              aria-current={adminActive ? "page" : undefined}
+              className={`${item} ${adminActive ? "text-ink" : "text-ink/70 hover:text-ink"}`}
+            >
+              {adminActive ? pill : null}
+              <ShieldCheck size={20} weight="bold" className={adminActive ? "text-primary" : "text-muted"} aria-hidden />
+              Admin
+            </Link>
+          </li>
+        ) : null}
       </ul>
       <div>
         <p className="px-3 pb-2 text-[12px] font-extrabold uppercase tracking-[0.08em] text-muted">Your cohorts</p>

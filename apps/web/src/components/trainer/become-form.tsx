@@ -4,59 +4,54 @@ import { AnimatePresence, motion } from "motion/react";
 import { useActionState, useState } from "react";
 import { claimTrainer, type ActionResult } from "@/app/trainer/actions";
 import { buttonClass } from "./ui";
-import { fieldClass, labelClass } from "./fields";
+import { fieldClass } from "./fields";
 
-export function BecomeTrainerForm({ defaultName }: { defaultName: string }) {
+/** The secondary path on "Become a trainer": a code from a program lead (bulk invites). */
+export function TrainerCodeForm() {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(claimTrainer, null);
   const error = state && !state.ok ? state.error : null;
   // Controlled, so React's post-action form reset doesn't wipe what they typed.
-  const [name, setName] = useState(defaultName);
   const [code, setCode] = useState("");
 
   return (
-    <form action={action} className="mt-8 grid gap-5">
-      <div>
-        <label htmlFor="displayName" className={labelClass}>
-          Your name, as learners will see it
-        </label>
-        <input id="displayName" name="displayName" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="name" className={fieldClass} />
-      </div>
-      <div>
-        <label htmlFor="code" className={labelClass}>
-          Trainer code
-        </label>
+    <form action={action}>
+      <label htmlFor="code" className="block text-[15px] font-extrabold text-ink">
+        Have a trainer code?
+      </label>
+      <p className="mt-0.5 text-[14px] font-semibold text-muted">If your program lead sent you one, it unlocks the trainer tools right away.</p>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
         <input
           id="code"
           name="code"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
           required
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}
-          placeholder="TRAIN-XXXX"
+          placeholder="TRAIN-XXXXXX"
           aria-invalid={!!error}
           aria-describedby={error ? "code-error" : undefined}
-          className={`${fieldClass} font-display text-[20px] uppercase tracking-[0.12em] placeholder:tracking-[0.12em]`}
+          className={`${fieldClass} !mt-0 font-display text-[18px] uppercase tracking-[0.1em] placeholder:tracking-[0.1em] sm:max-w-[260px]`}
         />
-        <div aria-live="polite" id="code-error">
-          <AnimatePresence>
-            {error ? (
-              <motion.p
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden pt-2.5 text-[14px] font-bold text-[#a4472a]"
-              >
-                {error}
-              </motion.p>
-            ) : null}
-          </AnimatePresence>
-        </div>
+        <button type="submit" disabled={pending} className={buttonClass("secondary", "lg")}>
+          {pending ? "Checking…" : "Use code"}
+        </button>
       </div>
-      <button type="submit" disabled={pending} className={buttonClass("primary", "lg", "w-full sm:w-fit")}>
-        {pending ? "Checking…" : "Unlock trainer tools"}
-      </button>
+      <div aria-live="polite" id="code-error">
+        <AnimatePresence>
+          {error ? (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden pt-2.5 text-[14px] font-bold text-[#a4472a]"
+            >
+              {error}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </form>
   );
 }

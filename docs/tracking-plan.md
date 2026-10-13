@@ -86,6 +86,8 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 |---|---|
 | `trainer_signed_in` | `is_new_user` |
 | `trainer_access_claimed` | — |
+| `trainer_access_requested` | `request_id`, `learner_count` (`1-10`, `11-30`, `31-100`, `100+`). Sent from "Become a trainer"; never the name, organization or note |
+| `trainer_access_approved` | `request_id`. Sent by the admin who approves it at `/trainer/admin` |
 | `cohort_created` | — |
 | `join_code_copied` | — |
 | `assignment_created` | `item_count`, `kinds` (array), `due_in_days` |
@@ -101,6 +103,6 @@ track). Set on sign-in / when they change (`pathway_id` also when a track is pic
 3. **Retention:** weekly retention on `practice_completed`.
 4. **Practice loop health:** `roleplay_ended.ended_early` rate, `debrief_viewed.latency_ms` p50/p90,
    `next_step_chosen` mix (dead ends = sessions ending at debrief).
-5. **Trainer activation:** `trainer_signed_in` → `cohort_created` → `assignment_created` →
+5. **Trainer activation:** `trainer_signed_in` → `trainer_access_requested` → `trainer_access_approved` (or `trainer_access_claimed`) → `cohort_created` → `assignment_created` →
    `review_saved`; time from `submission_created` to `review_saved`.
 6. **Content:** guide pageviews → `guide_drill_clicked` → `practice_completed` with `source = guide`.

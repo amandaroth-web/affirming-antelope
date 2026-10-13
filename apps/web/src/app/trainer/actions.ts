@@ -2,10 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getViewer, isUuid } from "@/lib/trainer/dal";
+import { getViewer, isUuid, signInPath } from "@/lib/trainer/dal";
+import { adminEmails } from "@/lib/trainer/admin";
+import {
+  NAME_MAX,
+  NOTE_MAX,
+  ORGANIZATION_MAX,
+  isLearnerCount,
+  looksLikeSignInCode,
+  normalizeTrainerCode,
+} from "@/lib/trainer/access";
+import { sendEmail } from "@/lib/email/send";
+import { newTrainerRequestEmail } from "@/lib/email/templates";
 import { RATINGS, validateItem, type ItemDraft, type ItemKind } from "@/lib/trainer/content";
-import { PATHWAYS, getDrill, getLesson, getScenario, type SkillId } from "@antelope/core";
+import { PATHWAYS, getDrill, getLesson, getScenario, type SkillId, type TrainerLearnerCount } from "@antelope/core";
 
 // Every action re-checks the session (Server Actions are public POST endpoints) and
 // relies on RLS for row access. Returns are shaped for the UI, never raw rows.
@@ -39,20 +51,79 @@ export async function signOut(): Promise<void> {
 export async function claimTrainer(_prev: ActionResult | null, form: FormData): Promise<ActionResult> {
   const ctx = await trainerClient();
   if (!ctx) return fail("Your session ended. Sign in again.");
-  const code = String(form.get("code") ?? "").trim().toUpperCase();
-  const name = String(form.get("displayName") ?? "").trim();
-  if (!code) return fail("Enter the trainer code you were given.");
-  if (name.length > 80) return fail("Keep your name under 80 characters.");
+  if (ctx.viewer.isAnonymous) redirect(signInPath("/trainer/become"));
+  const raw = String(form.get("code") ?? "").trim();
+  if (!raw) return fail("Enter the trainer code you were given.");
+  if (looksLikeSignInCode(raw)) return fail("That looks like your sign-in code. Trainer codes start with TRAIN-.");
+  const code = normalizeTrainerCode(raw);
 
   const { data, error } = await ctx.supabase.rpc("claim_trainer", { code });
-  if (error) return fail("We couldn't check that code. Try again in a moment.");
-  if (!data) return fail("That code didn't work. Check it with whoever sent it, or ask for a new one.");
+  if (error) return fail("We couldn't check that code just now. Try again in a moment.");
+  if (!data) return fail(`${code} didn't work. It may have expired or been used up. Check it with whoever sent it.`);
 
-  if (name && name !== ctx.viewer.displayName) {
-    await ctx.supabase.from("profiles").update({ display_name: name }).eq("id", ctx.viewer.id);
-  }
   revalidatePath("/trainer", "layout");
   redirect("/trainer?welcome=1");
+}
+
+export type RequestAccessResult = ActionResult<{ requestId: string; learnerCount: TrainerLearnerCount }>;
+
+/**
+ * "Request trainer access". The insert runs as the user, so RLS and the table's
+ * trigger enforce the rules (own row, permanent users, one pending, 7 days after a
+ * decline). The admins' email goes out after the response, and never fails this.
+ */
+export async function requestTrainerAccess(_prev: RequestAccessResult | null, form: FormData): Promise<RequestAccessResult> {
+  const ctx = await trainerClient();
+  if (!ctx || ctx.viewer.isAnonymous) redirect(signInPath("/trainer/become"));
+  if (ctx.viewer.canTrain) redirect("/trainer");
+
+  const name = String(form.get("name") ?? "").trim().replace(/\s+/g, " ");
+  const organization = String(form.get("organization") ?? "").trim().replace(/\s+/g, " ");
+  const learnerCount = String(form.get("learnerCount") ?? "");
+  const note = String(form.get("note") ?? "").trim();
+
+  if (!name) return fail("Add your name, as learners will see it.");
+  if (name.length > NAME_MAX) return fail(`Keep your name under ${NAME_MAX} characters.`);
+  if (!organization) return fail("Add the organization or team you train.");
+  if (organization.length > ORGANIZATION_MAX) return fail(`Keep the organization under ${ORGANIZATION_MAX} characters.`);
+  if (!isLearnerCount(learnerCount)) return fail("Pick about how many learners you'll train.");
+  if (note.length > NOTE_MAX) return fail(`Keep the note under ${NOTE_MAX} characters.`);
+
+  const { data, error } = await ctx.supabase
+    .from("trainer_access_requests")
+    .insert({ user_id: ctx.viewer.id, name, organization, learner_count: learnerCount, note: note || null })
+    .select("id")
+    .single();
+
+  if (error) {
+    // Already pending (a double submit, or another tab): show them the pending state.
+    if (error.code === "23505") {
+      revalidatePath("/trainer/become");
+      return fail("You already have a request waiting. We'll email you when it's reviewed.");
+    }
+    if (error.code === "PT429") return fail("You can send a new request a week after the last one was declined.");
+    if (error.code === "PT409") redirect("/trainer");
+    if (error.code === "42501") redirect(signInPath("/trainer/become"));
+    return fail("We couldn't send your request just now. Try again in a moment.");
+  }
+
+  // Learners see this name on their cohort, so keep the profile in step with the request.
+  if (name !== ctx.viewer.displayName) {
+    await ctx.supabase.from("profiles").update({ display_name: name }).eq("id", ctx.viewer.id);
+  }
+
+  const details = { name, email: ctx.viewer.email ?? "(no email)", organization, learnerCount, note: note || null };
+  after(async () => {
+    const to = [...adminEmails()];
+    if (!to.length) {
+      console.warn("[trainer-access] ADMIN_EMAILS is empty; nobody was told about the new request.");
+      return;
+    }
+    await sendEmail({ to, ...newTrainerRequestEmail(details) });
+  });
+
+  // No revalidatePath: the form tracks the request, then refreshes into the pending state.
+  return { ok: true, data: { requestId: data.id, learnerCount } };
 }
 
 // ---------------------------------------------------------------------------

@@ -247,13 +247,62 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"trainer_access_requests": {
+                  Row: {
+                    "created_at": string,"decided_at": string | null,"decided_by": string | null,"id": string,"learner_count": string,"name": string,"note": string | null,"organization": string,"status": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"learner_count": string,"name": string,"note"?: string | null,"organization": string,"status"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"decided_at"?: string | null,"decided_by"?: string | null,"id"?: string,"learner_count"?: string,"name"?: string,"note"?: string | null,"organization"?: string,"status"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "trainer_access_requests_decided_by_fkey"
+      columns: ["decided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "trainer_access_requests_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
             [_ in never]: never
           }
           Functions: {
-            "assignment_progress":
+            "admin_create_trainer_code":
+{ Args: { "label"?: string,"new_code": string,"use_limit"?: number,"valid_until"?: string }; Returns: {
+              "code": string,"created_at": string,"expires_at": string,"max_uses": number,"note": string,"uses": number
+            }[]
+                           },
+"admin_decide_trainer_request":
+{ Args: { "admin_id": string,"approve": boolean,"request_id": string }; Returns: Json
+                           },
+"admin_pending_trainer_requests":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "created_at": string,"email": string,"id": string,"learner_count": string,"name": string,"note": string,"organization": string,"user_id": string
+            }[]
+                           },
+"admin_trainer_codes":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "code": string,"created_at": string,"expires_at": string,"max_uses": number,"note": string,"uses": number
+            }[]
+                           },
+"admin_trainers":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "cohort_count": number,"display_name": string,"email": string,"joined_at": string,"trainer_since": string,"user_id": string
+            }[]
+                           },
+"assignment_progress":
 { Args: { "assignment_id": string }; Returns: {
               "display_name": string,"done": number,"item_id": string,"quantity": number,"user_id": string
             }[]

@@ -15,6 +15,8 @@ export interface Viewer {
   email: string | null;
   displayName: string;
   canTrain: boolean;
+  /** A guest (signInAnonymously). Guests can't become trainers; they sign in first. */
+  isAnonymous: boolean;
 }
 
 /** The signed-in user (verified JWT) plus their profile, or null. Memoized per request. */
@@ -33,6 +35,8 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     email: typeof data?.claims?.email === "string" ? data.claims.email : null,
     displayName: profile?.display_name ?? "Trainer",
     canTrain: !!profile?.can_train,
+    // Fails closed, like the database: a token without the claim counts as anonymous.
+    isAnonymous: data?.claims?.is_anonymous !== false,
   };
 });
 
@@ -40,9 +44,10 @@ export function signInPath(next?: string): string {
   return next && next !== "/trainer" ? `/trainer/sign-in?next=${encodeURIComponent(next)}` : "/trainer/sign-in";
 }
 
+/** Signed in with an email. Guests (anonymous users) are sent to sign in too. */
 export async function requireUser(next?: string): Promise<Viewer> {
   const viewer = await getViewer();
-  if (!viewer) redirect(signInPath(next));
+  if (!viewer || viewer.isAnonymous) redirect(signInPath(next));
   return viewer;
 }
 
@@ -52,6 +57,40 @@ export async function requireTrainer(next?: string): Promise<Viewer> {
   if (!viewer.canTrain) redirect("/trainer/become");
   return viewer;
 }
+
+export interface AccessRequest {
+  id: string;
+  name: string;
+  organization: string;
+  learnerCount: string;
+  status: "pending" | "approved" | "declined";
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+/** The viewer's latest trainer access request (RLS: own rows only), or null. */
+export const getMyAccessRequest = cache(async (): Promise<AccessRequest | null> => {
+  const viewer = await getViewer();
+  if (!viewer || viewer.isAnonymous) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("trainer_access_requests")
+    .select("id, name, organization, learner_count, status, created_at, decided_at")
+    .eq("user_id", viewer.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.id,
+    name: data.name,
+    organization: data.organization,
+    learnerCount: data.learner_count,
+    status: data.status as AccessRequest["status"],
+    createdAt: data.created_at,
+    decidedAt: data.decided_at,
+  };
+});
 
 export interface TrainerCohort {
   id: string;
